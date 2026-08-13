@@ -1,0 +1,637 @@
+{
+  "$defs": {
+    "AssertionDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locator"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 600,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "AssertionDefinition",
+      "type": "object"
+    },
+    "AutomationPackageRef": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Digest",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "version",
+        "digest"
+      ],
+      "title": "AutomationPackageRef",
+      "type": "object"
+    },
+    "CaseBaselineRef": {
+      "additionalProperties": false,
+      "properties": {
+        "baseline_id": {
+          "format": "uuid",
+          "title": "Baseline Id",
+          "type": "string"
+        },
+        "version": {
+          "pattern": "^case-v[0-9]+\\.[0-9]+\\.[0-9]+$",
+          "title": "Version",
+          "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "case_count": {
+          "minimum": 1,
+          "title": "Case Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "baseline_id",
+        "version",
+        "digest",
+        "case_count"
+      ],
+      "title": "CaseBaselineRef",
+      "type": "object"
+    },
+    "CaseDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "1.0",
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "case_id": {
+          "format": "uuid",
+          "title": "Case Id",
+          "type": "string"
+        },
+        "case_code": {
+          "pattern": "^TC-[A-Z0-9]+-[A-Z0-9-]+$",
+          "title": "Case Code",
+          "type": "string"
+        },
+        "module_key": {
+          "pattern": "^[a-z0-9][a-z0-9_-]*$",
+          "title": "Module Key",
+          "type": "string"
+        },
+        "module_name": {
+          "minLength": 1,
+          "title": "Module Name",
+          "type": "string"
+        },
+        "title": {
+          "minLength": 1,
+          "title": "Title",
+          "type": "string"
+        },
+        "test_point": {
+          "minLength": 1,
+          "title": "Test Point",
+          "type": "string"
+        },
+        "priority": {
+          "$ref": "#/$defs/CasePriority"
+        },
+        "preconditions": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Preconditions",
+          "type": "array"
+        },
+        "steps": {
+          "items": {
+            "$ref": "#/$defs/StepDefinition"
+          },
+          "minItems": 1,
+          "title": "Steps",
+          "type": "array"
+        },
+        "assertion": {
+          "$ref": "#/$defs/AssertionDefinition"
+        },
+        "tags": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "enabled": {
+          "default": true,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "source_instructions": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Instructions"
+        },
+        "data_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Data Type"
+        },
+        "expected_result": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected Result"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 600,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        },
+        "source_trace": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CaseSourceTrace"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        }
+      },
+      "required": [
+        "case_id",
+        "case_code",
+        "module_key",
+        "module_name",
+        "title",
+        "test_point",
+        "priority",
+        "steps",
+        "assertion"
+      ],
+      "title": "CaseDefinition",
+      "type": "object"
+    },
+    "CasePriority": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "title": "CasePriority",
+      "type": "string"
+    },
+    "CaseSourceTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "legacy_excel",
+          "default": "legacy_excel",
+          "title": "Kind",
+          "type": "string"
+        },
+        "worksheet": {
+          "minLength": 1,
+          "title": "Worksheet",
+          "type": "string"
+        },
+        "row_number": {
+          "minimum": 2,
+          "title": "Row Number",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "worksheet",
+        "row_number"
+      ],
+      "title": "CaseSourceTrace",
+      "type": "object"
+    },
+    "RuntimeVariable": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "value": {
+          "title": "Value",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "value"
+      ],
+      "title": "RuntimeVariable",
+      "type": "object"
+    },
+    "SecretBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "pattern": "^[A-Z][A-Z0-9_]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "ref": {
+          "pattern": "^secret://[A-Za-z0-9._/-]+$",
+          "title": "Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "ref"
+      ],
+      "title": "SecretBinding",
+      "type": "object"
+    },
+    "StepDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "minLength": 1,
+          "title": "Operation",
+          "type": "string"
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locator"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 600,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "StepDefinition",
+      "type": "object"
+    },
+    "TargetType": {
+      "enum": [
+        "WEB",
+        "APP",
+        "API"
+      ],
+      "title": "TargetType",
+      "type": "string"
+    },
+    "WebRunConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "base_url": {
+          "pattern": "^https?://[^\\s]+$",
+          "title": "Base Url",
+          "type": "string"
+        },
+        "headless": {
+          "default": true,
+          "title": "Headless",
+          "type": "boolean"
+        },
+        "viewport_width": {
+          "default": 1440,
+          "maximum": 7680,
+          "minimum": 320,
+          "title": "Viewport Width",
+          "type": "integer"
+        },
+        "viewport_height": {
+          "default": 900,
+          "maximum": 4320,
+          "minimum": 240,
+          "title": "Viewport Height",
+          "type": "integer"
+        },
+        "action_timeout_seconds": {
+          "default": 15,
+          "exclusiveMinimum": 0,
+          "maximum": 120,
+          "title": "Action Timeout Seconds",
+          "type": "number"
+        },
+        "navigation_timeout_seconds": {
+          "default": 30,
+          "exclusiveMinimum": 0,
+          "maximum": 300,
+          "title": "Navigation Timeout Seconds",
+          "type": "number"
+        },
+        "ignore_https_errors": {
+          "default": false,
+          "title": "Ignore Https Errors",
+          "type": "boolean"
+        },
+        "capture_trace": {
+          "default": true,
+          "title": "Capture Trace",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "base_url"
+      ],
+      "title": "WebRunConfig",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "run_id": {
+      "format": "uuid",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "project_id": {
+      "format": "uuid",
+      "title": "Project Id",
+      "type": "string"
+    },
+    "target_id": {
+      "format": "uuid",
+      "title": "Target Id",
+      "type": "string"
+    },
+    "target_type": {
+      "$ref": "#/$defs/TargetType"
+    },
+    "environment_id": {
+      "format": "uuid",
+      "title": "Environment Id",
+      "type": "string"
+    },
+    "case_baseline": {
+      "$ref": "#/$defs/CaseBaselineRef"
+    },
+    "automation_package": {
+      "$ref": "#/$defs/AutomationPackageRef"
+    },
+    "cases": {
+      "items": {
+        "$ref": "#/$defs/CaseDefinition"
+      },
+      "minItems": 1,
+      "title": "Cases",
+      "type": "array"
+    },
+    "browser": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Browser"
+    },
+    "web_config": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WebRunConfig"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "config_hash": {
+      "pattern": "^sha256:[0-9a-fA-F]{64}$",
+      "title": "Config Hash",
+      "type": "string"
+    },
+    "variables": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/RuntimeVariable"
+      },
+      "title": "Variables",
+      "type": "array"
+    },
+    "secret_bindings": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SecretBinding"
+      },
+      "title": "Secret Bindings",
+      "type": "array"
+    },
+    "created_by": {
+      "format": "uuid",
+      "title": "Created By",
+      "type": "string"
+    },
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "run_id",
+    "project_id",
+    "target_id",
+    "target_type",
+    "environment_id",
+    "case_baseline",
+    "automation_package",
+    "cases",
+    "config_hash",
+    "created_by",
+    "created_at"
+  ],
+  "title": "RunSnapshot",
+  "type": "object"
+}

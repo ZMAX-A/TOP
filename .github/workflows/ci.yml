@@ -1,0 +1,170 @@
+name: TestOps CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "20 18 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: testops-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  PYTHON_VERSION: "3.12"
+  NODE_VERSION: "22"
+
+jobs:
+  python-quality:
+    name: Python quality and contracts
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - name: Install Python dependencies
+        run: python -m pip install -e ".[dev,platform,runner]"
+      - name: Lint and format
+        run: |
+          python -m ruff check .
+          python -m ruff format --check .
+      - name: Test
+        run: python -m pytest
+      - name: Verify schemas and immutable artifacts
+        run: |
+          python scripts/export_schemas.py --check
+          python scripts/verify_artifacts.py
+      - name: Verify the migration graph and offline SQL
+        run: |
+          python -c "from alembic.config import Config; from alembic.script import ScriptDirectory; heads=ScriptDirectory.from_config(Config('alembic.ini')).get_heads(); assert len(heads) == 1, heads"
+          python -m alembic upgrade head --sql > "${RUNNER_TEMP}/testops-migration.sql"
+          test -s "${RUNNER_TEMP}/testops-migration.sql"
+
+  frontend:
+    name: Frontend typecheck and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: apps/frontend
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: apps/frontend/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+
+  postgres-migration:
+    name: PostgreSQL migration round trip
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: testops
+          POSTGRES_USER: testops
+          POSTGRES_PASSWORD: migration-test-password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U testops -d testops"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgresql+asyncpg://testops:migration-test-password@127.0.0.1:5432/testops
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[platform]"
+      - name: Upgrade, rollback, and upgrade again
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+          python -m alembic downgrade base
+          python -m alembic upgrade head
+          python -m alembic current
+
+  compose-smoke:
+    name: Full Compose smoke
+    needs: [python-quality, frontend, postgres-migration]
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      TESTOPS_IMAGE_TAG: ci-${{ github.run_id }}
+      POSTGRES_PASSWORD: compose-ci-password
+      MINIO_ROOT_PASSWORD: compose-ci-minio-password
+      MINIO_SECRET_KEY: compose-ci-minio-password
+      RUNNER_CALLBACK_TOKEN: compose-ci-runner-token
+      BOOTSTRAP_ADMIN_TOKEN: compose-ci-bootstrap-token
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: pip
+          cache-dependency-path: pyproject.toml
+      - run: python -m pip install -e ".[platform]"
+      - name: Build and start the full stack
+        run: docker compose --profile smoke up --detach --build
+      - name: Run deterministic smoke
+        if: github.event_name != 'schedule'
+        run: python scripts/smoke_compose.py
+      - name: Run scheduled recovery smoke
+        if: github.event_name == 'schedule'
+        run: python scripts/smoke_compose.py --exercise-recovery
+      - name: Capture Compose logs
+        if: always()
+        run: docker compose --profile smoke logs --no-color > "${RUNNER_TEMP}/compose.log"
+      - name: Upload Compose logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: compose-logs-${{ github.run_id }}
+          path: ${{ runner.temp }}/compose.log
+          if-no-files-found: warn
+          retention-days: 14
+      - name: Stop the ephemeral stack
+        if: always()
+        run: docker compose --profile smoke down --volumes --remove-orphans
+
+  observability-config:
+    name: Prometheus configuration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Validate Prometheus config and rules
+        run: >-
+          docker run --rm
+          --entrypoint /bin/promtool
+          --volume "${PWD}/infra/observability:/etc/prometheus:ro"
+          prom/prometheus:v3.13.1
+          check config /etc/prometheus/prometheus.yml

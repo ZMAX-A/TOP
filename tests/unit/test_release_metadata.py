@@ -1,0 +1,50 @@
+from __future__ import annotations
+
+import json
+import re
+import tomllib
+from pathlib import Path
+
+from alembic.config import Config
+from alembic.script import ScriptDirectory
+from scripts.smoke_compose import PACKAGE_VERSION
+
+from testops.api.main import API_VERSION
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def test_release_version_is_coherent_across_runtime_and_packaging() -> None:
+    project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    frontend = json.loads((ROOT / "apps/frontend/package.json").read_text(encoding="utf-8"))
+    frontend_lock = json.loads(
+        (ROOT / "apps/frontend/package-lock.json").read_text(encoding="utf-8")
+    )
+    environment = (ROOT / ".env.example").read_text(encoding="utf-8")
+    compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+
+    version = project["project"]["version"]
+    assert version == API_VERSION == PACKAGE_VERSION
+    assert frontend["version"] == version
+    assert frontend_lock["version"] == version
+    assert frontend_lock["packages"][""]["version"] == version
+    assert f"TESTOPS_IMAGE_TAG={version}" in environment
+    assert set(re.findall(r"TESTOPS_IMAGE_TAG:-([0-9]+\.[0-9]+\.[0-9]+)", compose)) == {version}
+
+
+def test_release_has_one_migration_head_and_required_operations_evidence() -> None:
+    config = Config(str(ROOT / "alembic.ini"))
+    config.set_main_option("script_location", str(ROOT / "infra/alembic"))
+    assert ScriptDirectory.from_config(config).get_heads() == ["20260813_0006"]
+
+    required = (
+        ROOT / ".github/workflows/ci.yml",
+        ROOT / "infra/observability/prometheus.yml",
+        ROOT / "infra/observability/alerts.yml",
+        ROOT / "docs/operations/production-runbook.md",
+        ROOT / "docs/operations/release-checklist.md",
+        ROOT / "docs/milestones/M6-release-hardening.md",
+        ROOT / "docs/milestones/M7.1-execution-quotas.md",
+        ROOT / "docs/milestones/M7.2-runner-pools.md",
+    )
+    assert all(path.is_file() and path.stat().st_size > 0 for path in required)

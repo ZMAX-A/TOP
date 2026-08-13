@@ -1,0 +1,349 @@
+{
+  "changes": [
+    {
+      "case_code": "TC-HOME-001",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 9,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-HOME-003",
+      "digit_count": 11,
+      "field": "input_data",
+      "from_type": "int",
+      "row": 11,
+      "rule": "numeric_cell_to_decimal_string",
+      "to_type": "string"
+    },
+    {
+      "case_code": "TC-HOME-003",
+      "field": "priority",
+      "from": "p1",
+      "row": 11,
+      "rule": "priority_alias",
+      "to": "P1"
+    },
+    {
+      "case_code": "TC-HOME-006",
+      "digit_count": 3,
+      "field": "input_data",
+      "from_type": "int",
+      "row": 14,
+      "rule": "numeric_cell_to_decimal_string",
+      "to_type": "string"
+    },
+    {
+      "case_code": "TC-HOME-007",
+      "digit_count": 11,
+      "field": "input_data",
+      "from_type": "int",
+      "row": 15,
+      "rule": "numeric_cell_to_decimal_string",
+      "to_type": "string"
+    },
+    {
+      "case_code": "TC-HOME-010",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 18,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-HOME-011",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 19,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-CUSTOMER-008",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 28,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-CUSTOMER-009",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 29,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-CUSTOMER-021",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 41,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-CUSTOMER-022",
+      "field": "priority",
+      "from": "中",
+      "row": 42,
+      "rule": "priority_alias",
+      "to": "P2"
+    },
+    {
+      "case_code": "TC-DETAIL-002",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 44,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-006",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 48,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-008",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 50,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-009",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 51,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-010",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 52,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-020",
+      "field": "assertion.locator",
+      "from": "元素定位器尾项",
+      "row": 62,
+      "rule": "promote_trailing_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-023",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 65,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-024",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 66,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-035",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 77,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-DETAIL-036",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 78,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-PROFILE-001",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 90,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-PROFILE-002",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 91,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-PROFILE-003",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 92,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    },
+    {
+      "case_code": "TC-PROFILE-004",
+      "field": "assertion.locator",
+      "from": "旧执行器隐式末项",
+      "row": 93,
+      "rule": "materialize_legacy_last_locator",
+      "to": "assertion.locator"
+    }
+  ],
+  "counts": {
+    "baseline_cases": 92,
+    "changes": 25,
+    "disabled_cases": 3,
+    "enabled_cases": 89,
+    "errors": 0,
+    "source_cases": 92,
+    "warnings": 8
+  },
+  "distribution": {
+    "assertions": {
+      "age_in_range": 3,
+      "element_disabled": 2,
+      "element_visible": 5,
+      "text_contains": 10,
+      "text_hidden": 2,
+      "text_not_empty": 3,
+      "text_optional": 1,
+      "text_visible": 49,
+      "url_contains": 14,
+      "value_equals": 3
+    },
+    "modules": {
+      "个人中心": 4,
+      "影像阅览": 5,
+      "案例库": 5,
+      "账号登录": 7,
+      "顾客列表": 22,
+      "顾客详情": 37,
+      "首页": 1,
+      "首页搜索": 6,
+      "首页跳转": 5
+    },
+    "operations": {
+      "click": 274,
+      "daterange": 3,
+      "find_click": 20,
+      "input": 59,
+      "input_enter": 1,
+      "nav": 34,
+      "retry_report": 1,
+      "select": 3,
+      "switch_tab": 1,
+      "verify": 85,
+      "wait": 155
+    },
+    "priorities": {
+      "P0": 16,
+      "P1": 67,
+      "P2": 8,
+      "P3": 1
+    }
+  },
+  "errors": [],
+  "migration": "legacy-excel-to-case-baseline",
+  "policies": {
+    "assertion_locator": "explicit column, otherwise legacy last nonblank locator",
+    "baseline_id": "UUIDv5(namespace, project_key + baseline version)",
+    "case_id": "UUIDv5(namespace, project_key + case_code); stable across baselines",
+    "immutability": "existing artifacts may only be reused byte-for-byte",
+    "input_slots": "legacy pipe order; trim nonblank slots; preserve whitespace-only slots"
+  },
+  "schema_version": "1.0",
+  "source": {
+    "file_digest": "sha256:04e9944f23e7e7d31537a7c17c9818d7b0ce640b7941aca48c67c09b3ab7c622",
+    "file_name": "test_case.xlsx",
+    "ignored_columns": [
+      "实际结果"
+    ],
+    "worksheet": "自动化测试用例"
+  },
+  "target": {
+    "baseline_id": "e9616299-f3e2-51a2-bb3c-4ea853ad51be",
+    "project_key": "yanjia-ai-web",
+    "version": "case-v1.0.0"
+  },
+  "warnings": [
+    {
+      "case_code": "TC-CUSTOMER-009",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:4e79758a990062236c2ff22c15eab6e2e3190610ea6c0f2267637515a2a41ec8",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 29,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-010",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:0ab4610b9257c2985566c82d624c1adf36c03b9949398a544728b4021bdf779d",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 30,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-011",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:d97ca182a0549c16556f264ca5f133303816ca3775b04161a01455984d8f2cd4",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 31,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-012",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:3eee72d9e917d84348cc4d2b106f719ae1c9e716b45736e1a1a246edf18eda7f",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 32,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-013",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:e3485f7a17c8de7b2471b6fee752f869a9837b06159d46cfe5f596e9db1c70cd",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 33,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-014",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:bd5f6acd44356d836a0b1b0a2265dc58ca63d7f9da4fd2563a9ce78c2bc5a785",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 34,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-015",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:b20e3b073e8403d35c29fadeef971ab3c1f9a65a5860a6f19b3c3bc23c38a583",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 35,
+      "segment_count": 1
+    },
+    {
+      "case_code": "TC-CUSTOMER-016",
+      "code": "unused_input_segments",
+      "content_digest": "sha256:939cace5fcea88c29888401990a360bc9cad8eb2918fc95f607ddcc098d5a40a",
+      "message": "旧执行器不会消费这些输入槽；未写入可执行步骤",
+      "row": 36,
+      "segment_count": 1
+    }
+  ]
+}

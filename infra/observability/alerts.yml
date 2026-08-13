@@ -1,0 +1,46 @@
+groups:
+  - name: testops-control-plane
+    rules:
+      - alert: TestOpsApiUnavailable
+        expr: up{job="testops-api"} == 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: TestOps API cannot be scraped
+          description: The control-plane metrics endpoint has been unavailable for two minutes.
+
+      - alert: TestOpsDatabaseNotReady
+        expr: testops_database_ready{job="testops-api"} == 0
+        for: 3m
+        labels:
+          severity: critical
+        annotations:
+          summary: TestOps database readiness is failing
+          description: The latest control-plane database readiness probe has failed for three minutes.
+
+      - alert: TestOpsApiHighErrorRate
+        expr: |
+          sum(rate(testops_http_requests_total{job="testops-api",status=~"5.."}[5m]))
+          /
+          clamp_min(sum(rate(testops_http_requests_total{job="testops-api"}[5m])), 0.001)
+          > 0.05
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps API has a high server-error rate
+          description: More than five percent of API requests have returned 5xx for ten minutes.
+
+      - alert: TestOpsApiHighLatency
+        expr: |
+          histogram_quantile(
+            0.95,
+            sum by (le) (rate(testops_http_request_duration_seconds_bucket{job="testops-api"}[5m]))
+          ) > 2
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps API p95 latency is high
+          description: The five-minute p95 request latency has exceeded two seconds for ten minutes.

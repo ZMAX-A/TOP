@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.venv
+**/__pycache__
+**/*.pyc
+**/.pytest_cache
+**/.ruff_cache
+apps/frontend/node_modules
+apps/frontend/dist
+artifacts
+backups
+reports
+screenshots
+.auth_state.json

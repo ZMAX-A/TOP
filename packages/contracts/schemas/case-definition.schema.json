@@ -1,0 +1,351 @@
+{
+  "$defs": {
+    "AssertionDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "minLength": 1,
+          "title": "Type",
+          "type": "string"
+        },
+        "expected": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Expected"
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locator"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 600,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "title": "AssertionDefinition",
+      "type": "object"
+    },
+    "CasePriority": {
+      "enum": [
+        "P0",
+        "P1",
+        "P2",
+        "P3"
+      ],
+      "title": "CasePriority",
+      "type": "string"
+    },
+    "CaseSourceTrace": {
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "const": "legacy_excel",
+          "default": "legacy_excel",
+          "title": "Kind",
+          "type": "string"
+        },
+        "worksheet": {
+          "minLength": 1,
+          "title": "Worksheet",
+          "type": "string"
+        },
+        "row_number": {
+          "minimum": 2,
+          "title": "Row Number",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "worksheet",
+        "row_number"
+      ],
+      "title": "CaseSourceTrace",
+      "type": "object"
+    },
+    "StepDefinition": {
+      "additionalProperties": false,
+      "properties": {
+        "operation": {
+          "minLength": 1,
+          "title": "Operation",
+          "type": "string"
+        },
+        "locator": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Locator"
+        },
+        "input": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Input"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "maximum": 600,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        }
+      },
+      "required": [
+        "operation"
+      ],
+      "title": "StepDefinition",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "const": "1.0",
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "case_id": {
+      "format": "uuid",
+      "title": "Case Id",
+      "type": "string"
+    },
+    "case_code": {
+      "pattern": "^TC-[A-Z0-9]+-[A-Z0-9-]+$",
+      "title": "Case Code",
+      "type": "string"
+    },
+    "module_key": {
+      "pattern": "^[a-z0-9][a-z0-9_-]*$",
+      "title": "Module Key",
+      "type": "string"
+    },
+    "module_name": {
+      "minLength": 1,
+      "title": "Module Name",
+      "type": "string"
+    },
+    "title": {
+      "minLength": 1,
+      "title": "Title",
+      "type": "string"
+    },
+    "test_point": {
+      "minLength": 1,
+      "title": "Test Point",
+      "type": "string"
+    },
+    "priority": {
+      "$ref": "#/$defs/CasePriority"
+    },
+    "preconditions": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Preconditions",
+      "type": "array"
+    },
+    "steps": {
+      "items": {
+        "$ref": "#/$defs/StepDefinition"
+      },
+      "minItems": 1,
+      "title": "Steps",
+      "type": "array"
+    },
+    "assertion": {
+      "$ref": "#/$defs/AssertionDefinition"
+    },
+    "tags": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Tags",
+      "type": "array"
+    },
+    "enabled": {
+      "default": true,
+      "title": "Enabled",
+      "type": "boolean"
+    },
+    "source_instructions": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Instructions"
+    },
+    "data_type": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Data Type"
+    },
+    "expected_result": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expected Result"
+    },
+    "timeout_seconds": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "maximum": 600,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Timeout Seconds"
+    },
+    "source_trace": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/CaseSourceTrace"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    }
+  },
+  "required": [
+    "case_id",
+    "case_code",
+    "module_key",
+    "module_name",
+    "title",
+    "test_point",
+    "priority",
+    "steps",
+    "assertion"
+  ],
+  "title": "CaseDefinition",
+  "type": "object"
+}

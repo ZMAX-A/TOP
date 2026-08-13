@@ -1,0 +1,47 @@
+{
+  "changes": [
+    {
+      "case_code": "TC-LOGIN-007",
+      "field": "assertion",
+      "from": {
+        "expected": "URL包含'/'",
+        "locator": "button[type='submit']",
+        "type": "url_contains"
+      },
+      "rule": "harden-successful-login-url-assertion",
+      "to": {
+        "expected": "URL不包含'/login'",
+        "locator": "button[type='submit']",
+        "type": "url_not_contains"
+      }
+    }
+  ],
+  "counts": {
+    "baseline_cases": 92,
+    "changes": 1,
+    "disabled_cases": 3,
+    "enabled_cases": 89,
+    "errors": 0,
+    "source_cases": 92,
+    "warnings": 0
+  },
+  "errors": [],
+  "migration": "derived-case-baseline",
+  "policies": {
+    "case_ids": "preserved from parent baseline",
+    "change_set": "harden-successful-login-url-assertion",
+    "parent_immutability": "parent files are read only"
+  },
+  "schema_version": "1.0",
+  "source": {
+    "baseline_id": "e9616299-f3e2-51a2-bb3c-4ea853ad51be",
+    "digest": "sha256:ab4f0a5265878c33c1f03f5f491453e5dfd5c2a84acf551d9936ac632026fef0",
+    "version": "case-v1.0.0"
+  },
+  "target": {
+    "baseline_id": "8865cdb1-fc2d-5272-82bb-9d67faa89c57",
+    "project_key": "yanjia-ai-web",
+    "version": "case-v1.0.1"
+  },
+  "warnings": []
+}

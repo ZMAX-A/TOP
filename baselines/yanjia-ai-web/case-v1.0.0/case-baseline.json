@@ -1,0 +1,5766 @@
+{
+  "baseline_id": "e9616299-f3e2-51a2-bb3c-4ea853ad51be",
+  "cases": [
+    {
+      "assertion": {
+        "expected": "页面显示'登录失败'",
+        "locator": "button[type=\"submit\"]",
+        "type": "text_contains"
+      },
+      "case_code": "TC-LOGIN-001",
+      "case_id": "8f84dd35-eaf3-5fcc-81f0-69f1569f8afa",
+      "data_type": "提示：该账号不存在，请重新登录！",
+      "enabled": true,
+      "expected_result": "提示：登录失败，请重试！",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "错误账号测试",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.在账号输入框输入错误账号\n2.点击登录按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 2,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "test123",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "${TEST_PASSWORD}",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "#store",
+          "operation": "click"
+        },
+        {
+          "locator": "button[type=\"submit\"]",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证错误账号登录提示",
+      "timeout_seconds": 5.0,
+      "title": "登录失败-错误账号"
+    },
+    {
+      "assertion": {
+        "expected": "页面显示'登录失败'",
+        "locator": "button[type='submit']",
+        "type": "text_contains"
+      },
+      "case_code": "TC-LOGIN-002",
+      "case_id": "15802a4a-4301-5c4c-8438-c878bdbc77d6",
+      "data_type": "提示：登录失败，请重试！",
+      "enabled": true,
+      "expected_result": "提示：登录失败，请重试！",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "错误密码测试",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入正确账号\n2.输入错误密码\n3.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 3,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "76371@01",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "wrong123",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "#store",
+          "operation": "click"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证错误密码登录提示",
+      "timeout_seconds": 5.0,
+      "title": "登录失败-错误密码"
+    },
+    {
+      "assertion": {
+        "expected": "账号输入框下方显示红色提示'请输入账号'",
+        "locator": "button[type='submit']",
+        "type": "text_visible"
+      },
+      "case_code": "TC-LOGIN-003",
+      "case_id": "f66e6b02-dcb7-5746-923c-7d618aa2b64f",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "红色提示：请输入账号、请输入密码、请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "必填校验",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.不输入账号和密码\n2.点击登录按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 4,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证必填校验",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-账号密码为空"
+    },
+    {
+      "assertion": {
+        "expected": "密码输入框下方显示红色提示'请输入密码'",
+        "locator": "button[type='submit']",
+        "type": "text_visible"
+      },
+      "case_code": "TC-LOGIN-004",
+      "case_id": "88a5bdba-31c3-5243-bc77-ed2296e4ef78",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "红色提示：请输入密码、请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入账号\n2.不输入密码\n3.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 5,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "test_user",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证密码必填",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-密码为空"
+    },
+    {
+      "assertion": {
+        "expected": "门店选择器下方显示红色提示'请选择门店'",
+        "locator": "button[type='submit']",
+        "type": "text_visible"
+      },
+      "case_code": "TC-LOGIN-005",
+      "case_id": "338aa3a6-eaec-5613-ba80-f2ffe458629b",
+      "data_type": "string|string",
+      "enabled": true,
+      "expected_result": "红色提示：请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入账号\n2.输入密码\n3.不选择门店\n4.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 6,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "23595.sg@01",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "correct_pwd",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证门店必选",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-未选择门店"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/user-agreemen'",
+        "locator": "text=《用户协议》",
+        "type": "url_contains"
+      },
+      "case_code": "TC-LOGIN-006",
+      "case_id": "aee5c834-7a27-5f3c-a71c-26e2c5dadb48",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "跳转进入用户协议界面",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.不输入账号和密码\n2.直接点击页面最下方'《用户协议》'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 7,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=《用户协议》",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "查看用户协议",
+      "timeout_seconds": 3.0,
+      "title": "查看用户协议"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/'",
+        "locator": "button[type='submit']",
+        "type": "url_contains"
+      },
+      "case_code": "TC-LOGIN-007",
+      "case_id": "a64936a6-869d-5ce8-80c0-3b13d07c0b87",
+      "data_type": "登录成功，跳转到首页",
+      "enabled": true,
+      "expected_result": "登录成功，跳转到首页",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "正常登录流程",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入正确账号\n2.输入正确密码\n3.选择门店\n4.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 8,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "${TEST_USERNAME}",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "${TEST_PASSWORD}",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "#store",
+          "operation": "click"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证正常登录流程",
+      "timeout_seconds": 10.0,
+      "title": "登录成功"
+    },
+    {
+      "assertion": {
+        "expected": "页面包含'顾客档案'、'案例库'、'设置'",
+        "locator": "text=顾客档案",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-001",
+      "case_id": "b0b74d6a-8344-5603-8936-163cbd4faede",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "展示：顾客档案、美际学院、案例管理、设置",
+      "module_key": "home",
+      "module_name": "首页",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "查看首页模块展示",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 9,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=顾客档案",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home"
+      ],
+      "test_point": "验证首页模块正确展示",
+      "timeout_seconds": 5.0,
+      "title": "首页模块展示"
+    },
+    {
+      "assertion": {
+        "expected": "页面显示'暂无'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-002",
+      "case_id": "83564c69-c010-582f-88d3-5cbc43f10b97",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "展示：暂无内容",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 10,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "不存在的用户xyz123",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 5.0,
+      "title": "搜索-不存在的用户"
+    },
+    {
+      "assertion": {
+        "expected": "页面显示'暂无'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-003",
+      "case_id": "bbceb28e-36d5-5532-bf0b-a94e3c1fcb4b",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "展示：暂无内容",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 11,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "13626710399",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 5.0,
+      "title": "搜索-不存在的手机号"
+    },
+    {
+      "assertion": {
+        "expected": "搜索结果列表包含用户名含't'的记录",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-004",
+      "case_id": "d0e37bea-40fa-5439-93ea-b2a489076b4d",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "可搜索到对应顾客：tw",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入存在的用户姓名部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 12,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "t",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-姓名部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "搜索结果包含用户名为'余婷'的记录",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-005",
+      "case_id": "19d6c099-3228-5f49-b001-d23be8a22539",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "可搜索到对应顾客：余婷",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入完整的用户姓名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 13,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "余婷",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-姓名精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "搜索结果列表包含用户名含'186'的记录",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-006",
+      "case_id": "562d75f6-aacd-5330-ad58-2a2487acd7ce",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "可搜索到对应手机号：含186",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入存在的手机号部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 14,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "186",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-手机号部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "搜索结果列表包含用户名含'13760228924'的记录",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-007",
+      "case_id": "3064d569-8464-5a6e-ac0c-7593c73dd396",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "可搜索到对应手机号：13760228924",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P3",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入完整的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 15,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "13760228924",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-手机号精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/customer'或'/archive'",
+        "locator": "text=已为",
+        "type": "url_contains"
+      },
+      "case_code": "TC-HOME-008",
+      "case_id": "131cc0a1-ab1a-5d00-9e75-e5257044e957",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "跳转到顾客档案列表页",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击顾客档案菜单",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 16,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-navigation"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转顾客档案"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/customer'或'/archive'",
+        "locator": "text=搜 索",
+        "type": "url_contains"
+      },
+      "case_code": "TC-HOME-009",
+      "case_id": "31f8f495-0831-5a68-8aa1-ec82cbeb746b",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "搜索结果",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 17,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=搜 索",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-navigation"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转顾客档案"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/case'或'/example'",
+        "locator": ".menu-item:has-text('案例管理')",
+        "type": "url_contains"
+      },
+      "case_code": "TC-HOME-010",
+      "case_id": "3b090453-a09b-5b20-8db5-cc060eab0f4d",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "跳转到案例管理页面",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击案例管理菜单",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 18,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=案例库",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-navigation"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转案例管理"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/setting'或'/config'",
+        "locator": ".menu-item:has-text('设置')",
+        "type": "url_contains"
+      },
+      "case_code": "TC-HOME-011",
+      "case_id": "7bdb007a-09fa-5905-aa6f-769746bafa7d",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "跳转到设置页面",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击设置菜单",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 19,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=设置",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-navigation"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转设置页"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'https://appd9mxpdu08531.h5.xet.pomoho.com/'",
+        "locator": "5",
+        "type": "url_contains"
+      },
+      "case_code": "TC-HOME-012",
+      "case_id": "a936b5ae-8287-5adc-bef1-47bda1f6c021",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "跳转到美际学院页面",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击美际学院",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 20,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=美际学院",
+          "operation": "click"
+        },
+        {
+          "operation": "switch_tab"
+        },
+        {
+          "locator": "5",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-navigation"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 15.0,
+      "title": "跳转美际学院"
+    },
+    {
+      "assertion": {
+        "expected": "'暂无'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-001",
+      "case_id": "50827dd0-997c-5c06-83e6-58cbf4ffc6ea",
+      "enabled": true,
+      "expected_result": "展示：暂无内容",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 21,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "不存在的用户xyz123",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 10.0,
+      "title": "搜索-不存在的用户"
+    },
+    {
+      "assertion": {
+        "expected": "'t'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-002",
+      "case_id": "67c7b511-fab3-5723-ba67-aa86a25c0e64",
+      "enabled": true,
+      "expected_result": "可搜索到对应顾客：tw",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的用户名部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 22,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "t",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-姓名部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "'余婷'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-003",
+      "case_id": "012bd000-e498-58ac-9dbd-f45f4d66b16b",
+      "enabled": true,
+      "expected_result": "可搜索到对应顾客：余婷",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 23,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "余婷",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-姓名精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "'暂无'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-004",
+      "case_id": "284f1ecf-d998-567f-80eb-fe4aee8fc724",
+      "enabled": true,
+      "expected_result": "展示：暂无内容",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 24,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "13626710399",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 10.0,
+      "title": "搜索-不存在的手机号"
+    },
+    {
+      "assertion": {
+        "expected": "'186'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-005",
+      "case_id": "cf60faef-6c02-534b-a8ed-493144398c2c",
+      "enabled": true,
+      "expected_result": "可搜索到对应手机号：含186",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的手机号部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 25,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "186",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-手机号部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "'13760228924'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-006",
+      "case_id": "34fdc20a-42fa-5b94-9557-a78145f7cdb2",
+      "enabled": true,
+      "expected_result": "可搜索到对应手机号：13760228924",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 26,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "13760228924",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-手机号精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "'暂无'",
+        "locator": ".ant-picker-cell[title='2015-02-13']",
+        "type": "text_contains"
+      },
+      "case_code": "TC-CUSTOMER-007",
+      "case_id": "54183ecc-a37b-521f-b00a-e099c1177d19",
+      "data_type": "daterange",
+      "enabled": true,
+      "expected_result": "筛选结果展示为空",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.选择时间范围筛选\n2.选择不存在数据的时间范围",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 27,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='开始日期']",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-picker-cell[title='2015-02-04']",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-picker-cell[title='2015-02-13']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证时间筛选空结果",
+      "timeout_seconds": 5.0,
+      "title": "时间筛选-无结果"
+    },
+    {
+      "assertion": {
+        "expected": "/customer",
+        "locator": "a:has-text('详情')",
+        "type": "url_contains"
+      },
+      "case_code": "TC-CUSTOMER-008",
+      "case_id": "a111e15d-b556-58dd-afaf-d20c7dbd8885",
+      "data_type": "daterange",
+      "enabled": true,
+      "expected_result": "展示符合时间范围的顾客档案",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.选择存在数据的时间范围",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 28,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "input": "2026/01/01-2026/6/28",
+          "locator": ".ant-picker-range input",
+          "operation": "daterange"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证时间筛选功能",
+      "timeout_seconds": 5.0,
+      "title": "时间筛选-有结果"
+    },
+    {
+      "assertion": {
+        "expected": "筛选结果展示性别为男的顾客",
+        "locator": ".anticon-man",
+        "type": "element_visible"
+      },
+      "case_code": "TC-CUSTOMER-009",
+      "case_id": "3d61d434-39d0-52bc-a740-7613cae249cc",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "筛选结果展示性别为男的顾客",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n2.选择'男'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 29,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=男",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证性别筛选",
+      "timeout_seconds": 5.0,
+      "title": "性别筛选-男"
+    },
+    {
+      "assertion": {
+        "expected": "'女'",
+        "locator": "a:has-text('详情')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-010",
+      "case_id": "f6df1ba4-6d75-5192-9a0d-f61b97c583ce",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "筛选结果展示性别为女的顾客",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n3.选择'女'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 30,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=女",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证性别筛选",
+      "timeout_seconds": 10.0,
+      "title": "性别筛选-女"
+    },
+    {
+      "assertion": {
+        "expected": "'保密'",
+        "locator": "a:has-text('详情')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-011",
+      "case_id": "d791f8da-cac5-5c7a-b141-acdb160d1511",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "筛选结果展示性别为保密的顾客",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n4.选择'保密'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 31,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=保密",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证性别筛选",
+      "timeout_seconds": 10.0,
+      "title": "性别筛选-保密"
+    },
+    {
+      "assertion": {
+        "expected": "18~25岁",
+        "locator": "a:has-text('详情')",
+        "type": "age_in_range"
+      },
+      "case_code": "TC-CUSTOMER-012",
+      "case_id": "6b8a34d7-1a48-567b-b7a5-b2cda69b9a0f",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "顾客档案页显示正常，且年龄在18~25岁",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n2.选择18~25岁\n3.点击确定\n4.点击顾客详情\n5.查看年龄是否在18~25岁",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 32,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=18~25岁",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证年龄段筛选后进入详情查看生日是否符合范围",
+      "timeout_seconds": 10.0,
+      "title": "年龄段筛选-18~25岁"
+    },
+    {
+      "assertion": {
+        "expected": "'/customer/'",
+        "locator": "a:has-text('详情')",
+        "type": "url_contains"
+      },
+      "case_code": "TC-CUSTOMER-013",
+      "case_id": "2b83bed9-a96d-5fd0-ad34-e0bfdc5defac",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "顾客档案页显示正常，且年龄在26~35岁",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n2.选择26~35岁\n3.点击确定\n4.点击顾客详情\n5.查看年龄是否在26~35岁",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 33,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=26~35岁",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证年龄段筛选后进入详情查看生日是否符合范围",
+      "timeout_seconds": 10.0,
+      "title": "年龄段筛选-26-35岁"
+    },
+    {
+      "assertion": {
+        "expected": "36~45岁",
+        "locator": "a:has-text('详情')",
+        "type": "age_in_range"
+      },
+      "case_code": "TC-CUSTOMER-014",
+      "case_id": "66bc5583-8708-5e2e-b2ae-26aee4b3904d",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "顾客档案页显示正常，且年龄在36~45岁",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n2.选择36~45岁\n3.点击确定\n4.点击顾客详情\n5.查看年龄是否在36~45岁",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 34,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=36~45岁",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证年龄段筛选后进入详情查看生日是否符合范围",
+      "timeout_seconds": 10.0,
+      "title": "年龄段筛选-36~45岁"
+    },
+    {
+      "assertion": {
+        "expected": "'暂无'",
+        "locator": ".ant-popover .ant-btn-primary",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-015",
+      "case_id": "bf084f57-10f4-5731-8ff9-cc5247417714",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "顾客档案页显示正常，且年龄在45岁以上",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n2.选择45岁以上\n3.点击确定\n4.点击顾客详情\n5.查看年龄是否在45岁以上",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 35,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=45岁以上",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证年龄段筛选后进入详情查看生日是否符合范围",
+      "timeout_seconds": 10.0,
+      "title": "年龄段筛选-45岁以上"
+    },
+    {
+      "assertion": {
+        "expected": "18岁以下",
+        "locator": "a:has-text('详情')",
+        "type": "age_in_range"
+      },
+      "case_code": "TC-CUSTOMER-016",
+      "case_id": "bdada093-ca73-55ec-96cc-d51a07f83aff",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "顾客档案页显示正常，且年龄在18岁以下",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n2.选择18岁以下\n3.点击确定\n4.点击顾客详情\n5.查看年龄是否在18岁以下",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 36,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=18岁以下",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证年龄段筛选后进入详情查看生日是否符合范围",
+      "timeout_seconds": 10.0,
+      "title": "年龄段筛选-18岁以下"
+    },
+    {
+      "assertion": {
+        "expected": "'暂无'",
+        "locator": ".ant-popover .ant-btn-primary",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-017",
+      "case_id": "231175ea-c0e6-53d3-8f00-18c985672d6b",
+      "data_type": "daterange",
+      "enabled": true,
+      "expected_result": "筛选结果展示为空",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.选择不存在数据的时间范围\n2.点击其他筛选\n2.选择性别'男'\n3.选择年龄'18-25'\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 37,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "2015/01/01-2015/01/31",
+          "locator": ".ant-picker-range input",
+          "operation": "daterange"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=男",
+          "operation": "click"
+        },
+        {
+          "locator": "text=18~25岁",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证多条件联合筛选",
+      "timeout_seconds": 10.0,
+      "title": "联合查询-无结果组合"
+    },
+    {
+      "assertion": {
+        "expected": "'详情'",
+        "locator": ".ant-popover .ant-btn-primary",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-018",
+      "case_id": "1d6eaa6c-2b69-5f1a-a397-342886c09f45",
+      "data_type": "daterange",
+      "enabled": true,
+      "expected_result": "展示符合时间范围的顾客档案",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.选择存在数据的时间范围\n2.点击其他筛选\n2.选择性别'男'\n3.选择年龄'18-25'\n5.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 38,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "2026/01/01-2026/07/30",
+          "locator": ".ant-picker-range input",
+          "operation": "daterange"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=男",
+          "operation": "click"
+        },
+        {
+          "locator": "text=18~25岁",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证多条件联合筛选",
+      "timeout_seconds": 10.0,
+      "title": "联合查询-有结果组合"
+    },
+    {
+      "assertion": {
+        "expected": "123",
+        "locator": ".ant-image + div .anticon",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-019",
+      "case_id": "2d563bfa-251b-5671-b9df-54e614e66bd2",
+      "enabled": true,
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已根据实际DOM调整：删除'已为'步骤；确定按钮用.ant-popover .ant-btn-primary；备注图标用.ant-image + div .anticon",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选 2.输入备注'123' 3.点击确定 4.点击详情 5.在历史影像中点击影像右侧备注图标 6.验证备注内容'123'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 39,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "input": "123",
+          "locator": "input[placeholder='备注']",
+          "operation": "input"
+        },
+        {
+          "locator": ".ant-popover .ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证备注筛选",
+      "timeout_seconds": 10.0,
+      "title": "备注筛选"
+    },
+    {
+      "assertion": {
+        "expected": "'详情','岁','上次检测时间','共检测'",
+        "locator": "a[data-link-text]",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-020",
+      "case_id": "650d4f7a-93db-5eb2-aacf-c2690d2410de",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "卡片包含：姓名、年龄、性别图标♂、手机号、上次检测时间、检测次数、详情按钮",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "卡片为自定义结构（非ant-list）；性别图标为图片形式无法文本断言；字段验证：姓名/年龄/手机号/上次检测时间/检测次数/详情",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案列表\n2.查看顾客卡片字段信息",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 40,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a[data-link-text]",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证卡片展示姓名、年龄、性别图标、手机号、上次检测时间、检测次数、详情按钮",
+      "timeout_seconds": 15.0,
+      "title": "顾客卡片字段验证"
+    },
+    {
+      "assertion": {
+        "expected": "'/customer/U'",
+        "locator": "a:has-text('详情')",
+        "type": "url_contains"
+      },
+      "case_code": "TC-CUSTOMER-021",
+      "case_id": "a34addc8-5df5-5c3a-adad-cce9035462bf",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "URL 包含 /customer/U，跳转成功",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击用户卡片或详情按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 41,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证详情页跳转",
+      "timeout_seconds": 5.0,
+      "title": "进入顾客详情"
+    },
+    {
+      "assertion": {
+        "expected": "'搜 索'",
+        "locator": "button:has-text('重 置')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-CUSTOMER-022",
+      "case_id": "6813dc19-3d02-57eb-8193-efcc0edb07bc",
+      "enabled": true,
+      "expected_result": "已选择筛选条件全部取消选中",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n1.选择性别、年龄，输入备注内容筛选\n2.点击重置按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 42,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('其他筛选')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=男",
+          "operation": "click"
+        },
+        {
+          "locator": "text=18~25岁",
+          "operation": "click"
+        },
+        {
+          "input": "123",
+          "locator": "input[placeholder='备注']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('重 置')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-list"
+      ],
+      "test_point": "验证重置按钮清空筛选条件",
+      "timeout_seconds": 10.0,
+      "title": "筛选重置功能"
+    },
+    {
+      "assertion": {
+        "expected": "请输入姓名",
+        "locator": "button.ant-btn-primary",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-001",
+      "case_id": "05f86d4d-9bf1-5ed2-8442-112617ea4901",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "提示：请输入姓名",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击编辑资料\n2.清空姓名\n3.点击保存\n验证：提示'请输入姓名'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 43,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "input": "",
+          "locator": "[placeholder*='姓名']",
+          "operation": "input"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证姓名必填校验",
+      "timeout_seconds": 3.0,
+      "title": "编辑资料-姓名必填"
+    },
+    {
+      "assertion": {
+        "expected": "特殊字符姓名保存成功",
+        "locator": "text=自动化&&*……*&测试",
+        "type": "element_visible"
+      },
+      "case_code": "TC-DETAIL-002",
+      "case_id": "94dbb609-d4aa-5d9f-875d-008f80bc63c7",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "保存成功，页面姓名更新为「自动化&&*……*&测试」",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.姓名改为testname并保存\n4.再次编辑资料\n5.姓名改为特殊字符并保存\n6.验证特殊字符姓名已显示",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 44,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "input": "testname",
+          "locator": "[placeholder*='姓名']",
+          "operation": "input"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "input": "自动化&&*……*&测试",
+          "locator": "[placeholder*='姓名']",
+          "operation": "input"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "text=自动化&&*……*&测试",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证特殊字符输入",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "客户名称长度不合法",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-003",
+      "case_id": "56049848-a46f-592a-91e5-69948b5836a1",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "提示：客户名称长度不合法",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.更改姓名\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 45,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "input": "DQWDQWDWDWDWDWDWDWDDDD11111112EF1",
+          "locator": "input[placeholder='请输入姓名']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证边界值-超长姓名",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-姓名超长字符"
+    },
+    {
+      "assertion": {
+        "expected": "男",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-004",
+      "case_id": "dc44e2d1-76a9-58b0-a42c-84ec78e14159",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "保存成功，性别显示'男'",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.选择性别'男'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 46,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "男",
+          "locator": ".ant-select-selector",
+          "operation": "select"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证性别修改",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-性别男"
+    },
+    {
+      "assertion": {
+        "expected": "女",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-005",
+      "case_id": "66190667-3844-57bb-a13a-7552caab7d13",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "保存成功，性别显示'女'",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.选择性别'女'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 47,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "女",
+          "locator": ".ant-select-selector",
+          "operation": "select"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证性别修改",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-性别女"
+    },
+    {
+      "assertion": {
+        "expected": "'性别下拉显示保密'",
+        "locator": ".ant-select-selector:has-text('保密')",
+        "type": "element_visible"
+      },
+      "case_code": "TC-DETAIL-006",
+      "case_id": "14313f16-7093-58c6-91be-37fed29702cf",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "保存成功，性别显示'保密'",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.选择性别'保密'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 48,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "保密",
+          "locator": ".ant-select-selector",
+          "operation": "select"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-select-selector:has-text('保密')",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证性别修改",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-性别保密"
+    },
+    {
+      "assertion": {
+        "expected": "'2022-08-04'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-007",
+      "case_id": "6325875b-464e-5ddf-a9e6-6c68e0b0cbbb",
+      "enabled": true,
+      "expected_result": "保存成功，生日显示'2022-08-03'",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.在生日选择框选择日期'2022-08-03'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 49,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "2022-08-04",
+          "locator": "input[placeholder='请选择日期']",
+          "operation": "input_enter"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证生日修改",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-生日修改"
+    },
+    {
+      "assertion": {
+        "expected": "空",
+        "locator": "input[placeholder='请输入家庭住址']",
+        "type": "value_equals"
+      },
+      "case_code": "TC-DETAIL-008",
+      "case_id": "8272cd65-607c-54b4-976e-6b91770706f6",
+      "enabled": true,
+      "expected_result": "保存成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "清空家庭住址后保存",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.清空家庭住址内容\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 50,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "",
+          "locator": "input[placeholder='请输入家庭住址']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入家庭住址']",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "家庭住址非必填",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-家庭住址非必填"
+    },
+    {
+      "assertion": {
+        "expected": "……&&*……*&",
+        "locator": "input[placeholder='请输入家庭住址']",
+        "type": "value_equals"
+      },
+      "case_code": "TC-DETAIL-009",
+      "case_id": "4d985f21-2fbb-5816-ba53-d342a7d488cd",
+      "enabled": true,
+      "expected_result": "保存成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "家庭住址输入特殊字符后保存",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.在家庭住址输入……&&*……*&\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 51,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "……&&*……*&",
+          "locator": "input[placeholder='请输入家庭住址']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入家庭住址']",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证家庭住址特殊字符",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-家庭住址特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "空",
+        "locator": "input[placeholder='请输入家庭住址']",
+        "type": "value_equals"
+      },
+      "case_code": "TC-DETAIL-010",
+      "case_id": "561ceb55-43de-54cc-b458-08e4c0f8db05",
+      "enabled": true,
+      "expected_result": "保存成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "家庭住址输入空格后保存",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.在家庭住址输入空格\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 52,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "",
+          "locator": "input[placeholder='请输入家庭住址']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入家庭住址']",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证家庭住址空格处理",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-家庭住址空格"
+    },
+    {
+      "assertion": {
+        "expected": "'请输入手机号'",
+        "locator": "button.ant-btn-primary",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-011",
+      "case_id": "8c4b34d1-9c98-5282-a182-f1ea60a5d794",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "提示：请输入手机号",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击编辑资料\n2.清空手机号\n3.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 53,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "input": "",
+          "locator": "[placeholder*='手机号']",
+          "operation": "input"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证手机号校验",
+      "timeout_seconds": 3.0,
+      "title": "编辑资料-手机号必填"
+    },
+    {
+      "assertion": {
+        "expected": "'测试备注内容'",
+        "locator": "button.ant-btn-primary",
+        "type": "text_contains"
+      },
+      "case_code": "TC-DETAIL-012",
+      "case_id": "47c224d8-f8ee-5cba-a01d-f9e75c7c0ea7",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "备注记录中显示最新的提交记录",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.已登录，进入顾客详情页\n2.点击右侧所有影像中的一个影像的右下角编辑图标\n3.在备注栏输入备注内容\n4.点击提交\n5.备注记录中显示最新的提交记录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 54,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=已为",
+          "operation": "click"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "div.ant-image + div span.anticon",
+          "operation": "click"
+        },
+        {
+          "input": "测试备注内容",
+          "locator": "textarea.ant-input-borderless",
+          "operation": "input"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注添加",
+      "timeout_seconds": 5.0,
+      "title": "影像-添加备注"
+    },
+    {
+      "assertion": {
+        "expected": "'保存成功'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-013",
+      "case_id": "b883976a-76a8-5b42-ae12-85389da651ba",
+      "enabled": true,
+      "expected_result": "保存成功，备注无内容",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "清空备注后保存，备注非必填",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.清空备注一栏的内容\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 55,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "",
+          "locator": "textarea[placeholder='请输入备注']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注非必填",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-备注非必填"
+    },
+    {
+      "assertion": {
+        "expected": "'保存成功'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-014",
+      "case_id": "dadd609f-37c1-5ae7-9db4-54bb05223f9f",
+      "enabled": true,
+      "expected_result": "保存成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "备注输入特殊字符后保存",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.在备注一栏输入特殊字符……&&*……*&\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 56,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "input": "……&&*……*&",
+          "locator": "textarea[placeholder='请输入备注']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注特殊字符",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-备注特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "'保存成功'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-015",
+      "case_id": "8d93b100-216b-57cd-b2bd-3788c57b5d5a",
+      "enabled": true,
+      "expected_result": "保存成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.在婚姻状况的下拉框选择保密\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 57,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "button:has-text('编辑资料')",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-select:has(#editInfo_marital) .ant-select-selector",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-select-dropdown .ant-select-item-option:has-text('保密')",
+          "operation": "click"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证婚姻状况修改",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-婚姻状况修改"
+    },
+    {
+      "assertion": {
+        "expected": "'自动化标签测试1'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-016",
+      "case_id": "33a738f8-d5db-5454-aef4-1a05db9ab7ea",
+      "enabled": true,
+      "expected_result": "最新保存的标签在最前面展示",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "nav进入顾客列表，影像编辑图标易缺失，因此改为更稳妥的div",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5.点击添加标签\n6.输入自动化标签测试1\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 58,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": "自动化标签测试1",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-添加标签"
+    },
+    {
+      "assertion": {
+        "expected": "'请输入标签内容'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-017",
+      "case_id": "2284ffa4-8369-5103-9107-a53c292f5af5",
+      "enabled": true,
+      "expected_result": "提示：请输入标签内容",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5.点击添加标签\n6.不输入内容\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 59,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "5",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证标签必填",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-标签为空"
+    },
+    {
+      "assertion": {
+        "expected": "%……&*",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-018",
+      "case_id": "c94e4fab-ca6d-54ac-a2f6-8a3da76c8348",
+      "enabled": true,
+      "expected_result": "可保存成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "nav改为div,输入注意去掉占位符，否则读取不到",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5.点击添加标签\n6.输入特殊字符%……&*\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 60,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": "%……&*",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证标签特殊字符",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-标签特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "'请输入标签内容'",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-019",
+      "case_id": "4dc5e862-73d9-5d26-9c47-f47413823429",
+      "enabled": true,
+      "expected_result": "提示：请输入标签内容",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5.点击添加标签\n6.输入空格\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 61,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": "",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证标签空格处理",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-标签空格"
+    },
+    {
+      "assertion": {
+        "expected": "不显示'自动化标签测试1'标签",
+        "locator": "text=确 定",
+        "type": "text_hidden"
+      },
+      "case_code": "TC-DETAIL-020",
+      "case_id": "73e643a2-ade0-5543-ab98-f4f3b59b31af",
+      "enabled": true,
+      "expected_result": "页面没有'自动化标签测试1'标签",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "标签「自动化标签测试1」需已存在（由 TC-DETAIL-016 生成）",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5.删除‘自动化标签测试1’标签\n6.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 62,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-tag:has-text('自动化标签测试1')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('自动化标签测试1') .anticon-close",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('自动化标签测试1') .anticon-close",
+          "operation": "click"
+        },
+        {
+          "locator": "text=确定",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证本地标签删除",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-本地标签可删除"
+    },
+    {
+      "assertion": {
+        "expected": "'影像备注测试'",
+        "locator": "button:has-text('提 交')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-021",
+      "case_id": "6a84c674-cca4-5198-8b13-9a1aa3c25839",
+      "enabled": true,
+      "expected_result": "页面的备注记录显示最新的备注提交记录",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需要有历史影像",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5在备注框输入影像备注测试\n6.点击提交",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 63,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "textarea",
+          "operation": "verify"
+        },
+        {
+          "input": "影像备注测试",
+          "locator": "textarea",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('提 交')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注内容",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-备注内容"
+    },
+    {
+      "assertion": {
+        "expected": "……&&*……*&",
+        "locator": "button:has-text('提 交')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-022",
+      "case_id": "dc13cad2-f059-5ea6-92e0-102192e37ba4",
+      "enabled": true,
+      "expected_result": "页面的备注记录显示最新的备注提交记录",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5在备注框输入特殊字符\n6.点击提交",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 64,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "textarea",
+          "operation": "verify"
+        },
+        {
+          "input": "……&&*……*&",
+          "locator": "textarea",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('提 交')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注特殊字符",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-备注特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "提交按钮禁用",
+        "locator": "button:has-text('提 交')",
+        "type": "element_disabled"
+      },
+      "case_code": "TC-DETAIL-023",
+      "case_id": "c1156e44-a55a-58ac-b6ba-f5ae6da1b01f",
+      "enabled": true,
+      "expected_result": "提交按钮为灰色，无法提交",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需要有历史影像",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.查找有检测记录顾客\n3.进入详情页\n4.点击右侧所有影像中的一个影像的右下角编辑图标\n5在备注框输入空格\n6.点击提交",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 65,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测|.ant-image + div .anticon",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-image + div .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "textarea",
+          "operation": "verify"
+        },
+        {
+          "input": "",
+          "locator": "textarea",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('提 交')",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注空格",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-备注空格"
+    },
+    {
+      "assertion": {
+        "expected": "管理按钮切换成功",
+        "locator": "a:text-is('管理')",
+        "type": "element_visible"
+      },
+      "case_code": "TC-DETAIL-024",
+      "case_id": "48f58c8b-51ad-59cb-9cc5-6180a69018f6",
+      "enabled": true,
+      "expected_result": "按钮可以正确切换",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需要有历史影像；验证管理/完成按钮来回切换",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.查找有检测记录顾客\n3.进入详情页\n4.点击管理\n5.再点击完成",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 66,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:text-is('管理')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:text-is('管理')",
+          "operation": "click"
+        },
+        {
+          "locator": "a:text-is('完成')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:text-is('完成')",
+          "operation": "click"
+        },
+        {
+          "locator": "a:text-is('管理')",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证按钮切换",
+      "timeout_seconds": 15.0,
+      "title": "删除影像-完成按钮切换"
+    },
+    {
+      "assertion": {
+        "expected": "'共检测0次'",
+        "locator": "0.5",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-025",
+      "case_id": "a32353fb-b252-55e8-8ed4-c5e1de9df873",
+      "data_type": "none",
+      "enabled": false,
+      "expected_result": "数据删除成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "严格找共检测1次的顾客，删除后验证卡片显示共检测0次",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.查找有检测记录顾客\n3.进入详情页\n4.点击管理\n5.勾选最近影像\n6.点击删除",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 67,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测1次",
+          "operation": "find_click"
+        },
+        {
+          "locator": "a:has-text('管理')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[type='checkbox']",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('删除')",
+          "operation": "click"
+        },
+        {
+          "locator": ".footer-btn-danger",
+          "operation": "click"
+        },
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证删除最后影像后的状态",
+      "timeout_seconds": 15.0,
+      "title": "删除影像-最后一张"
+    },
+    {
+      "assertion": {
+        "expected": "'测试'",
+        "locator": "0.5",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-026",
+      "case_id": "3bf46684-e348-5973-b0fb-c837f115bedc",
+      "enabled": true,
+      "expected_result": "顾客卡片展示修改后的用户姓名",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击影像详情\n2.点击编辑资料\n3.修改姓名为'测试'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 68,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image",
+          "operation": "click"
+        },
+        {
+          "locator": "text=编辑资料",
+          "operation": "click"
+        },
+        {
+          "input": "测试",
+          "locator": "input[placeholder='请输入姓名']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        },
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证姓名修改后卡片更新",
+      "timeout_seconds": 15.0,
+      "title": "卡片-修改姓名后同步"
+    },
+    {
+      "assertion": {
+        "expected": "'13626710311'",
+        "locator": "0.5",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-027",
+      "case_id": "2df133cd-8518-5dee-a153-b8e0381e6645",
+      "enabled": true,
+      "expected_result": "顾客卡片展示修改后的手机号",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击影像详情\n2.点击编辑资料\n3.修改手机号为'13626710311'\n5.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 69,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-image",
+          "operation": "click"
+        },
+        {
+          "locator": "text=编辑资料",
+          "operation": "click"
+        },
+        {
+          "input": "13626710311",
+          "locator": "input[placeholder='请输入手机号']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        },
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证手机号修改后卡片更新",
+      "timeout_seconds": 15.0,
+      "title": "卡片-修改手机号后同步"
+    },
+    {
+      "assertion": {
+        "expected": "'共检测'",
+        "locator": "0.5",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-028",
+      "case_id": "2190a6bd-4cd3-5311-a7f1-5a7e7199f82c",
+      "enabled": false,
+      "expected_result": "该顾客的卡片右下角显示共检测n次,n=详情页中所有历史影像个数",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击右下角显示'共检测N次',N>1的卡片的详情按钮\n2.点击管理\n3.勾选影像\n4.点击删除\n5.返回顾客列表\n7.查看该用户卡片",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 70,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测(?:[2-9]|[1-9]\\d+)次",
+          "operation": "find_click"
+        },
+        {
+          "locator": "a:has-text('管理')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[type='checkbox']",
+          "operation": "click"
+        },
+        {
+          "locator": "a:has-text('删除')",
+          "operation": "click"
+        },
+        {
+          "locator": ".footer-btn-danger",
+          "operation": "click"
+        },
+        {
+          "input": "",
+          "locator": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证删除非最后影像后卡片状态",
+      "timeout_seconds": 15.0,
+      "title": "卡片-删除非最后影像后状态"
+    },
+    {
+      "assertion": {
+        "expected": "请先选择需要删除的影像",
+        "locator": "text=删除",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-029",
+      "case_id": "f7e4981a-63f2-5ee8-9f52-9af32368c6d1",
+      "enabled": true,
+      "expected_result": "提示：请先选择需要删除的影像",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需要有历史影像；管理模式下不选影像直接删除应提示",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.查找有检测记录顾客\n3.进入详情页\n4.点击管理\n5.点击删除",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 71,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:text-is('管理')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:text-is('管理')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=删除",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证未选择影像删除提示",
+      "timeout_seconds": 15.0,
+      "title": "删除影像-未选择影像点击删除"
+    },
+    {
+      "assertion": {
+        "expected": "咨询单",
+        "locator": "text=前往顾客档案",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-030",
+      "case_id": "183a9580-4cba-5498-a07e-51b6a66010cf",
+      "enabled": true,
+      "expected_result": "诊断结果下方出现最新创建的咨询单",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需要「咨询单特定」测试用户存在且有历史影像",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击历史的影像记录\n5.进入影像阅览页面之后点击右上角查看报告\n6.再点击右上角的完成\n7.然后点击前往弹框中的前往顾客档案",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 72,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "verify"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "15",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=查看报告|text=完 成|[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "retry_report"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=完 成",
+          "operation": "click"
+        },
+        {
+          "locator": "5",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=前往顾客档案",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证咨询单添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-添加咨询单"
+    },
+    {
+      "assertion": {
+        "expected": "咨询单标签测试",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-031",
+      "case_id": "9f91d8a1-4b5c-570f-aabb-b3810da84c13",
+      "enabled": true,
+      "expected_result": "标签页出现咨询单标签测试",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单；咨询单记录在诊断结果标签页",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.点击添加标签\n6.输入咨询单标签测试\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 73,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单标签测试",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证咨询单的备注标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签添加"
+    },
+    {
+      "assertion": {
+        "expected": "请输入标签内容",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-032",
+      "case_id": "da57dacf-ea3f-50b3-81ea-d9c5aad6b89e",
+      "enabled": true,
+      "expected_result": "提示：请输入标签内容",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.点击添加标签\n6.输入空格\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 74,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": " ",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证咨询单的备注标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签为空格"
+    },
+    {
+      "assertion": {
+        "expected": "%……&*",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-033",
+      "case_id": "5f54e85b-25ba-5498-bd0e-524cf88b02a1",
+      "enabled": true,
+      "expected_result": "标签页出现%……&*",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.点击添加标签\n6.输入特殊字符\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 75,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": "%……&*",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证咨询单的备注标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "请输入标签内容",
+        "locator": "button:has-text('保 存')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-DETAIL-034",
+      "case_id": "6206ba1b-0649-594f-b468-c1e7b226a394",
+      "enabled": true,
+      "expected_result": "提示：请输入标签内容",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.点击添加标签\n6.不输入内容\n7.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 76,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-tag:has-text('添加标签')",
+          "operation": "click"
+        },
+        {
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "verify"
+        },
+        {
+          "input": "",
+          "locator": "input[placeholder='请输入标签内容']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('保 存')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证标签非空校验",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签为空"
+    },
+    {
+      "assertion": {
+        "expected": "咨询单备注测试",
+        "locator": "text=咨询单备注测试",
+        "type": "element_visible"
+      },
+      "case_code": "TC-DETAIL-035",
+      "case_id": "fcf93e45-3a55-5113-813e-a36eaf05e82d",
+      "enabled": true,
+      "expected_result": "备注记录出现最新的备注",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.在备注栏输入咨询单备注测试\n6.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 77,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "textarea",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单备注测试",
+          "locator": "textarea",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('提 交')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=咨询单备注测试",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注内容添加",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注输入"
+    },
+    {
+      "assertion": {
+        "expected": "提交按钮禁用",
+        "locator": "button:has-text('提 交')",
+        "type": "element_disabled"
+      },
+      "case_code": "TC-DETAIL-036",
+      "case_id": "3b1cfe3f-f2cb-51d9-b1f0-991b01bfba8f",
+      "enabled": true,
+      "expected_result": "提交按钮为灰色，无法提交",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.在备注一栏输入空格\n6.点击提交",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 78,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "textarea",
+          "operation": "verify"
+        },
+        {
+          "input": " ",
+          "locator": "textarea",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('提 交')",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注内容添加",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注空格"
+    },
+    {
+      "assertion": {
+        "expected": "自动化删除测试",
+        "locator": "text=确定",
+        "type": "text_hidden"
+      },
+      "case_code": "TC-DETAIL-037",
+      "case_id": "75935576-fc47-5d66-8c75-b5bc330c0c46",
+      "enabled": true,
+      "expected_result": "备注被删除",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "自包含用例：先新增固定备注再删除，验证点固定无需随测试数据更新",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.在搜索框搜索咨询单特定用户\n3.进入该用户详情页\n4.点击咨询单右下角的备注图标\n5.在备注一栏输入自动化删除测试\n6.点击提交\n7.点击最新一条备注右侧的删除图标\n8.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 79,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "div:text-is('顾客档案')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "verify"
+        },
+        {
+          "input": "咨询单特定",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "verify"
+        },
+        {
+          "locator": "a:has-text('详情')",
+          "operation": "click"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "verify"
+        },
+        {
+          "locator": "[role='tabpanel'] .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "5",
+          "operation": "wait"
+        },
+        {
+          "locator": "textarea",
+          "operation": "verify"
+        },
+        {
+          "input": "自动化删除测试",
+          "locator": "textarea",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('提 交')",
+          "operation": "click"
+        },
+        {
+          "locator": "text=自动化删除测试",
+          "operation": "verify"
+        },
+        {
+          "locator": ".ant-timeline .anticon",
+          "operation": "click"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "text=确定",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:customer-detail"
+      ],
+      "test_point": "验证备注内容删除",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-删除备注"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'customerModel'",
+        "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+        "type": "url_contains"
+      },
+      "case_code": "TC-IMAGE-001",
+      "case_id": "70b303c3-95e7-5109-82f8-99b6ebe15027",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "进入影像阅览/皮肤分析页",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表，选择有检测记录的顾客 2.点击历史影像条目进入影像阅览",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 80,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:image-viewer"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 10.0,
+      "title": "进入影像阅览"
+    },
+    {
+      "assertion": {
+        "expected": "'分屏对比'",
+        "locator": "text=分屏对比",
+        "type": "text_contains"
+      },
+      "case_code": "TC-IMAGE-002",
+      "case_id": "9edbea4d-e447-58c4-ba1c-bac7876af8dd",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "影像展示分屏对比模式",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击模式对比中的分屏对比",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 81,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "text=分屏对比",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:image-viewer"
+      ],
+      "test_point": "验证模式图切换",
+      "timeout_seconds": 10.0,
+      "title": "分屏对比"
+    },
+    {
+      "assertion": {
+        "expected": "'镜像对比'",
+        "locator": "text=镜像对比",
+        "type": "text_contains"
+      },
+      "case_code": "TC-IMAGE-003",
+      "case_id": "2fa12109-130a-5570-a359-2095de07898e",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "影像展示镜像对比模式",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击模式对比中的镜像对比",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 82,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "text=镜像对比",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:image-viewer"
+      ],
+      "test_point": "验证分屏对比功能",
+      "timeout_seconds": 10.0,
+      "title": "镜像对比"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'customerModel'",
+        "locator": "10",
+        "type": "url_contains"
+      },
+      "case_code": "TC-IMAGE-004",
+      "case_id": "f9920f50-9889-54c7-ae35-270fd2dc6cb4",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "左侧历史影像，右侧当前影像，各有独立模式图",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击历史对比中的分屏对比 2.在弹窗中选择一张历史影像 3.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 83,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "2",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "label:has(input[value=\"historysplitScene\"])",
+          "operation": "click"
+        },
+        {
+          "locator": "text=请选择",
+          "operation": "click"
+        },
+        {
+          "locator": "[class*=\"PFozf\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "10",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:image-viewer"
+      ],
+      "test_point": "验证镜像对比功能",
+      "timeout_seconds": 10.0,
+      "title": "历史分屏对比"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'customerModel'",
+        "locator": "10",
+        "type": "url_contains"
+      },
+      "case_code": "TC-IMAGE-005",
+      "case_id": "098e3464-bef7-5a90-9372-031265711089",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "展示历史镜像对比模式",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击历史对比中的镜像对比 2.在弹窗中选择一张历史影像 3.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 84,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "0.5",
+          "operation": "wait"
+        },
+        {
+          "input": "/customer",
+          "operation": "nav"
+        },
+        {
+          "locator": "3",
+          "operation": "wait"
+        },
+        {
+          "locator": "共检测",
+          "operation": "find_click"
+        },
+        {
+          "locator": "[data-layout=\"column\"][data-layout-align=\"center center\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "label:has(input[value=\"historymirror\"])",
+          "operation": "click"
+        },
+        {
+          "locator": "text=请选择",
+          "operation": "click"
+        },
+        {
+          "locator": "[class*=\"PFozf\"]",
+          "operation": "click"
+        },
+        {
+          "locator": "button.ant-btn-primary",
+          "operation": "click"
+        },
+        {
+          "locator": "10",
+          "operation": "wait"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:image-viewer"
+      ],
+      "test_point": "验证历史对比功能",
+      "timeout_seconds": 10.0,
+      "title": "历史镜像对比"
+    },
+    {
+      "assertion": {
+        "expected": "/case",
+        "locator": "text=案例库",
+        "type": "url_contains"
+      },
+      "case_code": "TC-CASE-001",
+      "case_id": "0b8746f2-3613-50d2-9b14-add4747e3b68",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "进入案例库页面，URL包含/case",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "进入案例库",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 85,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=案例库",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:case-library"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "进入案例管理"
+    },
+    {
+      "assertion": {
+        "expected": "暂无内容",
+        "locator": "button:has-text(\"搜 索\")",
+        "type": "text_contains"
+      },
+      "case_code": "TC-CASE-002",
+      "case_id": "c66698d5-4618-54e1-8d6c-b75333da5919",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "页面显示暂无内容",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.输入不存在的标签xyz 3.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 86,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=案例库",
+          "operation": "click"
+        },
+        {
+          "input": "xyz",
+          "locator": "input[placeholder=\"请输入案例关键字\"]",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text(\"搜 索\")",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:case-library"
+      ],
+      "test_point": "验证标签搜索",
+      "timeout_seconds": 5.0,
+      "title": "标签搜索-无结果"
+    },
+    {
+      "assertion": {
+        "expected": "火",
+        "locator": "button:has-text(\"搜 索\")",
+        "type": "text_contains"
+      },
+      "case_code": "TC-CASE-003",
+      "case_id": "42d42f92-c88d-5a78-a691-0ec0c9e93f8f",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "搜索结果列表中含有包含\"火\"标签的案例",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.输入已存在的标签（火） 3.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 87,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=案例库",
+          "operation": "click"
+        },
+        {
+          "input": "火",
+          "locator": "input[placeholder=\"请输入案例关键字\"]",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text(\"搜 索\")",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:case-library"
+      ],
+      "test_point": "验证标签搜索",
+      "timeout_seconds": 5.0,
+      "title": "标签搜索-有结果"
+    },
+    {
+      "assertion": {
+        "expected": "火",
+        "locator": ".ant-tag-checkable:has-text(\"火\")",
+        "type": "text_contains"
+      },
+      "case_code": "TC-CASE-004",
+      "case_id": "52f40c83-df9d-5117-8cb6-f70f7d41188c",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "页面展示含有\"火\"标签的案例",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.点击标签\"火\"筛选",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 88,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=案例库",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-tag-checkable:has-text(\"火\")",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:case-library"
+      ],
+      "test_point": "验证标签筛选",
+      "timeout_seconds": 5.0,
+      "title": "标签筛选-单选"
+    },
+    {
+      "assertion": {
+        "expected": "删除成功",
+        "locator": ".footer-btn-danger:has-text(\"删除\")",
+        "type": "text_contains"
+      },
+      "case_code": "TC-CASE-005",
+      "case_id": "4dcc90fd-4250-5ba6-8cec-3bb426536fcb",
+      "data_type": "string",
+      "enabled": false,
+      "expected_result": "删除成功，案例列表中不显示该案例",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.点击管理 3.勾选最新案例的复选框 4.点击删除 5.确认删除",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 89,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=案例库",
+          "operation": "click"
+        },
+        {
+          "locator": "button:has-text(\"管 理\")",
+          "operation": "click"
+        },
+        {
+          "locator": ".ant-checkbox-wrapper",
+          "operation": "click"
+        },
+        {
+          "locator": "button:has-text(\"删 除\")",
+          "operation": "click"
+        },
+        {
+          "locator": ".footer-btn-danger:has-text(\"删除\")",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:case-library"
+      ],
+      "test_point": "验证删除功能",
+      "timeout_seconds": 5.0,
+      "title": "删除案例"
+    },
+    {
+      "assertion": {
+        "expected": "账号字段不为空",
+        "locator": "text=账号",
+        "type": "text_not_empty"
+      },
+      "case_code": "TC-PROFILE-001",
+      "case_id": "64c70ce4-25ac-5087-ad03-7ddb18410144",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "显示登录的账号",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n2.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 90,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "/setting",
+          "operation": "nav"
+        },
+        {
+          "locator": "li:has-text(\"个人中心\")",
+          "operation": "click"
+        },
+        {
+          "locator": "text=账号",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:profile"
+      ],
+      "test_point": "验证账号信息展示",
+      "timeout_seconds": 3.0,
+      "title": "查看账号"
+    },
+    {
+      "assertion": {
+        "expected": "姓名字段不为空",
+        "locator": "text=姓名",
+        "type": "text_not_empty"
+      },
+      "case_code": "TC-PROFILE-002",
+      "case_id": "41a31a95-571a-5a8d-8156-c0ec010ebe5e",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "显示账号对应的姓名",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n3.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 91,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "/setting",
+          "operation": "nav"
+        },
+        {
+          "locator": "li:has-text(\"个人中心\")",
+          "operation": "click"
+        },
+        {
+          "locator": "text=姓名",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:profile"
+      ],
+      "test_point": "验证姓名展示",
+      "timeout_seconds": 3.0,
+      "title": "查看姓名"
+    },
+    {
+      "assertion": {
+        "expected": "注册时间字段不为空且为日期格式",
+        "locator": "text=注册时间",
+        "type": "text_not_empty"
+      },
+      "case_code": "TC-PROFILE-003",
+      "case_id": "3d8548a9-25c4-541d-93a6-ed4293cf4462",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "显示机构后台创建账号的时间",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n4.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 92,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "/setting",
+          "operation": "nav"
+        },
+        {
+          "locator": "li:has-text(\"个人中心\")",
+          "operation": "click"
+        },
+        {
+          "locator": "text=注册时间",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:profile"
+      ],
+      "test_point": "验证注册时间展示",
+      "timeout_seconds": 3.0,
+      "title": "查看注册时间"
+    },
+    {
+      "assertion": {
+        "expected": "手机号字段显示正确或为空",
+        "locator": "text=手机号",
+        "type": "text_optional"
+      },
+      "case_code": "TC-PROFILE-004",
+      "case_id": "f1036bc6-0edf-5fba-a946-0044d55b9025",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "手机号不为空时显示对应手机号",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n5.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 93,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "/setting",
+          "operation": "nav"
+        },
+        {
+          "locator": "li:has-text(\"个人中心\")",
+          "operation": "click"
+        },
+        {
+          "locator": "text=手机号",
+          "operation": "verify"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:profile"
+      ],
+      "test_point": "验证手机号展示",
+      "timeout_seconds": 3.0,
+      "title": "查看手机号"
+    }
+  ],
+  "project_key": "yanjia-ai-web",
+  "schema_version": "1.0",
+  "source": {
+    "file_digest": "sha256:04e9944f23e7e7d31537a7c17c9818d7b0ce640b7941aca48c67c09b3ab7c622",
+    "file_name": "test_case.xlsx",
+    "kind": "legacy_excel",
+    "worksheet": "自动化测试用例"
+  },
+  "version": "case-v1.0.0"
+}

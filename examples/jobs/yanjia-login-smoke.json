@@ -1,0 +1,378 @@
+{
+  "automation_package": {
+    "digest": "sha256:8cb04083c93e4603a92303e189b0ee7cbadf3e85550937f44e43d2776cd73605",
+    "name": "yanjia-web",
+    "version": "0.1.0"
+  },
+  "browser": "chromium",
+  "case_baseline": {
+    "baseline_id": "8865cdb1-fc2d-5272-82bb-9d67faa89c57",
+    "case_count": 92,
+    "digest": "sha256:297c34c2dcd0585908414479e1140d0f112b8a34fb1a625b93c9914d7a6dc2fe",
+    "version": "case-v1.0.1"
+  },
+  "cases": [
+    {
+      "assertion": {
+        "expected": "页面显示'登录失败'",
+        "locator": "button[type=\"submit\"]",
+        "type": "text_contains"
+      },
+      "case_code": "TC-LOGIN-001",
+      "case_id": "8f84dd35-eaf3-5fcc-81f0-69f1569f8afa",
+      "data_type": "提示：该账号不存在，请重新登录！",
+      "enabled": true,
+      "expected_result": "提示：登录失败，请重试！",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "错误账号测试",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.在账号输入框输入错误账号\n2.点击登录按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 2,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "test123",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "${TEST_PASSWORD}",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "#store",
+          "operation": "click"
+        },
+        {
+          "locator": "button[type=\"submit\"]",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证错误账号登录提示",
+      "timeout_seconds": 5.0,
+      "title": "登录失败-错误账号"
+    },
+    {
+      "assertion": {
+        "expected": "页面显示'登录失败'",
+        "locator": "button[type='submit']",
+        "type": "text_contains"
+      },
+      "case_code": "TC-LOGIN-002",
+      "case_id": "15802a4a-4301-5c4c-8438-c878bdbc77d6",
+      "data_type": "提示：登录失败，请重试！",
+      "enabled": true,
+      "expected_result": "提示：登录失败，请重试！",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "错误密码测试",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入正确账号\n2.输入错误密码\n3.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 3,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "76371@01",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "wrong123",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "#store",
+          "operation": "click"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证错误密码登录提示",
+      "timeout_seconds": 5.0,
+      "title": "登录失败-错误密码"
+    },
+    {
+      "assertion": {
+        "expected": "账号输入框下方显示红色提示'请输入账号'",
+        "locator": "button[type='submit']",
+        "type": "text_visible"
+      },
+      "case_code": "TC-LOGIN-003",
+      "case_id": "f66e6b02-dcb7-5746-923c-7d618aa2b64f",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "红色提示：请输入账号、请输入密码、请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "必填校验",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.不输入账号和密码\n2.点击登录按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 4,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证必填校验",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-账号密码为空"
+    },
+    {
+      "assertion": {
+        "expected": "密码输入框下方显示红色提示'请输入密码'",
+        "locator": "button[type='submit']",
+        "type": "text_visible"
+      },
+      "case_code": "TC-LOGIN-004",
+      "case_id": "88a5bdba-31c3-5243-bc77-ed2296e4ef78",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "红色提示：请输入密码、请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入账号\n2.不输入密码\n3.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 5,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "test_user",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证密码必填",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-密码为空"
+    },
+    {
+      "assertion": {
+        "expected": "门店选择器下方显示红色提示'请选择门店'",
+        "locator": "button[type='submit']",
+        "type": "text_visible"
+      },
+      "case_code": "TC-LOGIN-005",
+      "case_id": "338aa3a6-eaec-5613-ba80-f2ffe458629b",
+      "data_type": "string|string",
+      "enabled": true,
+      "expected_result": "红色提示：请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入账号\n2.输入密码\n3.不选择门店\n4.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 6,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "23595.sg@01",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "correct_pwd",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证门店必选",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-未选择门店"
+    },
+    {
+      "assertion": {
+        "expected": "URL包含'/user-agreemen'",
+        "locator": "text=《用户协议》",
+        "type": "url_contains"
+      },
+      "case_code": "TC-LOGIN-006",
+      "case_id": "aee5c834-7a27-5f3c-a71c-26e2c5dadb48",
+      "data_type": "none",
+      "enabled": true,
+      "expected_result": "跳转进入用户协议界面",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.不输入账号和密码\n2.直接点击页面最下方'《用户协议》'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 7,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "locator": "text=《用户协议》",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "查看用户协议",
+      "timeout_seconds": 3.0,
+      "title": "查看用户协议"
+    },
+    {
+      "assertion": {
+        "expected": "URL不包含'/login'",
+        "locator": "button[type='submit']",
+        "type": "url_not_contains"
+      },
+      "case_code": "TC-LOGIN-007",
+      "case_id": "a64936a6-869d-5ce8-80c0-3b13d07c0b87",
+      "data_type": "登录成功，跳转到首页",
+      "enabled": true,
+      "expected_result": "登录成功，跳转到首页",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "正常登录流程",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入正确账号\n2.输入正确密码\n3.选择门店\n4.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 8,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "${TEST_USERNAME}",
+          "locator": "#username",
+          "operation": "input"
+        },
+        {
+          "input": "${TEST_PASSWORD}",
+          "locator": "#password",
+          "operation": "input"
+        },
+        {
+          "locator": "#store",
+          "operation": "click"
+        },
+        {
+          "locator": "button[type='submit']",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:login"
+      ],
+      "test_point": "验证正常登录流程",
+      "timeout_seconds": 10.0,
+      "title": "登录成功"
+    }
+  ],
+  "config_hash": "sha256:adf437977c28a1992732762a77d6417d28c174989a552223fdcbfdf79b5b8f62",
+  "created_at": "2026-08-11T16:00:00+08:00",
+  "created_by": "b3ef6675-e2a4-5f66-afbe-54eb5ece56fc",
+  "environment_id": "a9299047-5764-5985-b5b3-0e871844acd8",
+  "project_id": "dd6f9be0-097c-5f2b-ae95-8bebd6e03181",
+  "run_id": "9feebdb4-96e4-5b31-bbaa-2c51acb5cf9c",
+  "schema_version": "1.0",
+  "secret_bindings": [
+    {
+      "name": "TEST_USERNAME",
+      "ref": "secret://yanjia/staging/test-username"
+    },
+    {
+      "name": "TEST_PASSWORD",
+      "ref": "secret://yanjia/staging/test-password"
+    }
+  ],
+  "target_id": "1bb3d626-0d34-5a8a-9178-7aa05c29655e",
+  "target_type": "WEB",
+  "variables": [
+    {
+      "name": "STORE_NAME",
+      "value": ""
+    }
+  ],
+  "web_config": {
+    "action_timeout_seconds": 15.0,
+    "base_url": "https://example.invalid/login",
+    "capture_trace": true,
+    "headless": true,
+    "ignore_https_errors": false,
+    "navigation_timeout_seconds": 30.0,
+    "viewport_height": 900,
+    "viewport_width": 1440
+  }
+}

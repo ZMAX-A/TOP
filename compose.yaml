@@ -1,0 +1,276 @@
+name: testops-platform
+
+x-api-build: &api-build
+  context: .
+  dockerfile: infra/docker/api.Dockerfile
+
+x-control-plane-environment: &control-plane-environment
+  TESTOPS_ENV: container
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-testops}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-testops}
+  DATABASE_ECHO: "false"
+  AUTO_CREATE_SCHEMA: "false"
+  RUNNER_CALLBACK_TOKEN: ${RUNNER_CALLBACK_TOKEN:-change-me-runner-callback-token}
+  BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:-change-me-one-time-bootstrap-token}
+  SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
+  CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
+  MINIO_ENDPOINT: http://minio:9000
+  MINIO_PUBLIC_ENDPOINT: ${MINIO_PUBLIC_ENDPOINT:-http://127.0.0.1:9000}
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-testops-local}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change-me-local-only}
+  MINIO_BUCKET: ${MINIO_BUCKET:-testops-artifacts}
+  MINIO_REGION: ${MINIO_REGION:-us-east-1}
+  ARTIFACT_URL_TTL_SECONDS: ${ARTIFACT_URL_TTL_SECONDS:-300}
+  RUN_EVENT_POLL_SECONDS: ${RUN_EVENT_POLL_SECONDS:-0.5}
+  RUN_EVENT_HEARTBEAT_SECONDS: ${RUN_EVENT_HEARTBEAT_SECONDS:-15}
+  RUNNER_HEARTBEAT_TTL_SECONDS: ${RUNNER_HEARTBEAT_TTL_SECONDS:-45}
+  METRICS_TOKEN: ${METRICS_TOKEN:-}
+
+x-worker-environment: &worker-environment
+  DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-testops}:${POSTGRES_PASSWORD:-change-me-local-only}@postgres:5432/${POSTGRES_DB:-testops}
+  REDIS_URL: redis://redis:6379/0
+  CONTROL_PLANE_URL: http://api:8000
+  RUNNER_CALLBACK_TOKEN: ${RUNNER_CALLBACK_TOKEN:-change-me-runner-callback-token}
+  OUTBOX_BATCH_SIZE: ${OUTBOX_BATCH_SIZE:-20}
+  RUNNER_HEARTBEAT_TTL_SECONDS: ${RUNNER_HEARTBEAT_TTL_SECONDS:-45}
+  RUNNER_CAPACITY_POLL_SECONDS: ${RUNNER_CAPACITY_POLL_SECONDS:-2}
+  RUNNER_WORKER_KEY: ${RUNNER_WORKER_KEY:-compose-web-1}
+  RUNNER_POOL_KEY: ${RUNNER_POOL_KEY:-default-web}
+  RUNNER_DISPLAY_NAME: ${RUNNER_DISPLAY_NAME:-Compose Web Worker 1}
+  RUNNER_VERSION: ${RUNNER_VERSION:-0.10.0}
+  RUNNER_MAX_SLOTS: ${RUNNER_MAX_SLOTS:-1}
+  RUNNER_HEARTBEAT_INTERVAL_SECONDS: ${RUNNER_HEARTBEAT_INTERVAL_SECONDS:-15}
+  RUNNER_CAPABILITIES: '${RUNNER_CAPABILITIES:-{"target_types":["WEB"],"browsers":["chromium"],"labels":{"runtime":"compose","os":"linux"}}}'
+  RUNNER_WORKSPACE_ROOT: /var/lib/testops/runs
+  MINIO_ENDPOINT: http://minio:9000
+  MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-testops-local}
+  MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-change-me-local-only}
+  MINIO_BUCKET: ${MINIO_BUCKET:-testops-artifacts}
+  MINIO_REGION: ${MINIO_REGION:-us-east-1}
+  TESTOPS_SECRET_SMOKE_USERNAME: smoke-user
+  TESTOPS_SECRET_SMOKE_PASSWORD: smoke-password
+
+services:
+  postgres:
+    image: postgres:${POSTGRES_IMAGE_TAG:-17-alpine}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-testops}
+      POSTGRES_USER: ${POSTGRES_USER:-testops}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-change-me-local-only}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:${REDIS_IMAGE_TAG:-7-alpine}
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio:
+    image: quay.io/minio/minio:${MINIO_IMAGE_TAG:-latest}
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-testops-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-local-only}
+    ports:
+      - "${MINIO_API_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - minio-data:/data
+    healthcheck:
+      test: ["CMD", "mc", "ready", "local"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  minio-init:
+    image: minio/mc:${MINIO_MC_IMAGE_TAG:-latest}
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        until mc alias set local http://minio:9000 "$${MINIO_ROOT_USER}" "$${MINIO_ROOT_PASSWORD}"; do sleep 1; done
+        mc mb --ignore-existing "local/$${MINIO_BUCKET}"
+        mc version enable "local/$${MINIO_BUCKET}"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-testops-local}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-change-me-local-only}
+      MINIO_BUCKET: ${MINIO_BUCKET:-testops-artifacts}
+    depends_on:
+      minio:
+        condition: service_healthy
+    restart: "no"
+
+  migrate:
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.10.0}
+    build: *api-build
+    command: ["python", "scripts/db_upgrade.py"]
+    environment: *control-plane-environment
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  api:
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.10.0}
+    build: *api-build
+    command:
+      - python
+      - -m
+      - uvicorn
+      - testops.api.main:app
+      - --host
+      - 0.0.0.0
+      - --port
+      - "8000"
+    environment: *control-plane-environment
+    ports:
+      - "${TESTOPS_API_PORT:-8000}:8000"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3).read()
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 5s
+    init: true
+    restart: unless-stopped
+
+  outbox:
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.10.0}
+    build: *api-build
+    command:
+      - python
+      - scripts/dispatch_outbox.py
+      - --watch
+      - --interval-seconds
+      - "0.5"
+    environment: *worker-environment
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+  worker:
+    image: testops-worker:${TESTOPS_IMAGE_TAG:-0.10.0}
+    build:
+      context: .
+      dockerfile: infra/docker/worker.Dockerfile
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - testops.worker.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --pool=solo
+      - --hostname=testops@%h
+      - --queues=celery,testops.pool.${RUNNER_POOL_KEY:-default-web}
+    environment: *worker-environment
+    volumes:
+      - runner-workspaces:/var/lib/testops/runs
+    depends_on:
+      api:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio-init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - celery -A testops.worker.celery_app:celery_app inspect ping --timeout 5 | grep -q pong
+      interval: 10s
+      timeout: 8s
+      retries: 12
+      start_period: 15s
+    shm_size: 1gb
+    init: true
+    stop_grace_period: 30s
+    restart: unless-stopped
+
+  frontend:
+    image: testops-frontend:${TESTOPS_IMAGE_TAG:-0.10.0}
+    build:
+      context: .
+      dockerfile: infra/docker/frontend.Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/frontend-healthz"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  smoke-target:
+    profiles: ["smoke"]
+    image: testops-smoke-target:${TESTOPS_IMAGE_TAG:-0.10.0}
+    build:
+      context: infra/smoke-target
+    ports:
+      - "${SMOKE_TARGET_PORT:-18080}:8080"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:8080/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+  prometheus:
+    profiles: ["observability"]
+    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.13.1}
+    command:
+      - --config.file=/etc/prometheus/prometheus.yml
+      - --storage.tsdb.path=/prometheus
+      - --storage.tsdb.retention.time=15d
+    ports:
+      - "${PROMETHEUS_PORT:-9090}:9090"
+    volumes:
+      - ./infra/observability/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./infra/observability/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - prometheus-data:/prometheus
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1:9090/-/ready"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  postgres-data:
+  redis-data:
+  minio-data:
+  runner-workspaces:
+  prometheus-data:
