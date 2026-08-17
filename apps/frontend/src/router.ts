@@ -53,6 +53,11 @@ const router = createRouter({
       component: () => import('@/views/RunOperationsView.vue'),
     },
     {
+      path: '/projects/:projectId/quality',
+      name: 'project-quality',
+      component: () => import('@/views/QualityAnalyticsView.vue'),
+    },
+    {
       path: '/projects/:projectId/runs/:runId',
       name: 'run-detail',
       component: () => import('@/views/RunDetailView.vue'),

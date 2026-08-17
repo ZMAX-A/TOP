@@ -16,11 +16,20 @@ class ControlPlaneClient:
         self._headers = {"X-Runner-Token": runner_token}
         self._timeout = timeout_seconds
 
-    def report_status(self, run_id: UUID, status: RunStatus) -> dict[str, Any]:
+    def report_status(
+        self,
+        run_id: UUID,
+        status: RunStatus,
+        *,
+        worker_key: str | None = None,
+    ) -> dict[str, Any]:
+        payload: dict[str, str] = {"status": status.value}
+        if worker_key is not None:
+            payload["worker_key"] = worker_key
         response = httpx.post(
             f"{self._base_url}/api/v1/internal/runs/{run_id}/status",
             headers=self._headers,
-            json={"status": status.value},
+            json=payload,
             timeout=self._timeout,
         )
         response.raise_for_status()

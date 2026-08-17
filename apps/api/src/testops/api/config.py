@@ -39,6 +39,7 @@ class Settings:
     run_event_poll_seconds: float = 0.5
     run_event_heartbeat_seconds: float = 15.0
     runner_heartbeat_ttl_seconds: int = 45
+    run_dispatch_start_timeout_seconds: int = 300
 
     @classmethod
     def from_environment(cls) -> Settings:
@@ -57,6 +58,11 @@ class Settings:
         runner_heartbeat_ttl_seconds = int(os.getenv("RUNNER_HEARTBEAT_TTL_SECONDS", "45"))
         if not 15 <= runner_heartbeat_ttl_seconds <= 600:
             raise ValueError("RUNNER_HEARTBEAT_TTL_SECONDS must be between 15 and 600")
+        run_dispatch_start_timeout_seconds = int(
+            os.getenv("RUN_DISPATCH_START_TIMEOUT_SECONDS", "300")
+        )
+        if not 30 <= run_dispatch_start_timeout_seconds <= 3600:
+            raise ValueError("RUN_DISPATCH_START_TIMEOUT_SECONDS must be between 30 and 3600")
         cors_origins = tuple(
             origin.strip()
             for origin in os.getenv(
@@ -87,4 +93,5 @@ class Settings:
             run_event_poll_seconds=run_event_poll_seconds,
             run_event_heartbeat_seconds=run_event_heartbeat_seconds,
             runner_heartbeat_ttl_seconds=runner_heartbeat_ttl_seconds,
+            run_dispatch_start_timeout_seconds=run_dispatch_start_timeout_seconds,
         )

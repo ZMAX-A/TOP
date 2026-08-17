@@ -5,7 +5,7 @@ from __future__ import annotations
 from testops.contracts import RunStatus
 
 ALLOWED_RUN_TRANSITIONS: dict[RunStatus, frozenset[RunStatus]] = {
-    RunStatus.QUEUED: frozenset({RunStatus.PREPARING, RunStatus.CANCELED}),
+    RunStatus.QUEUED: frozenset({RunStatus.PREPARING, RunStatus.CANCELED, RunStatus.INFRA_ERROR}),
     RunStatus.PREPARING: frozenset({RunStatus.RUNNING, RunStatus.CANCELED, RunStatus.INFRA_ERROR}),
     RunStatus.RUNNING: frozenset(
         {

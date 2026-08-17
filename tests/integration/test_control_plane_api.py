@@ -18,9 +18,17 @@ from testops.api.persistence import (
     ArtifactRecord,
     AuditLogRecord,
     DispatchOutboxRecord,
+    ProjectMemberRecord,
+    RegressionScheduleFiringRecord,
+    RegressionScheduleRecord,
     RunCaseRecord,
     RunEventRecord,
+    RunnerSlotLeaseRecord,
+    RunnerWorkerRecord,
 )
+from testops.api.persistence import TestRunRecord as RunRecord
+from testops.api.reliability_services import process_run_reliability
+from testops.api.schedule_services import process_due_schedules
 from testops.contracts import CaseBaseline, canonical_sha256
 from testops.worker.outbox import dispatch_outbox_batch
 
@@ -192,6 +200,42 @@ class ControlPlaneApiTests(unittest.TestCase):
             "case_codes": list(case_codes),
         }
 
+    def test_project_creation_persists_creator_membership_and_audit(self) -> None:
+        first = self.client.post(
+            "/api/v1/projects",
+            headers=self.headers,
+            json={"key": "project-transaction", "name": "Project Transaction"},
+        )
+        self.assertEqual(first.status_code, 201, first.text)
+        project_id = UUID(first.json()["id"])
+
+        duplicate = self.client.post(
+            "/api/v1/projects",
+            headers=self.headers,
+            json={"key": "project-transaction", "name": "Duplicate Project"},
+        )
+        self.assertEqual(duplicate.status_code, 409, duplicate.text)
+        self.assertEqual(duplicate.json()["detail"], "project key already exists")
+
+        async def persisted_dependencies() -> tuple[int, int]:
+            async with self.app.state.session_factory() as session:
+                member_count = await session.scalar(
+                    select(func.count())
+                    .select_from(ProjectMemberRecord)
+                    .where(ProjectMemberRecord.project_id == project_id)
+                )
+                audit_count = await session.scalar(
+                    select(func.count())
+                    .select_from(AuditLogRecord)
+                    .where(
+                        AuditLogRecord.project_id == project_id,
+                        AuditLogRecord.action == "project.created",
+                    )
+                )
+                return int(member_count or 0), int(audit_count or 0)
+
+        self.assertEqual(asyncio.run(persisted_dependencies()), (1, 1))
+
     def test_full_run_creation_is_idempotent_and_writes_outbox(self) -> None:
         resources = self._bootstrap()
         request_headers = {**self.headers, "Idempotency-Key": "login-smoke-0001"}
@@ -260,6 +304,7 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertEqual(initial.status_code, 200, initial.text)
         self.assertEqual(initial.json()["max_in_flight_runs"], 20)
         self.assertEqual(initial.json()["max_daily_runs"], 500)
+        self.assertEqual(initial.json()["run_timeout_seconds"], 3600)
         self.assertEqual(initial.json()["quota_status"], "AVAILABLE")
 
         invalid = self.client.patch(
@@ -274,6 +319,12 @@ class ControlPlaneApiTests(unittest.TestCase):
             json={"max_daily_runs": None},
         )
         self.assertEqual(null_value.status_code, 422, null_value.text)
+        invalid_timeout = self.client.patch(
+            policy_url,
+            headers=self.headers,
+            json={"run_timeout_seconds": 59},
+        )
+        self.assertEqual(invalid_timeout.status_code, 422, invalid_timeout.text)
 
         updated = self.client.patch(
             policy_url,
@@ -501,6 +552,650 @@ class ControlPlaneApiTests(unittest.TestCase):
         catalog = self.client.get("/api/v1/runner-pools/catalog", headers=self.headers)
         self.assertEqual(catalog.status_code, 200, catalog.text)
         self.assertEqual(catalog.json()[0]["key"], "web-chromium")
+
+    def test_run_reliability_times_out_and_recovers_runner_leases(self) -> None:
+        resources = self._bootstrap()
+        policy = self.client.patch(
+            f"/api/v1/projects/{resources['project_id']}/execution-policy",
+            headers=self.headers,
+            json={"run_timeout_seconds": 60},
+        )
+        self.assertEqual(policy.status_code, 200, policy.text)
+        self.assertEqual(policy.json()["run_timeout_seconds"], 60)
+        pool = self.client.post(
+            "/api/v1/admin/runner-pools",
+            headers=self.headers,
+            json={
+                "key": "reliability-web",
+                "name": "Reliability Web Pool",
+                "target_types": ["WEB"],
+                "max_concurrency": 1,
+            },
+        )
+        self.assertEqual(pool.status_code, 201, pool.text)
+        bound = self.client.patch(
+            f"/api/v1/projects/{resources['project_id']}/targets/{resources['target_id']}",
+            headers=self.headers,
+            json={"runner_pool_id": pool.json()["id"]},
+        )
+        self.assertEqual(bound.status_code, 200, bound.text)
+        heartbeat_url = "/api/v1/internal/runner-workers/reliability-worker/heartbeat"
+        heartbeat_payload = {
+            "pool_key": "reliability-web",
+            "display_name": "Reliability Worker",
+            "runner_version": "0.12.0",
+            "max_slots": 1,
+            "capabilities": {
+                "target_types": ["WEB"],
+                "browsers": ["chromium"],
+                "labels": {"purpose": "reliability-test"},
+            },
+        }
+        heartbeat = self.client.put(
+            heartbeat_url,
+            headers=RUNNER_HEADERS,
+            json=heartbeat_payload,
+        )
+        self.assertEqual(heartbeat.status_code, 200, heartbeat.text)
+        publisher = RecordingPublisher()
+
+        async def dispatch() -> object:
+            return await dispatch_outbox_batch(
+                self.app.state.session_factory,
+                publisher,
+                capacity_poll_seconds=0.1,
+            )
+
+        async def expire_run_timeout(run_id: str, moment: datetime) -> None:
+            async with self.app.state.session_factory() as session:
+                run = await session.get(RunRecord, UUID(run_id))
+                assert run is not None
+                run.timeout_at = moment - timedelta(seconds=1)
+                await session.commit()
+
+        async def expire_worker_heartbeat(moment: datetime) -> None:
+            async with self.app.state.session_factory() as session:
+                worker = await session.scalar(
+                    select(RunnerWorkerRecord).where(
+                        RunnerWorkerRecord.worker_key == "reliability-worker"
+                    )
+                )
+                assert worker is not None
+                worker.last_heartbeat_at = moment - timedelta(seconds=60)
+                await session.commit()
+
+        async def expire_dispatch_start(run_id: str, moment: datetime) -> None:
+            async with self.app.state.session_factory() as session:
+                run = await session.get(RunRecord, UUID(run_id))
+                assert run is not None
+                run.dispatched_at = moment - timedelta(seconds=301)
+                await session.commit()
+
+        def create_run(key: str, case_code: str) -> dict[str, object]:
+            response = self.client.post(
+                "/api/v1/runs",
+                headers={**self.headers, "Idempotency-Key": key},
+                json=self._run_payload(resources, case_code),
+            )
+            self.assertEqual(response.status_code, 201, response.text)
+            self.assertEqual(response.json()["timeout_seconds"], 60)
+            return response.json()
+
+        first = create_run("reliability-timeout", "TC-LOGIN-001")
+        self.assertEqual(asyncio.run(dispatch()).published, 1)
+        for status_value in ("PREPARING", "RUNNING"):
+            status_response = self.client.post(
+                f"/api/v1/internal/runs/{first['id']}/status",
+                headers=RUNNER_HEADERS,
+                json={
+                    "status": status_value,
+                    "worker_key": "reliability-worker",
+                },
+            )
+            self.assertEqual(status_response.status_code, 200, status_response.text)
+        running = self.client.get(f"/api/v1/runs/{first['id']}", headers=self.headers)
+        self.assertTrue(running.json()["timeout_at"].endswith(("Z", "+00:00")))
+        moment = datetime.now(UTC)
+        asyncio.run(expire_run_timeout(str(first["id"]), moment))
+        timed_out = asyncio.run(process_run_reliability(self.app.state.session_factory, now=moment))
+        self.assertEqual((timed_out.timed_out, timed_out.leases_released), (1, 1))
+        recovered = self.client.get(f"/api/v1/runs/{first['id']}", headers=self.headers)
+        self.assertEqual(recovered.json()["status"], "TIMED_OUT")
+        self.assertTrue(recovered.json()["cancel_requested"])
+
+        self.assertEqual(
+            self.client.put(
+                heartbeat_url,
+                headers=RUNNER_HEADERS,
+                json=heartbeat_payload,
+            ).status_code,
+            200,
+        )
+        second = create_run("reliability-runner-lost", "TC-LOGIN-003")
+        self.assertGreaterEqual(asyncio.run(dispatch()).published, 1)
+        preparing = self.client.post(
+            f"/api/v1/internal/runs/{second['id']}/status",
+            headers=RUNNER_HEADERS,
+            json={"status": "PREPARING", "worker_key": "reliability-worker"},
+        )
+        self.assertEqual(preparing.status_code, 200, preparing.text)
+        moment = datetime.now(UTC)
+        asyncio.run(expire_worker_heartbeat(moment))
+        lost = asyncio.run(process_run_reliability(self.app.state.session_factory, now=moment))
+        self.assertEqual((lost.runner_lost, lost.leases_released), (1, 1))
+        recovered = self.client.get(f"/api/v1/runs/{second['id']}", headers=self.headers)
+        self.assertEqual(recovered.json()["status"], "INFRA_ERROR")
+        self.assertIn("heartbeat expired", recovered.json()["error_message"])
+
+        self.assertEqual(
+            self.client.put(
+                heartbeat_url,
+                headers=RUNNER_HEADERS,
+                json=heartbeat_payload,
+            ).status_code,
+            200,
+        )
+        third = create_run("reliability-dispatch-stalled", "TC-LOGIN-007")
+        self.assertGreaterEqual(asyncio.run(dispatch()).published, 1)
+        moment = datetime.now(UTC)
+        asyncio.run(expire_dispatch_start(str(third["id"]), moment))
+        stalled = asyncio.run(
+            process_run_reliability(
+                self.app.state.session_factory,
+                now=moment,
+                dispatch_start_timeout_seconds=300,
+            )
+        )
+        self.assertEqual((stalled.dispatch_stalled, stalled.leases_released), (1, 1))
+        recovered = self.client.get(f"/api/v1/runs/{third['id']}", headers=self.headers)
+        self.assertEqual(recovered.json()["status"], "INFRA_ERROR")
+
+        async def recovery_evidence() -> tuple[int, int]:
+            async with self.app.state.session_factory() as session:
+                expired_leases = await session.scalar(
+                    select(func.count())
+                    .select_from(RunnerSlotLeaseRecord)
+                    .where(RunnerSlotLeaseRecord.status == "EXPIRED")
+                )
+                audits = await session.scalar(
+                    select(func.count())
+                    .select_from(AuditLogRecord)
+                    .where(
+                        AuditLogRecord.action.in_(
+                            ("run.timed_out", "run.runner_lost", "run.dispatch_stalled")
+                        )
+                    )
+                )
+                return int(expired_leases or 0), int(audits or 0)
+
+        self.assertEqual(asyncio.run(recovery_evidence()), (3, 3))
+
+    def test_regression_schedules_trigger_idempotently_and_apply_misfire_policy(self) -> None:
+        resources = self._bootstrap()
+        schedule_payload = {
+            "key": "weekday-login",
+            "name": "工作日登录回归",
+            "target_id": resources["target_id"],
+            "environment_id": resources["environment_id"],
+            "baseline_id": resources["baseline_id"],
+            "automation_package_id": resources["package_id"],
+            "case_codes": ["TC-LOGIN-001"],
+            "cron_expression": "0 9 * * 1-5",
+            "timezone": "Asia/Shanghai",
+            "misfire_policy": "FIRE_ONCE",
+            "misfire_grace_seconds": 60,
+        }
+        created = self.client.post(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules",
+            headers=self.headers,
+            json=schedule_payload,
+        )
+        self.assertEqual(created.status_code, 201, created.text)
+        schedule = created.json()
+        self.assertEqual(schedule["cron_expression"], "0 9 * * 1-5")
+        self.assertEqual(schedule["timezone"], "Asia/Shanghai")
+        self.assertIsNotNone(schedule["next_fire_at"])
+        self.assertTrue(schedule["next_fire_at"].endswith(("Z", "+00:00")))
+
+        listed = self.client.get(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules",
+            headers=self.headers,
+        )
+        self.assertEqual(listed.status_code, 200, listed.text)
+        self.assertEqual([item["id"] for item in listed.json()], [schedule["id"]])
+
+        trigger_url = (
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules/"
+            f"{schedule['id']}/trigger"
+        )
+        trigger_headers = {**self.headers, "Idempotency-Key": "manual-schedule-trigger-0001"}
+        manual = self.client.post(trigger_url, headers=trigger_headers)
+        self.assertEqual(manual.status_code, 201, manual.text)
+        self.assertEqual(manual.json()["regression_schedule_id"], schedule["id"])
+        self.assertIsNotNone(manual.json()["scheduled_for"])
+        self.assertTrue(manual.json()["scheduled_for"].endswith(("Z", "+00:00")))
+        replay = self.client.post(trigger_url, headers=trigger_headers)
+        self.assertEqual(replay.status_code, 200, replay.text)
+        self.assertEqual(replay.json()["id"], manual.json()["id"])
+        replayed_schedules = self.client.get(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules",
+            headers=self.headers,
+        )
+        self.assertEqual(
+            replayed_schedules.json()[0]["last_scheduled_for"],
+            manual.json()["scheduled_for"],
+        )
+
+        moment = datetime.now(UTC)
+        missed_for = moment - timedelta(minutes=5)
+
+        async def set_due(schedule_id: str, scheduled_for: datetime) -> None:
+            async with self.app.state.session_factory() as session:
+                record = await session.get(RegressionScheduleRecord, UUID(schedule_id))
+                assert record is not None
+                record.next_fire_at = scheduled_for
+                await session.commit()
+
+        asyncio.run(set_due(schedule["id"], missed_for))
+        dispatched = asyncio.run(process_due_schedules(self.app.state.session_factory, now=moment))
+        self.assertEqual(
+            (
+                dispatched.selected,
+                dispatched.triggered,
+                dispatched.skipped,
+                dispatched.blocked,
+                dispatched.failed,
+            ),
+            (1, 1, 0, 0, 0),
+        )
+        firings = self.client.get(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules/"
+            f"{schedule['id']}/firings",
+            headers=self.headers,
+        )
+        self.assertEqual(firings.status_code, 200, firings.text)
+        self.assertEqual(
+            {item["trigger_kind"] for item in firings.json()},
+            {"MANUAL", "MISFIRE"},
+        )
+        scheduled_firing = next(
+            item for item in firings.json() if item["trigger_kind"] == "MISFIRE"
+        )
+        self.assertEqual(scheduled_firing["status"], "TRIGGERED")
+        self.assertIsNotNone(scheduled_firing["run_id"])
+        self.assertTrue(scheduled_firing["scheduled_for"].endswith(("Z", "+00:00")))
+
+        skipped_payload = {
+            **schedule_payload,
+            "key": "skip-stale-login",
+            "name": "跳过过期登录回归",
+            "misfire_policy": "SKIP",
+        }
+        skipped_schedule = self.client.post(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules",
+            headers=self.headers,
+            json=skipped_payload,
+        )
+        self.assertEqual(skipped_schedule.status_code, 201, skipped_schedule.text)
+        scoped_manual = self.client.post(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules/"
+            f"{skipped_schedule.json()['id']}/trigger",
+            headers=trigger_headers,
+        )
+        self.assertEqual(scoped_manual.status_code, 201, scoped_manual.text)
+        self.assertNotEqual(scoped_manual.json()["id"], manual.json()["id"])
+        self.assertEqual(
+            scoped_manual.json()["regression_schedule_id"],
+            skipped_schedule.json()["id"],
+        )
+        asyncio.run(set_due(skipped_schedule.json()["id"], missed_for))
+        skipped = asyncio.run(process_due_schedules(self.app.state.session_factory, now=moment))
+        self.assertEqual((skipped.selected, skipped.skipped, skipped.failed), (1, 1, 0))
+
+        paused = self.client.patch(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules/{schedule['id']}",
+            headers=self.headers,
+            json={"status": "PAUSED"},
+        )
+        self.assertEqual(paused.status_code, 200, paused.text)
+        self.assertEqual(paused.json()["status"], "PAUSED")
+        self.assertIsNone(paused.json()["next_fire_at"])
+
+        async def count_firings() -> int:
+            async with self.app.state.session_factory() as session:
+                count = await session.scalar(
+                    select(func.count()).select_from(RegressionScheduleFiringRecord)
+                )
+                return int(count or 0)
+
+        self.assertEqual(asyncio.run(count_firings()), 4)
+
+    def test_metrics_expose_dispatch_and_schedule_backlog(self) -> None:
+        resources = self._bootstrap()
+        run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "metrics-backlog-run"},
+            json=self._run_payload(resources, "TC-LOGIN-001"),
+        )
+        self.assertEqual(run.status_code, 201, run.text)
+        schedule = self.client.post(
+            f"/api/v1/projects/{resources['project_id']}/regression-schedules",
+            headers=self.headers,
+            json={
+                "key": "metrics-schedule",
+                "name": "Metrics Schedule",
+                "target_id": resources["target_id"],
+                "environment_id": resources["environment_id"],
+                "baseline_id": resources["baseline_id"],
+                "automation_package_id": resources["package_id"],
+                "cron_expression": "*/5 * * * *",
+                "timezone": "UTC",
+            },
+        )
+        self.assertEqual(schedule.status_code, 201, schedule.text)
+        moment = datetime.now(UTC)
+
+        async def age_backlogs() -> None:
+            async with self.app.state.session_factory() as session:
+                run_record = await session.get(RunRecord, UUID(run.json()["id"]))
+                schedule_record = await session.get(
+                    RegressionScheduleRecord,
+                    UUID(schedule.json()["id"]),
+                )
+                assert run_record is not None and schedule_record is not None
+                run_record.dispatch_state = "WAITING"
+                run_record.dispatch_wait_reason = "NO_HEALTHY_RUNNER"
+                run_record.created_at = moment - timedelta(minutes=10)
+                schedule_record.next_fire_at = moment - timedelta(minutes=5)
+                await session.commit()
+
+        asyncio.run(age_backlogs())
+        metrics = self.client.get("/metrics")
+        self.assertEqual(metrics.status_code, 200, metrics.text)
+        self.assertIn('testops_runs_in_flight{status="QUEUED"} 1.0', metrics.text)
+        self.assertIn("testops_dispatch_waiting_runs 1.0", metrics.text)
+        self.assertIn("testops_schedule_due_backlog 1.0", metrics.text)
+        self.assertIn("testops_reliability_snapshot_success 1.0", metrics.text)
+
+    def test_project_quality_policy_trends_and_failure_clusters(self) -> None:
+        resources = self._bootstrap()
+        policy_url = f"/api/v1/projects/{resources['project_id']}/quality-policy"
+        initial_policy = self.client.get(policy_url, headers=self.headers)
+        self.assertEqual(initial_policy.status_code, 200, initial_policy.text)
+        self.assertEqual(initial_policy.json()["target_pass_rate_percent"], 95)
+        self.assertEqual(initial_policy.json()["window_days"], 30)
+
+        invalid_policy = self.client.patch(
+            policy_url,
+            headers=self.headers,
+            json={"target_pass_rate_percent": 0},
+        )
+        self.assertEqual(invalid_policy.status_code, 422, invalid_policy.text)
+        policy = self.client.patch(
+            policy_url,
+            headers=self.headers,
+            json={"target_pass_rate_percent": 80, "window_days": 14},
+        )
+        self.assertEqual(policy.status_code, 200, policy.text)
+        self.assertEqual(policy.json()["target_pass_rate_percent"], 80)
+        self.assertEqual(policy.json()["window_days"], 14)
+
+        statuses = ("PASSED", "FAILED", "FAILED", "INFRA_ERROR", "TIMED_OUT", "CANCELED")
+        run_ids: list[UUID] = []
+        for index, _status in enumerate(statuses):
+            created = self.client.post(
+                "/api/v1/runs",
+                headers={**self.headers, "Idempotency-Key": f"quality-run-{index:04d}"},
+                json=self._run_payload(resources, "TC-LOGIN-001"),
+            )
+            self.assertEqual(created.status_code, 201, created.text)
+            run_ids.append(UUID(created.json()["id"]))
+
+        moment = datetime.now(UTC)
+        assertion_messages = (
+            "Expected 200 at https://one.example.invalid/orders request "
+            "11111111-1111-4111-8111-111111111111 attempt 1 token=alpha",
+            "Expected 404 at https://two.example.invalid/orders request "
+            "22222222-2222-4222-8222-222222222222 attempt 2 token=beta",
+        )
+
+        async def seed_quality_history() -> None:
+            async with self.app.state.session_factory() as session:
+                for index, (run_id, run_status) in enumerate(zip(run_ids, statuses, strict=True)):
+                    run = await session.get(RunRecord, run_id)
+                    run_case = await session.scalar(
+                        select(RunCaseRecord).where(RunCaseRecord.run_id == run_id)
+                    )
+                    assert run is not None and run_case is not None
+                    finished_at = moment - timedelta(days=1 if index < 2 else 0, minutes=index)
+                    run.status = run_status
+                    run.started_at = finished_at - timedelta(seconds=2)
+                    run.finished_at = finished_at
+                    if run_status == "PASSED":
+                        run_case.status = "PASSED"
+                    elif run_status == "FAILED":
+                        run_case.status = "FAILED"
+                        run_case.failure_category = "ASSERTION"
+                        run_case.error_message = assertion_messages[index - 1]
+                    elif run_status == "INFRA_ERROR":
+                        run_case.status = "INFRA_ERROR"
+                        run_case.failure_category = "BROWSER"
+                        run_case.error_message = "Chromium process exited with code 137"
+                    elif run_status == "TIMED_OUT":
+                        run_case.status = "TIMED_OUT"
+                        run_case.error_message = "Run timed out after 3600 seconds"
+                    else:
+                        run_case.status = "CANCELED"
+                await session.commit()
+
+        asyncio.run(seed_quality_history())
+        analytics_url = f"/api/v1/projects/{resources['project_id']}/quality/analytics"
+        analytics = self.client.get(analytics_url, headers=self.headers)
+        self.assertEqual(analytics.status_code, 200, analytics.text)
+        payload = analytics.json()
+        self.assertEqual(payload["window_days"], 14)
+        self.assertEqual(
+            payload["filters"],
+            {"target_id": None, "environment_id": None, "baseline_id": None},
+        )
+        self.assertEqual(payload["target_pass_rate_percent"], 80)
+        self.assertEqual(payload["slo_status"], "BREACHED")
+        self.assertEqual(payload["runs"]["total_terminal_runs"], 6)
+        self.assertEqual(payload["runs"]["conclusive_runs"], 3)
+        self.assertEqual(payload["runs"]["pass_rate_percent"], 33.33)
+        self.assertEqual(payload["runs"]["execution_reliability_percent"], 60.0)
+        self.assertEqual(payload["cases"]["total_terminal_cases"], 6)
+        self.assertEqual(payload["cases"]["timed_out_cases"], 1)
+        self.assertEqual(payload["cases"]["canceled_cases"], 1)
+        self.assertEqual(len(payload["trend"]), 14)
+        self.assertTrue(payload["trend"][0]["bucket_started_at"].endswith("Z"))
+        self.assertFalse(payload["failure_data_truncated"])
+
+        assertion_cluster = payload["failure_clusters"][0]
+        self.assertEqual(assertion_cluster["failure_category"], "ASSERTION")
+        self.assertEqual(assertion_cluster["occurrences"], 2)
+        self.assertEqual(assertion_cluster["affected_runs"], 2)
+        self.assertEqual(assertion_cluster["failed_occurrences"], 2)
+        self.assertIn("<url>", assertion_cluster["message_pattern"])
+        self.assertIn("<uuid>", assertion_cluster["message_pattern"])
+        self.assertIn("token=<redacted>", assertion_cluster["message_pattern"])
+        self.assertNotIn("alpha", assertion_cluster["message_pattern"])
+        self.assertNotIn("two.example.invalid", assertion_cluster["message_pattern"])
+        flaky = payload["flaky"]
+        self.assertEqual(flaky["minimum_conclusive_executions"], 3)
+        self.assertEqual(flaky["minimum_status_transitions"], 2)
+        self.assertEqual(flaky["analyzed_executions"], 3)
+        self.assertEqual(flaky["detected_cases"], 1)
+        self.assertFalse(flaky["data_truncated"])
+        self.assertEqual(len(flaky["cases"]), 1)
+        flaky_case = flaky["cases"][0]
+        self.assertEqual(flaky_case["case_code"], "TC-LOGIN-001")
+        self.assertEqual(flaky_case["conclusive_executions"], 3)
+        self.assertEqual(flaky_case["passed_executions"], 1)
+        self.assertEqual(flaky_case["failed_executions"], 2)
+        self.assertEqual(flaky_case["pass_rate_percent"], 33.33)
+        self.assertEqual(flaky_case["status_transitions"], 2)
+        self.assertEqual(flaky_case["transition_rate_percent"], 100.0)
+        self.assertEqual(flaky_case["latest_status"], "FAILED")
+
+        seven_days = self.client.get(f"{analytics_url}?window_days=7", headers=self.headers)
+        self.assertEqual(seven_days.status_code, 200, seven_days.text)
+        self.assertEqual(seven_days.json()["window_days"], 7)
+        self.assertEqual(len(seven_days.json()["trend"]), 7)
+        invalid_window = self.client.get(
+            f"{analytics_url}?window_days=0",
+            headers=self.headers,
+        )
+        self.assertEqual(invalid_window.status_code, 422, invalid_window.text)
+
+        second_target = self.client.post(
+            f"/api/v1/projects/{resources['project_id']}/targets",
+            headers=self.headers,
+            json={
+                "key": "admin-web",
+                "name": "第二 Web 管理端",
+                "target_type": "WEB",
+                "browser": "chromium",
+            },
+        )
+        self.assertEqual(second_target.status_code, 201, second_target.text)
+        second_target_id = second_target.json()["id"]
+        second_environment = self.client.post(
+            (f"/api/v1/projects/{resources['project_id']}/targets/{second_target_id}/environments"),
+            headers=self.headers,
+            json={
+                "key": "staging",
+                "name": "第二测试环境",
+                "web_config": {
+                    "base_url": "https://second.example.invalid/login",
+                    "headless": True,
+                    "capture_trace": True,
+                },
+            },
+        )
+        self.assertEqual(second_environment.status_code, 201, second_environment.text)
+        second_environment_id = second_environment.json()["id"]
+
+        earlier_baseline_directory = ROOT / "baselines/yanjia-ai-web/case-v1.0.0"
+        earlier_baseline_document = json.loads(
+            (earlier_baseline_directory / "case-baseline.json").read_text("utf-8")
+        )
+        earlier_manifest = json.loads(
+            (earlier_baseline_directory / "manifest.json").read_text("utf-8")
+        )
+        second_baseline = self.client.post(
+            f"/api/v1/projects/{resources['project_id']}/baselines",
+            headers=self.headers,
+            json={
+                "baseline": earlier_baseline_document,
+                "digest": earlier_manifest["baseline"]["digest"],
+            },
+        )
+        self.assertEqual(second_baseline.status_code, 201, second_baseline.text)
+        second_baseline_id = second_baseline.json()["baseline_id"]
+        second_package = self.client.post(
+            (
+                f"/api/v1/projects/{resources['project_id']}/targets/"
+                f"{second_target_id}/automation-packages"
+            ),
+            headers=self.headers,
+            json={"name": "yanjia-admin-web", "version": "0.1.0", "digest": PACKAGE_DIGEST},
+        )
+        self.assertEqual(second_package.status_code, 201, second_package.text)
+        second_resources = {
+            "project_id": resources["project_id"],
+            "target_id": second_target_id,
+            "environment_id": second_environment_id,
+            "baseline_id": second_baseline_id,
+            "package_id": second_package.json()["id"],
+        }
+        second_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "quality-dimension-run-0001"},
+            json=self._run_payload(second_resources, "TC-LOGIN-001"),
+        )
+        self.assertEqual(second_run.status_code, 201, second_run.text)
+
+        async def seed_second_dimension() -> None:
+            async with self.app.state.session_factory() as session:
+                run = await session.get(RunRecord, UUID(second_run.json()["id"]))
+                run_case = await session.scalar(
+                    select(RunCaseRecord).where(
+                        RunCaseRecord.run_id == UUID(second_run.json()["id"])
+                    )
+                )
+                assert run is not None and run_case is not None
+                run.status = "PASSED"
+                run.started_at = moment - timedelta(seconds=2)
+                run.finished_at = moment
+                run_case.status = "PASSED"
+                await session.commit()
+
+        asyncio.run(seed_second_dimension())
+
+        dimension_queries = (
+            ("target_id", second_target_id),
+            ("environment_id", second_environment_id),
+            ("baseline_id", second_baseline_id),
+        )
+        for query_name, query_value in dimension_queries:
+            filtered = self.client.get(
+                f"{analytics_url}?{query_name}={query_value}",
+                headers=self.headers,
+            )
+            self.assertEqual(filtered.status_code, 200, filtered.text)
+            filtered_payload = filtered.json()
+            self.assertEqual(filtered_payload["filters"][query_name], query_value)
+            self.assertEqual(filtered_payload["runs"]["total_terminal_runs"], 1)
+            self.assertEqual(filtered_payload["runs"]["pass_rate_percent"], 100.0)
+            self.assertEqual(filtered_payload["slo_status"], "MET")
+            self.assertEqual(filtered_payload["flaky"]["detected_cases"], 0)
+
+        combined = self.client.get(
+            (
+                f"{analytics_url}?target_id={second_target_id}"
+                f"&environment_id={second_environment_id}&baseline_id={second_baseline_id}"
+            ),
+            headers=self.headers,
+        )
+        self.assertEqual(combined.status_code, 200, combined.text)
+        self.assertEqual(combined.json()["runs"]["total_terminal_runs"], 1)
+
+        no_data = self.client.get(
+            (
+                f"{analytics_url}?target_id={resources['target_id']}"
+                f"&baseline_id={second_baseline_id}"
+            ),
+            headers=self.headers,
+        )
+        self.assertEqual(no_data.status_code, 200, no_data.text)
+        self.assertEqual(no_data.json()["slo_status"], "NO_DATA")
+        self.assertEqual(no_data.json()["runs"]["total_terminal_runs"], 0)
+
+        mismatched_environment = self.client.get(
+            (
+                f"{analytics_url}?target_id={second_target_id}"
+                f"&environment_id={resources['environment_id']}"
+            ),
+            headers=self.headers,
+        )
+        self.assertEqual(mismatched_environment.status_code, 422, mismatched_environment.text)
+        missing_target = self.client.get(
+            f"{analytics_url}?target_id={uuid4()}",
+            headers=self.headers,
+        )
+        self.assertEqual(missing_target.status_code, 404, missing_target.text)
+
+        async def policy_audit_count() -> int:
+            async with self.app.state.session_factory() as session:
+                count = await session.scalar(
+                    select(func.count())
+                    .select_from(AuditLogRecord)
+                    .where(AuditLogRecord.action == "project.quality_policy_updated")
+                )
+                return int(count or 0)
+
+        self.assertEqual(asyncio.run(policy_audit_count()), 1)
 
     def test_published_baseline_is_idempotent_but_immutable(self) -> None:
         resources = self._bootstrap()

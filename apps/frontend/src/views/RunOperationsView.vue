@@ -21,7 +21,7 @@ import type {
   Target,
 } from '@/api/types'
 import { auth } from '@/auth'
-import { formatDate, runTagType, shortDigest } from '@/presentation'
+import { formatDate, formatUtcDate, runTagType, shortDigest } from '@/presentation'
 
 const TERMINAL_STATUSES = new Set<RunStatus>([
   'PASSED',
@@ -330,6 +330,10 @@ onMounted(initialize)
                 class="table-link mono"
                 @click="router.push({ name: 'run-detail', params: { projectId, runId: scope.row.source_run_id } })"
               >{{ scope.row.source_run_id.slice(0, 8) }}</span>
+            </div>
+            <div v-if="scope.row.regression_schedule_id" class="lineage scheduled-lineage">
+              定时回归 · 计划 <span class="mono">{{ scope.row.regression_schedule_id.slice(0, 8) }}</span>
+              <template v-if="scope.row.scheduled_for"> · {{ formatUtcDate(scope.row.scheduled_for) }}</template>
             </div>
           </template>
         </el-table-column>

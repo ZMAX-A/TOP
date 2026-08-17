@@ -1,7 +1,15 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, DocumentAdd, Lock, Refresh, Setting, VideoPlay } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  DataAnalysis,
+  DocumentAdd,
+  Lock,
+  Refresh,
+  Setting,
+  VideoPlay,
+} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 import { ApiError, api } from '@/api/client'
@@ -170,6 +178,10 @@ onMounted(load)
       </div>
       <div class="heading-actions">
         <el-button :icon="Refresh" @click="load">刷新</el-button>
+        <el-button
+          :icon="DataAnalysis"
+          @click="router.push({ name: 'project-quality', params: { projectId } })"
+        >质量分析</el-button>
         <el-button
           :icon="Setting"
           @click="router.push({ name: 'project-settings', params: { projectId } })"

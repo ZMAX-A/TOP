@@ -43,12 +43,26 @@ from .persistence import (
     AutomationPackageRecord,
     CaseBaselineRecord,
     EnvironmentRecord,
+    RegressionScheduleFiringRecord,
+    RegressionScheduleRecord,
     RunCaseRecord,
     RunEventRecord,
     RunnerPoolRecord,
     RunnerWorkerRecord,
     TestRunRecord,
     utc_now,
+)
+from .quality_services import (
+    get_quality_analytics,
+    get_quality_policy,
+    update_quality_policy,
+)
+from .schedule_services import (
+    create_regression_schedule,
+    list_regression_schedule_firings,
+    list_regression_schedules,
+    trigger_regression_schedule,
+    update_regression_schedule,
 )
 from .schemas import (
     ArtifactAccessResponse,
@@ -69,6 +83,13 @@ from .schemas import (
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
+    QualityAnalyticsResponse,
+    QualityPolicyResponse,
+    QualityPolicyUpdate,
+    RegressionScheduleCreate,
+    RegressionScheduleFiringResponse,
+    RegressionScheduleResponse,
+    RegressionScheduleUpdate,
     RunBatchCancelRequest,
     RunBatchCancelResponse,
     RunCaseResponse,
@@ -206,6 +227,18 @@ def _baseline_response(record: CaseBaselineRecord) -> BaselineResponse:
 
 def _package_response(record: AutomationPackageRecord) -> AutomationPackageResponse:
     return AutomationPackageResponse.model_validate(record)
+
+
+def _regression_schedule_response(
+    record: RegressionScheduleRecord,
+) -> RegressionScheduleResponse:
+    return RegressionScheduleResponse.model_validate(record)
+
+
+def _regression_firing_response(
+    record: RegressionScheduleFiringRecord,
+) -> RegressionScheduleFiringResponse:
+    return RegressionScheduleFiringResponse.model_validate(record)
 
 
 def _run_response(record: TestRunRecord) -> RunResponse:
@@ -467,6 +500,167 @@ async def patch_project_execution_policy(
 ) -> object:
     await authorize_project(session, principal, project_id, "project:manage")
     return await update_execution_policy(session, project_id, payload, principal.user_id)
+
+
+@router.get(
+    "/projects/{project_id}/quality-policy",
+    response_model=QualityPolicyResponse,
+    tags=["quality-analytics"],
+)
+async def get_project_quality_policy(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityPolicyResponse:
+    await authorize_project(session, principal, project_id, "project:read")
+    return await get_quality_policy(session, project_id)
+
+
+@router.patch(
+    "/projects/{project_id}/quality-policy",
+    response_model=QualityPolicyResponse,
+    tags=["quality-analytics"],
+)
+async def patch_project_quality_policy(
+    project_id: UUID,
+    payload: QualityPolicyUpdate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityPolicyResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await update_quality_policy(session, project_id, payload, principal.user_id)
+
+
+@router.get(
+    "/projects/{project_id}/quality/analytics",
+    response_model=QualityAnalyticsResponse,
+    tags=["quality-analytics"],
+)
+async def get_project_quality_analytics(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+    window_days: Annotated[int | None, Query(ge=1, le=90)] = None,
+    target_id: UUID | None = None,
+    environment_id: UUID | None = None,
+    baseline_id: UUID | None = None,
+) -> QualityAnalyticsResponse:
+    await authorize_project(session, principal, project_id, "run:read")
+    return await get_quality_analytics(
+        session,
+        project_id,
+        window_days=window_days,
+        target_id=target_id,
+        environment_id=environment_id,
+        baseline_id=baseline_id,
+    )
+
+
+@router.post(
+    "/projects/{project_id}/regression-schedules",
+    response_model=RegressionScheduleResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["regression-schedules"],
+)
+async def post_regression_schedule(
+    project_id: UUID,
+    payload: RegressionScheduleCreate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RegressionScheduleResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record = await create_regression_schedule(session, project_id, payload, principal.user_id)
+    return _regression_schedule_response(record)
+
+
+@router.get(
+    "/projects/{project_id}/regression-schedules",
+    response_model=tuple[RegressionScheduleResponse, ...],
+    tags=["regression-schedules"],
+)
+async def get_regression_schedules(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> tuple[RegressionScheduleResponse, ...]:
+    await authorize_project(session, principal, project_id, "project:read")
+    records = await list_regression_schedules(session, project_id)
+    return tuple(_regression_schedule_response(record) for record in records)
+
+
+@router.patch(
+    "/projects/{project_id}/regression-schedules/{schedule_id}",
+    response_model=RegressionScheduleResponse,
+    tags=["regression-schedules"],
+)
+async def patch_regression_schedule(
+    project_id: UUID,
+    schedule_id: UUID,
+    payload: RegressionScheduleUpdate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RegressionScheduleResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record = await update_regression_schedule(
+        session,
+        project_id,
+        schedule_id,
+        payload,
+        principal.user_id,
+    )
+    return _regression_schedule_response(record)
+
+
+@router.get(
+    "/projects/{project_id}/regression-schedules/{schedule_id}/firings",
+    response_model=tuple[RegressionScheduleFiringResponse, ...],
+    tags=["regression-schedules"],
+)
+async def get_regression_schedule_firings(
+    project_id: UUID,
+    schedule_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+    limit: Annotated[int, Query(ge=1, le=200)] = 50,
+) -> tuple[RegressionScheduleFiringResponse, ...]:
+    await authorize_project(session, principal, project_id, "project:read")
+    records = await list_regression_schedule_firings(
+        session,
+        project_id,
+        schedule_id,
+        limit=limit,
+    )
+    return tuple(_regression_firing_response(record) for record in records)
+
+
+@router.post(
+    "/projects/{project_id}/regression-schedules/{schedule_id}/trigger",
+    response_model=RunResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["regression-schedules"],
+)
+async def post_regression_schedule_trigger(
+    project_id: UUID,
+    schedule_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+    response: Response,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
+) -> RunResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record, created = await trigger_regression_schedule(
+        session,
+        project_id,
+        schedule_id,
+        idempotency_key=idempotency_key,
+        actor_id=principal.user_id,
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return _run_response(record)
 
 
 @router.post(
@@ -953,7 +1147,12 @@ async def post_internal_run_status(
     _auth: RunnerAuth,
     session: Session,
 ) -> InternalRunStatusResponse:
-    record, changed = await update_run_status(session, run_id, payload.status)
+    record, changed = await update_run_status(
+        session,
+        run_id,
+        payload.status,
+        worker_key=payload.worker_key,
+    )
     return InternalRunStatusResponse(
         run_id=record.id,
         status=RunStatus(record.status),

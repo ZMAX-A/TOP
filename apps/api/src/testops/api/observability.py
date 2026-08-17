@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from time import perf_counter
+from typing import TYPE_CHECKING
 
 from prometheus_client import (
     CollectorRegistry,
@@ -15,6 +16,9 @@ from prometheus_client import (
     generate_latest,
 )
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
+
+if TYPE_CHECKING:
+    from .reliability_services import ReliabilitySnapshot
 
 HTTP_DURATION_BUCKETS = (
     0.005,
@@ -72,6 +76,56 @@ class ApiMetrics:
             registry=self.registry,
         )
         self.database_ready.set(0)
+        self.runs_in_flight = Gauge(
+            "testops_runs_in_flight",
+            "Current non-terminal Runs by status.",
+            ("status",),
+            registry=self.registry,
+        )
+        for status in ("QUEUED", "PREPARING", "RUNNING"):
+            self.runs_in_flight.labels(status=status).set(0)
+        self.dispatch_waiting_runs = Gauge(
+            "testops_dispatch_waiting_runs",
+            "Runs currently waiting for dispatch capacity.",
+            registry=self.registry,
+        )
+        self.dispatch_backlog_oldest_age_seconds = Gauge(
+            "testops_dispatch_backlog_oldest_age_seconds",
+            "Age of the oldest Run waiting for dispatch capacity.",
+            registry=self.registry,
+        )
+        self.schedule_due_backlog = Gauge(
+            "testops_schedule_due_backlog",
+            "Active regression schedules whose next fire time is due.",
+            registry=self.registry,
+        )
+        self.schedule_lag_seconds = Gauge(
+            "testops_schedule_lag_seconds",
+            "Lag of the oldest due regression schedule.",
+            registry=self.registry,
+        )
+        self.stale_runner_leases = Gauge(
+            "testops_stale_runner_leases",
+            "Active leases bound to Runner workers with expired heartbeats.",
+            registry=self.registry,
+        )
+        self.reliability_snapshot_success = Gauge(
+            "testops_reliability_snapshot_success",
+            "Whether the latest reliability snapshot query succeeded.",
+            registry=self.registry,
+        )
+        self.reliability_snapshot_success.set(0)
+
+    def update_reliability(self, snapshot: ReliabilitySnapshot) -> None:
+        self.runs_in_flight.labels(status="QUEUED").set(snapshot.queued_runs)
+        self.runs_in_flight.labels(status="PREPARING").set(snapshot.preparing_runs)
+        self.runs_in_flight.labels(status="RUNNING").set(snapshot.running_runs)
+        self.dispatch_waiting_runs.set(snapshot.dispatch_waiting_runs)
+        self.dispatch_backlog_oldest_age_seconds.set(snapshot.dispatch_backlog_oldest_age_seconds)
+        self.schedule_due_backlog.set(snapshot.due_schedules)
+        self.schedule_lag_seconds.set(snapshot.schedule_lag_seconds)
+        self.stale_runner_leases.set(snapshot.stale_runner_leases)
+        self.reliability_snapshot_success.set(1)
 
     def render(self) -> bytes:
         return generate_latest(self.registry)

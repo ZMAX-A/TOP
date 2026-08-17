@@ -1,23 +1,36 @@
 <script setup lang="ts">
 import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { ArrowLeft, Connection, Plus, Refresh, Setting, User } from '@element-plus/icons-vue'
+import {
+  ArrowLeft,
+  Calendar,
+  Connection,
+  Plus,
+  Refresh,
+  Setting,
+  User,
+  VideoPlay,
+} from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 import { ApiError, api } from '@/api/client'
 import type {
+  AutomationPackage,
+  Baseline,
   Environment,
   ExecutionPolicy,
   Project,
   ProjectMember,
   ProjectMemberCandidate,
   ProjectRole,
+  RegressionSchedule,
+  RegressionScheduleFiring,
   RunnerPoolCatalog,
   SecretBinding,
   Target,
 } from '@/api/types'
 import { auth } from '@/auth'
-import { formatDate, shortDigest } from '@/presentation'
+import { formatDate, formatUtcDate, shortDigest } from '@/presentation'
 
 const route = useRoute()
 const router = useRouter()
@@ -31,6 +44,9 @@ const targets = ref<Target[]>([])
 const environmentsByTarget = ref<Record<string, Environment[]>>({})
 const executionPolicy = ref<ExecutionPolicy>()
 const runnerPools = ref<RunnerPoolCatalog[]>([])
+const regressionSchedules = ref<RegressionSchedule[]>([])
+const baselines = ref<Baseline[]>([])
+const packagesByTarget = ref<Record<string, AutomationPackage[]>>({})
 
 const currentMember = computed(() =>
   members.value.find((item) => item.user_id === auth.state.user?.id),
@@ -42,6 +58,9 @@ const canManage = computed(
 )
 const environmentCount = computed(() =>
   Object.values(environmentsByTarget.value).reduce((total, items) => total + items.length, 0),
+)
+const activeScheduleCount = computed(
+  () => regressionSchedules.value.filter((item) => item.status === 'ACTIVE').length,
 )
 const inFlightPercent = computed(() => {
   const policy = executionPolicy.value
@@ -98,7 +117,38 @@ const policyBusy = ref(false)
 const policyForm = reactive({
   max_in_flight_runs: 20,
   max_daily_runs: 500,
+  run_timeout_seconds: 3600,
 })
+
+const scheduleVisible = ref(false)
+const scheduleBusy = ref(false)
+const scheduleEditId = ref('')
+const scheduleForm = reactive({
+  key: '',
+  name: '',
+  description: '',
+  target_id: '',
+  environment_id: '',
+  baseline_id: '',
+  automation_package_id: '',
+  case_codes: '',
+  cron_expression: '0 2 * * *',
+  timezone: 'Asia/Shanghai',
+  misfire_policy: 'FIRE_ONCE' as RegressionSchedule['misfire_policy'],
+  misfire_grace_seconds: 300,
+  status: 'ACTIVE' as 'ACTIVE' | 'PAUSED',
+})
+const scheduleTarget = computed(() =>
+  targets.value.find((item) => item.id === scheduleForm.target_id),
+)
+const scheduleEnvironments = computed(
+  () => environmentsByTarget.value[scheduleForm.target_id] || [],
+)
+const schedulePackages = computed(() => packagesByTarget.value[scheduleForm.target_id] || [])
+const firingVisible = ref(false)
+const firingLoading = ref(false)
+const firingSchedule = ref<RegressionSchedule>()
+const firings = ref<RegressionScheduleFiring[]>([])
 
 const roleLabels: Record<ProjectRole, string> = {
   VIEWER: '只读成员',
@@ -109,10 +159,6 @@ const roleLabels: Record<ProjectRole, string> = {
 
 function report(error: unknown, fallback: string): void {
   ElMessage.error(error instanceof ApiError ? error.message : fallback)
-}
-
-function formatUtcWindow(value: string): string {
-  return `${new Date(value).toISOString().slice(0, 16).replace('T', ' ')} UTC`
 }
 
 function poolLabel(poolId: string | null | undefined, fallback = '未绑定（默认队列）'): string {
@@ -128,26 +174,43 @@ function compatiblePools(targetType: Target['target_type']): RunnerPoolCatalog[]
 async function load(): Promise<void> {
   loading.value = true
   try {
-    const [projectList, memberList, targetList, policy, poolCatalog] = await Promise.all([
+    const [
+      projectList,
+      memberList,
+      targetList,
+      policy,
+      poolCatalog,
+      scheduleList,
+      baselineList,
+    ] = await Promise.all([
       api.projects(),
       api.projectMembers(projectId.value),
       api.targets(projectId.value),
       api.executionPolicy(projectId.value),
       api.runnerPoolCatalog(),
+      api.regressionSchedules(projectId.value),
+      api.baselines(projectId.value),
     ])
     project.value = projectList.find((item) => item.id === projectId.value)
     members.value = memberList
     targets.value = targetList
     executionPolicy.value = policy
     runnerPools.value = poolCatalog
+    regressionSchedules.value = scheduleList
+    baselines.value = baselineList
     Object.assign(policyForm, {
       max_in_flight_runs: policy.max_in_flight_runs,
       max_daily_runs: policy.max_daily_runs,
+      run_timeout_seconds: policy.run_timeout_seconds,
     })
     const environmentLists = await Promise.all(
       targetList.map(async (target) => [target.id, await api.environments(projectId.value, target.id)] as const),
     )
     environmentsByTarget.value = Object.fromEntries(environmentLists)
+    const packageLists = await Promise.all(
+      targetList.map(async (target) => [target.id, await api.packages(projectId.value, target.id)] as const),
+    )
+    packagesByTarget.value = Object.fromEntries(packageLists)
   } catch (error) {
     report(error, '项目设置加载失败')
   } finally {
@@ -369,18 +432,157 @@ async function saveExecutionPolicy(): Promise<void> {
     const saved = await api.updateExecutionPolicy(projectId.value, {
       max_in_flight_runs: policyForm.max_in_flight_runs,
       max_daily_runs: policyForm.max_daily_runs,
+      run_timeout_seconds: policyForm.run_timeout_seconds,
     })
     executionPolicy.value = saved
     Object.assign(policyForm, {
       max_in_flight_runs: saved.max_in_flight_runs,
       max_daily_runs: saved.max_daily_runs,
+      run_timeout_seconds: saved.run_timeout_seconds,
     })
-    ElMessage.success('执行配额已更新')
+    ElMessage.success('执行策略已更新')
   } catch (error) {
-    report(error, '执行配额更新失败')
+    report(error, '执行策略更新失败')
   } finally {
     policyBusy.value = false
   }
+}
+
+function parseCaseCodes(value: string): string[] {
+  return value
+    .split(/[\s,]+/)
+    .map((item) => item.trim())
+    .filter(Boolean)
+}
+
+function scheduleTargetChanged(): void {
+  scheduleForm.environment_id = scheduleEnvironments.value.find((item) => item.status === 'ACTIVE')?.id || ''
+  scheduleForm.automation_package_id = schedulePackages.value[0]?.id || ''
+}
+
+function openSchedule(schedule?: RegressionSchedule): void {
+  scheduleEditId.value = schedule?.id || ''
+  const targetId = schedule?.target_id || targets.value.find((item) => item.status === 'ACTIVE')?.id || ''
+  Object.assign(scheduleForm, {
+    key: schedule?.key || '',
+    name: schedule?.name || '',
+    description: schedule?.description || '',
+    target_id: targetId,
+    environment_id:
+      schedule?.environment_id ||
+      environmentsByTarget.value[targetId]?.find((item) => item.status === 'ACTIVE')?.id ||
+      '',
+    baseline_id:
+      schedule?.baseline_id ||
+      [...baselines.value].reverse().find((item) => item.status === 'RELEASED')?.baseline_id ||
+      '',
+    automation_package_id:
+      schedule?.automation_package_id || packagesByTarget.value[targetId]?.[0]?.id || '',
+    case_codes: schedule?.case_codes.join(', ') || '',
+    cron_expression: schedule?.cron_expression || '0 2 * * *',
+    timezone: schedule?.timezone || 'Asia/Shanghai',
+    misfire_policy: schedule?.misfire_policy || 'FIRE_ONCE',
+    misfire_grace_seconds: schedule?.misfire_grace_seconds || 300,
+    status: schedule?.status === 'PAUSED' ? 'PAUSED' : 'ACTIVE',
+  })
+  scheduleVisible.value = true
+}
+
+async function saveSchedule(): Promise<void> {
+  if (
+    !scheduleForm.key ||
+    !scheduleForm.name ||
+    !scheduleForm.target_id ||
+    !scheduleForm.environment_id ||
+    !scheduleForm.baseline_id ||
+    !scheduleForm.automation_package_id ||
+    !scheduleForm.cron_expression ||
+    !scheduleForm.timezone
+  ) {
+    ElMessage.warning('请填写计划标识、名称、运行资源、Cron 和时区')
+    return
+  }
+  scheduleBusy.value = true
+  const payload = {
+    name: scheduleForm.name,
+    description: scheduleForm.description || null,
+    target_id: scheduleForm.target_id,
+    environment_id: scheduleForm.environment_id,
+    baseline_id: scheduleForm.baseline_id,
+    automation_package_id: scheduleForm.automation_package_id,
+    case_codes: parseCaseCodes(scheduleForm.case_codes),
+    cron_expression: scheduleForm.cron_expression,
+    timezone: scheduleForm.timezone,
+    misfire_policy: scheduleForm.misfire_policy,
+    misfire_grace_seconds: scheduleForm.misfire_grace_seconds,
+    status: scheduleForm.status,
+  }
+  try {
+    if (scheduleEditId.value) {
+      await api.updateRegressionSchedule(projectId.value, scheduleEditId.value, payload)
+    } else {
+      await api.createRegressionSchedule(projectId.value, { key: scheduleForm.key, ...payload })
+    }
+    scheduleVisible.value = false
+    ElMessage.success(scheduleEditId.value ? '回归计划已更新' : '回归计划已创建')
+    await load()
+  } catch (error) {
+    report(error, '回归计划保存失败')
+  } finally {
+    scheduleBusy.value = false
+  }
+}
+
+async function changeScheduleStatus(
+  schedule: RegressionSchedule,
+  status: RegressionSchedule['status'],
+): Promise<void> {
+  try {
+    await api.updateRegressionSchedule(projectId.value, schedule.id, { status })
+    ElMessage.success(status === 'ACTIVE' ? '回归计划已恢复' : status === 'PAUSED' ? '回归计划已暂停' : '回归计划已归档')
+    await load()
+  } catch (error) {
+    report(error, '回归计划状态更新失败')
+  }
+}
+
+async function triggerSchedule(schedule: RegressionSchedule): Promise<void> {
+  try {
+    const run = await api.triggerRegressionSchedule(
+      projectId.value,
+      schedule.id,
+      `manual:${schedule.id}:${crypto.randomUUID()}`,
+    )
+    ElMessage.success('已创建一次立即回归 Run')
+    await router.push({ name: 'run-detail', params: { projectId: projectId.value, runId: run.id } })
+  } catch (error) {
+    report(error, '立即回归触发失败')
+  }
+}
+
+async function openFirings(schedule: RegressionSchedule): Promise<void> {
+  firingSchedule.value = schedule
+  firingVisible.value = true
+  firingLoading.value = true
+  try {
+    firings.value = await api.regressionScheduleFirings(projectId.value, schedule.id)
+  } catch (error) {
+    report(error, '触发记录加载失败')
+  } finally {
+    firingLoading.value = false
+  }
+}
+
+function targetLabel(targetId: string): string {
+  return targets.value.find((item) => item.id === targetId)?.name || targetId
+}
+
+function environmentLabel(targetId: string, environmentId: string): string {
+  return environmentsByTarget.value[targetId]?.find((item) => item.id === environmentId)?.name || environmentId
+}
+
+function baselineLabel(baselineId: string): string {
+  return baselines.value.find((item) => item.baseline_id === baselineId)?.version || baselineId
 }
 
 onMounted(load)
@@ -396,7 +598,7 @@ onMounted(load)
       <div>
         <div class="project-key">{{ project?.key }}</div>
         <h1>{{ project?.name || '项目' }} · 设置</h1>
-        <p>管理成员角色、测试资源、Runner Pool 绑定、Secret 引用和项目执行配额。</p>
+        <p>管理成员角色、测试资源、Runner Pool、定时回归、Secret 引用和项目执行策略。</p>
       </div>
       <el-button :icon="Refresh" @click="load">刷新</el-button>
     </header>
@@ -405,6 +607,7 @@ onMounted(load)
       <article class="metric-card"><el-icon><User /></el-icon><strong>{{ members.length }}</strong><span>项目成员</span></article>
       <article class="metric-card"><el-icon><Connection /></el-icon><strong>{{ targets.length }}</strong><span>测试目标</span></article>
       <article class="metric-card"><el-icon><Setting /></el-icon><strong>{{ environmentCount }}</strong><span>运行环境</span></article>
+      <article class="metric-card"><el-icon><Calendar /></el-icon><strong>{{ activeScheduleCount }}</strong><span>启用回归计划</span></article>
       <article class="metric-card"><el-icon><Setting /></el-icon><strong>{{ executionPolicy?.remaining_in_flight_runs ?? '—' }}</strong><span>剩余在途名额</span></article>
     </div>
 
@@ -546,11 +749,84 @@ onMounted(load)
           </article>
         </el-tab-pane>
 
-        <el-tab-pane label="执行配额" name="capacity">
+        <el-tab-pane label="定时回归" name="schedules">
           <div class="toolbar">
             <div>
-              <strong>项目执行准入</strong>
-              <span class="section-note">统计口径为 UTC 自然日；配额拒绝不会创建 Run 或 Outbox</span>
+              <strong>项目回归计划</strong>
+              <span class="section-note">Cron 按项目时区解释，服务端统一保存和派发 UTC 时刻</span>
+            </div>
+            <el-button v-if="canManage" type="primary" :icon="Plus" @click="openSchedule()">
+              创建计划
+            </el-button>
+          </div>
+          <el-table :data="regressionSchedules" empty-text="暂无定时回归计划">
+            <el-table-column label="计划" min-width="220">
+              <template #default="scope">
+                <strong>{{ scope.row.name }}</strong>
+                <div class="muted mono">{{ scope.row.key }}</div>
+                <div v-if="scope.row.last_error" class="schedule-error">{{ scope.row.last_error }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="Cron / 时区" min-width="210">
+              <template #default="scope">
+                <code>{{ scope.row.cron_expression }}</code>
+                <div class="muted">{{ scope.row.timezone }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="运行资源" min-width="250">
+              <template #default="scope">
+                <div>{{ targetLabel(scope.row.target_id) }} · {{ environmentLabel(scope.row.target_id, scope.row.environment_id) }}</div>
+                <div class="muted">基线 {{ baselineLabel(scope.row.baseline_id) }} · {{ scope.row.case_codes.length || '全部启用' }} 个用例范围</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="下次派发（UTC）" min-width="210">
+              <template #default="scope">
+                <span v-if="scope.row.next_fire_at">{{ formatUtcDate(scope.row.next_fire_at) }}</span>
+                <span v-else class="muted">已暂停</span>
+                <div class="muted">{{ scope.row.misfire_policy === 'FIRE_ONCE' ? '错过后补一次' : '错过后跳过' }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="135">
+              <template #default="scope">
+                <el-select
+                  v-if="canManage && scope.row.status !== 'ARCHIVED'"
+                  :model-value="scope.row.status"
+                  @change="changeScheduleStatus(scope.row as RegressionSchedule, $event as RegressionSchedule['status'])"
+                >
+                  <el-option label="启用" value="ACTIVE" />
+                  <el-option label="暂停" value="PAUSED" />
+                  <el-option label="归档" value="ARCHIVED" />
+                </el-select>
+                <el-tag v-else :type="scope.row.status === 'ACTIVE' ? 'success' : 'info'">
+                  {{ scope.row.status }}
+                </el-tag>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" min-width="220" fixed="right">
+              <template #default="scope">
+                <el-button
+                  v-if="canManage && scope.row.status !== 'ARCHIVED'"
+                  link
+                  type="primary"
+                  :icon="VideoPlay"
+                  @click="triggerSchedule(scope.row as RegressionSchedule)"
+                >立即运行</el-button>
+                <el-button link @click="openFirings(scope.row as RegressionSchedule)">记录</el-button>
+                <el-button
+                  v-if="canManage && scope.row.status !== 'ARCHIVED'"
+                  link
+                  @click="openSchedule(scope.row as RegressionSchedule)"
+                >编辑</el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="执行策略" name="capacity">
+          <div class="toolbar">
+            <div>
+              <strong>项目执行准入与超时</strong>
+              <span class="section-note">统计口径为 UTC 自然日；超时策略在 Run 创建时冻结</span>
             </div>
             <el-tag
               v-if="executionPolicy"
@@ -581,7 +857,7 @@ onMounted(load)
 
               <article class="quota-meter">
                 <header>
-                  <div><strong>今日创建量</strong><span>窗口开始 {{ formatUtcWindow(executionPolicy.daily_window_started_at) }}</span></div>
+                  <div><strong>今日创建量</strong><span>窗口开始 {{ formatUtcDate(executionPolicy.daily_window_started_at) }}</span></div>
                   <b>{{ executionPolicy.runs_created_today }} / {{ executionPolicy.max_daily_runs }}</b>
                 </header>
                 <el-progress
@@ -619,12 +895,23 @@ onMounted(load)
                   controls-position="right"
                 />
               </el-form-item>
+              <el-form-item label="单次 Run 超时（秒）">
+                <el-input-number
+                  :key="`timeout-${executionPolicy.run_timeout_seconds}`"
+                  v-model="policyForm.run_timeout_seconds"
+                  :min="60"
+                  :max="86400"
+                  :step="60"
+                  :disabled="!canManage"
+                  controls-position="right"
+                />
+              </el-form-item>
               <el-button
                 v-if="canManage"
                 type="primary"
                 :loading="policyBusy"
                 @click="saveExecutionPolicy"
-              >保存执行配额</el-button>
+              >保存执行策略</el-button>
               <span class="policy-updated">最近更新 {{ formatDate(executionPolicy.updated_at) }}</span>
             </el-form>
           </div>
@@ -759,6 +1046,156 @@ onMounted(load)
         <el-button type="primary" :loading="environmentEditBusy" @click="saveEnvironment">保存</el-button>
       </template>
     </el-dialog>
+
+    <el-dialog
+      v-model="scheduleVisible"
+      :title="scheduleEditId ? '编辑回归计划' : '创建回归计划'"
+      width="760px"
+      destroy-on-close
+    >
+      <el-alert
+        title="Cron 使用 5 段数字格式：分钟 小时 日 月 星期。下次派发时间会明确显示为 UTC。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-form label-position="top" class="dialog-form">
+        <div class="form-grid">
+          <el-form-item label="计划标识" required>
+            <el-input v-model="scheduleForm.key" :disabled="Boolean(scheduleEditId)" placeholder="nightly-login" />
+          </el-form-item>
+          <el-form-item label="计划名称" required>
+            <el-input v-model="scheduleForm.name" placeholder="每日登录回归" />
+          </el-form-item>
+        </div>
+        <el-form-item label="说明"><el-input v-model="scheduleForm.description" /></el-form-item>
+        <div class="form-grid">
+          <el-form-item label="测试目标" required>
+            <el-select v-model="scheduleForm.target_id" style="width: 100%" @change="scheduleTargetChanged">
+              <el-option
+                v-for="target in targets.filter((item) => item.status === 'ACTIVE' || item.id === scheduleForm.target_id)"
+                :key="target.id"
+                :label="`${target.name} · ${target.target_type}`"
+                :value="target.id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="运行环境" required>
+            <el-select v-model="scheduleForm.environment_id" style="width: 100%">
+              <el-option
+                v-for="environment in scheduleEnvironments"
+                :key="environment.id"
+                :label="environment.name"
+                :value="environment.id"
+                :disabled="environment.status !== 'ACTIVE'"
+              />
+            </el-select>
+          </el-form-item>
+        </div>
+        <div class="form-grid">
+          <el-form-item label="Released 基线" required>
+            <el-select v-model="scheduleForm.baseline_id" style="width: 100%">
+              <el-option
+                v-for="baseline in baselines.filter((item) => item.status === 'RELEASED')"
+                :key="baseline.baseline_id"
+                :label="`${baseline.version} · ${baseline.enabled_case_count} 启用`"
+                :value="baseline.baseline_id"
+              />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="自动化包" required>
+            <el-select v-model="scheduleForm.automation_package_id" style="width: 100%">
+              <el-option
+                v-for="item in schedulePackages"
+                :key="item.id"
+                :label="`${item.name}@${item.version}`"
+                :value="item.id"
+              />
+            </el-select>
+          </el-form-item>
+        </div>
+        <el-form-item label="用例编号（逗号或空格分隔；留空表示全部启用用例）">
+          <el-input v-model="scheduleForm.case_codes" type="textarea" :rows="2" placeholder="TC-LOGIN-001, TC-LOGIN-007" />
+        </el-form-item>
+        <div class="form-grid">
+          <el-form-item label="Cron 表达式" required>
+            <el-input v-model="scheduleForm.cron_expression" placeholder="0 2 * * *" />
+          </el-form-item>
+          <el-form-item label="IANA 时区" required>
+            <el-select
+              v-model="scheduleForm.timezone"
+              filterable
+              allow-create
+              default-first-option
+              style="width: 100%"
+            >
+              <el-option label="Asia/Shanghai" value="Asia/Shanghai" />
+              <el-option label="UTC" value="UTC" />
+              <el-option label="America/New_York" value="America/New_York" />
+              <el-option label="Europe/London" value="Europe/London" />
+            </el-select>
+          </el-form-item>
+        </div>
+        <div class="form-grid schedule-policy-grid">
+          <el-form-item label="错过触发策略">
+            <el-select v-model="scheduleForm.misfire_policy" style="width: 100%">
+              <el-option label="补触发一次" value="FIRE_ONCE" />
+              <el-option label="跳过" value="SKIP" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="宽限时间（秒）">
+            <el-input-number v-model="scheduleForm.misfire_grace_seconds" :min="60" :max="86400" style="width: 100%" />
+          </el-form-item>
+          <el-form-item label="状态">
+            <el-select v-model="scheduleForm.status" style="width: 100%">
+              <el-option label="启用" value="ACTIVE" />
+              <el-option label="暂停" value="PAUSED" />
+            </el-select>
+          </el-form-item>
+        </div>
+        <div class="schedule-summary">
+          当前目标：{{ scheduleTarget?.name || '未选择' }}；计划只保存资源版本 ID，触发时生成不可变 Run Snapshot。
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="scheduleVisible = false">取消</el-button>
+        <el-button type="primary" :loading="scheduleBusy" @click="saveSchedule">保存计划</el-button>
+      </template>
+    </el-dialog>
+
+    <el-dialog
+      v-model="firingVisible"
+      :title="`${firingSchedule?.name || '回归计划'} · 触发记录`"
+      width="820px"
+      destroy-on-close
+    >
+      <el-table v-loading="firingLoading" :data="firings" empty-text="暂无触发记录">
+        <el-table-column label="计划时间（UTC）" min-width="205">
+          <template #default="scope">{{ formatUtcDate(scope.row.scheduled_for) }}</template>
+        </el-table-column>
+        <el-table-column label="类型" width="120">
+          <template #default="scope"><el-tag effect="plain">{{ scope.row.trigger_kind }}</el-tag></template>
+        </el-table-column>
+        <el-table-column label="结果" width="120">
+          <template #default="scope">
+            <el-tag :type="scope.row.status === 'TRIGGERED' ? 'success' : scope.row.status === 'BLOCKED' ? 'danger' : 'info'">
+              {{ scope.row.status }}
+            </el-tag>
+          </template>
+        </el-table-column>
+        <el-table-column label="Run / 原因" min-width="290">
+          <template #default="scope">
+            <el-button
+              v-if="scope.row.run_id"
+              link
+              type="primary"
+              @click="router.push({ name: 'run-detail', params: { projectId, runId: scope.row.run_id } })"
+            >{{ scope.row.run_id }}</el-button>
+            <span v-else class="schedule-error">{{ scope.row.error_message || '未创建 Run' }}</span>
+          </template>
+        </el-table-column>
+      </el-table>
+    </el-dialog>
   </div>
 </template>
 
@@ -781,7 +1218,7 @@ onMounted(load)
 
 .metric-grid {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 18px;
 }
@@ -892,6 +1329,26 @@ onMounted(load)
   gap: 16px;
 }
 
+.schedule-policy-grid {
+  grid-template-columns: 1.15fr 1fr 0.85fr;
+}
+
+.schedule-error {
+  margin-top: 4px;
+  color: #c45656;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.schedule-summary {
+  padding: 11px 13px;
+  border-radius: 8px;
+  color: #587083;
+  background: #f3f7f8;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 .quota-layout {
   display: grid;
   grid-template-columns: minmax(0, 1.65fr) minmax(280px, 0.75fr);
@@ -984,6 +1441,10 @@ onMounted(load)
   }
 
   .quota-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .schedule-policy-grid {
     grid-template-columns: 1fr;
   }
 

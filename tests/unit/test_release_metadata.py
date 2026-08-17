@@ -35,7 +35,7 @@ def test_release_version_is_coherent_across_runtime_and_packaging() -> None:
 def test_release_has_one_migration_head_and_required_operations_evidence() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "infra/alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["20260813_0006"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["20260814_0010"]
 
     required = (
         ROOT / ".github/workflows/ci.yml",
@@ -46,5 +46,10 @@ def test_release_has_one_migration_head_and_required_operations_evidence() -> No
         ROOT / "docs/milestones/M6-release-hardening.md",
         ROOT / "docs/milestones/M7.1-execution-quotas.md",
         ROOT / "docs/milestones/M7.2-runner-pools.md",
+        ROOT / "docs/milestones/M7.3-regression-schedules.md",
+        ROOT / "docs/milestones/M7.4-run-reliability.md",
+        ROOT / "docs/milestones/M7.5-quality-analytics.md",
+        ROOT / "docs/milestones/M7.6-quality-dimensions.md",
+        ROOT / "docs/milestones/M7.7-flaky-case-detection.md",
     )
     assert all(path.is_file() and path.stat().st_size > 0 for path in required)

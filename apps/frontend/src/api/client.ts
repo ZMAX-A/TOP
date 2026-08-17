@@ -14,6 +14,11 @@ import type {
   Project,
   ProjectMember,
   ProjectMemberCandidate,
+  QualityAnalytics,
+  QualityAnalyticsQuery,
+  QualityPolicy,
+  RegressionSchedule,
+  RegressionScheduleFiring,
   Run,
   RunBatchCancelResult,
   RunDetail,
@@ -167,6 +172,47 @@ export const api = {
     request<ExecutionPolicy>(
       `/api/v1/projects/${projectId}/execution-policy`,
       json('PATCH', payload),
+    ),
+  qualityPolicy: (projectId: string) =>
+    request<QualityPolicy>(`/api/v1/projects/${projectId}/quality-policy`),
+  updateQualityPolicy: (projectId: string, payload: unknown) =>
+    request<QualityPolicy>(
+      `/api/v1/projects/${projectId}/quality-policy`,
+      json('PATCH', payload),
+    ),
+  qualityAnalytics: (projectId: string, query: QualityAnalyticsQuery = {}) =>
+    request<QualityAnalytics>(
+      withQuery(`/api/v1/projects/${projectId}/quality/analytics`, {
+        window_days: query.windowDays,
+        target_id: query.targetId,
+        environment_id: query.environmentId,
+        baseline_id: query.baselineId,
+      }),
+    ),
+  regressionSchedules: (projectId: string) =>
+    request<RegressionSchedule[]>(`/api/v1/projects/${projectId}/regression-schedules`),
+  createRegressionSchedule: (projectId: string, payload: unknown) =>
+    request<RegressionSchedule>(
+      `/api/v1/projects/${projectId}/regression-schedules`,
+      json('POST', payload),
+    ),
+  updateRegressionSchedule: (projectId: string, scheduleId: string, payload: unknown) =>
+    request<RegressionSchedule>(
+      `/api/v1/projects/${projectId}/regression-schedules/${scheduleId}`,
+      json('PATCH', payload),
+    ),
+  regressionScheduleFirings: (projectId: string, scheduleId: string) =>
+    request<RegressionScheduleFiring[]>(
+      `/api/v1/projects/${projectId}/regression-schedules/${scheduleId}/firings`,
+    ),
+  triggerRegressionSchedule: (
+    projectId: string,
+    scheduleId: string,
+    idempotencyKey: string,
+  ) =>
+    request<Run>(
+      `/api/v1/projects/${projectId}/regression-schedules/${scheduleId}/trigger`,
+      json('POST', undefined, { 'Idempotency-Key': idempotencyKey }),
     ),
   projectMembers: (projectId: string) =>
     request<ProjectMember[]>(`/api/v1/projects/${projectId}/members`),

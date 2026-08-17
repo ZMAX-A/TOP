@@ -21,6 +21,16 @@ from .celery_app import celery_app
 from .config import WorkerSettings
 from .control_plane import ControlPlaneClient
 
+TERMINAL_RUN_STATUSES = frozenset(
+    {
+        RunStatus.PASSED.value,
+        RunStatus.FAILED.value,
+        RunStatus.CANCELED.value,
+        RunStatus.TIMED_OUT.value,
+        RunStatus.INFRA_ERROR.value,
+    }
+)
+
 
 def _recovery_result(job: RunSnapshot, error: Exception) -> RunResult:
     moment = datetime.now(UTC)
@@ -119,6 +129,15 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
         settings.control_plane_url,
         settings.runner_callback_token,
     )
+    initial_state = control_plane.run_state(job.run_id)
+    if initial_state["status"] in TERMINAL_RUN_STATUSES:
+        return {
+            "run_id": str(job.run_id),
+            "status": str(initial_state["status"]),
+            "recovered": False,
+            "ignored": True,
+        }
+
     existing = _existing_result(settings.workspace_root, job.run_id)
     if existing is not None:
         _reconcile_events(settings.workspace_root, job.run_id, control_plane)
@@ -126,14 +145,6 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
         control_plane.report_result(uploaded)
         return {"run_id": str(job.run_id), "status": existing.status.value, "recovered": True}
 
-    initial_state = control_plane.run_state(job.run_id)
-    if initial_state["status"] == RunStatus.CANCELED.value:
-        return {
-            "run_id": str(job.run_id),
-            "status": RunStatus.CANCELED.value,
-            "recovered": False,
-            "ignored": True,
-        }
     if initial_state["cancel_requested"]:
         result = _canceled_result(job)
         control_plane.report_result(result)
@@ -148,9 +159,17 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
         secret_provider=EnvironmentSecretProvider(),
     )
     try:
-        control_plane.report_status(job.run_id, RunStatus.PREPARING)
+        control_plane.report_status(
+            job.run_id,
+            RunStatus.PREPARING,
+            worker_key=settings.runner_worker_key,
+        )
         adapter.prepare(job)
-        control_plane.report_status(job.run_id, RunStatus.RUNNING)
+        control_plane.report_status(
+            job.run_id,
+            RunStatus.RUNNING,
+            worker_key=settings.runner_worker_key,
+        )
 
         def reporter(event: dict[str, object]) -> None:
             try:

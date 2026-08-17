@@ -18,6 +18,8 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
         "migrate",
         "api",
         "outbox",
+        "scheduler",
+        "reaper",
         "worker",
         "frontend",
         "smoke-target",
@@ -30,6 +32,8 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "RUNNER_POOL_KEY:" in compose
     assert "RUNNER_CAPABILITIES:" in compose
     assert "--queues=celery,testops.pool.${RUNNER_POOL_KEY:-default-web}" in compose
+    assert "scripts/schedule_regressions.py" in compose
+    assert "scripts/reap_run_reliability.py" in compose
 
     for path in (
         "infra/docker/api.Dockerfile",

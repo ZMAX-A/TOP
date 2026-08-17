@@ -1,5 +1,14 @@
 # 生产发布验收清单
 
+## 2026-08-17 本机预验收证据
+
+- 全量 Pytest 84 项通过，仓库标准入口 65 项通过；Ruff 检查通过，122 个 Python 文件格式一致；
+- Vue 严格 TypeScript 检查和 Vite 生产构建通过；
+- Alembic 唯一 Head 为 `20260814_0010`，PostgreSQL 17 完成 `upgrade head -> downgrade base -> upgrade head`；
+- 完整 Compose 普通冒烟和 Outbox/Worker 中断恢复冒烟通过，成功与预期失败 Run 的事件和制品均已校验；
+- 2026-08-17 演示环境再次完成普通冒烟。本节仅记录本机证据，不替代 GitHub Actions、代码评审、生产安全
+  配置、容量评估、告警接收器和备份恢复演练等正式发布门禁。
+
 ## 合并门禁
 
 - [ ] `Python quality and contracts` 通过；
@@ -31,7 +40,8 @@
 
 - [ ] PostgreSQL、Redis、MinIO 和 Runner 工作区容量满足发布窗口与保留周期；
 - [ ] API 可用性、数据库就绪、5xx 和 p95 延迟告警已接入接收器并测试；
-- [ ] Outbox、Worker、Run 终态率和制品上传有值班查询与处置步骤；
+- [ ] Outbox、Scheduler、Reaper、Worker、Run 终态率和制品上传有值班查询与处置步骤；
+- [ ] 派发积压、计划延迟、失联 Worker 租约告警已接入接收器并完成测试；
 - [ ] 成功与预期失败两条 Compose 冒烟 Run 均完成，制品摘要和短时 URL 正确；
 - [ ] 人工验证登录、RBAC、项目设置、审批发布、运行运营和审计查询；
 - [ ] 发布负责人、值班人、变更窗口和停止条件已确认。

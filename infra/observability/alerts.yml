@@ -44,3 +44,45 @@ groups:
         annotations:
           summary: TestOps API p95 latency is high
           description: The five-minute p95 request latency has exceeded two seconds for ten minutes.
+
+      - alert: TestOpsReliabilitySnapshotUnavailable
+        expr: testops_reliability_snapshot_success{job="testops-api"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps reliability metrics are unavailable
+          description: The API has failed to query Run and scheduler reliability state for five minutes.
+
+      - alert: TestOpsDispatchBacklogOldest
+        expr: |
+          testops_dispatch_waiting_runs{job="testops-api"} > 0
+          and
+          testops_dispatch_backlog_oldest_age_seconds{job="testops-api"} > 300
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps Run dispatch backlog is aging
+          description: At least one Run has waited for dispatch capacity for over five minutes.
+
+      - alert: TestOpsRegressionScheduleLag
+        expr: |
+          testops_schedule_due_backlog{job="testops-api"} > 0
+          and
+          testops_schedule_lag_seconds{job="testops-api"} > 120
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps regression schedules are delayed
+          description: An active regression schedule has remained due for over two minutes.
+
+      - alert: TestOpsStaleRunnerLease
+        expr: testops_stale_runner_leases{job="testops-api"} > 0
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: TestOps has stale Runner slot leases
+          description: An active Run is bound to a Runner whose heartbeat has expired.

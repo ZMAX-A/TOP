@@ -41,6 +41,7 @@ export interface ExecutionPolicy {
   project_id: string
   max_in_flight_runs: number
   max_daily_runs: number
+  run_timeout_seconds: number
   in_flight_runs: number
   queued_runs: number
   preparing_runs: number
@@ -52,6 +53,152 @@ export interface ExecutionPolicy {
   daily_window_started_at: string
   generated_at: string
   updated_at: string
+}
+
+export interface QualityPolicy {
+  project_id: string
+  target_pass_rate_percent: number
+  window_days: number
+  updated_at: string
+}
+
+export interface QualityRunSummary {
+  total_terminal_runs: number
+  conclusive_runs: number
+  passed_runs: number
+  failed_runs: number
+  canceled_runs: number
+  timed_out_runs: number
+  infra_error_runs: number
+  pass_rate_percent: number | null
+  execution_reliability_percent: number | null
+}
+
+export interface QualityCaseSummary {
+  total_terminal_cases: number
+  conclusive_cases: number
+  passed_cases: number
+  failed_cases: number
+  skipped_cases: number
+  canceled_cases: number
+  timed_out_cases: number
+  infra_error_cases: number
+  pass_rate_percent: number | null
+}
+
+export interface QualityTrendPoint {
+  bucket_started_at: string
+  total_terminal_runs: number
+  passed_runs: number
+  failed_runs: number
+  canceled_runs: number
+  timed_out_runs: number
+  infra_error_runs: number
+  pass_rate_percent: number | null
+}
+
+export interface FailureCluster {
+  fingerprint: string
+  failure_category: string
+  message_pattern: string
+  occurrences: number
+  affected_runs: number
+  failed_occurrences: number
+  timed_out_occurrences: number
+  infra_error_occurrences: number
+  case_codes: string[]
+  latest_at: string
+}
+
+export interface FlakyCase {
+  case_id: string
+  case_code: string
+  conclusive_executions: number
+  passed_executions: number
+  failed_executions: number
+  pass_rate_percent: number
+  status_transitions: number
+  transition_rate_percent: number
+  latest_status: 'PASSED' | 'FAILED'
+  latest_completed_at: string
+}
+
+export interface FlakyCaseAnalysis {
+  minimum_conclusive_executions: number
+  minimum_status_transitions: number
+  analyzed_executions: number
+  detected_cases: number
+  data_truncated: boolean
+  cases: FlakyCase[]
+}
+
+export interface QualityAnalyticsFilters {
+  target_id: string | null
+  environment_id: string | null
+  baseline_id: string | null
+}
+
+export interface QualityAnalyticsQuery {
+  windowDays?: number
+  targetId?: string
+  environmentId?: string
+  baselineId?: string
+}
+
+export interface QualityAnalytics {
+  project_id: string
+  filters: QualityAnalyticsFilters
+  window_days: number
+  window_started_at: string
+  window_ended_at: string
+  generated_at: string
+  target_pass_rate_percent: number
+  slo_status: 'NO_DATA' | 'MET' | 'BREACHED'
+  latest_completed_at: string | null
+  runs: QualityRunSummary
+  cases: QualityCaseSummary
+  trend: QualityTrendPoint[]
+  failure_clusters: FailureCluster[]
+  failure_data_truncated: boolean
+  flaky: FlakyCaseAnalysis
+}
+
+export interface RegressionSchedule {
+  id: string
+  project_id: string
+  key: string
+  name: string
+  description: string | null
+  target_id: string
+  environment_id: string
+  baseline_id: string
+  automation_package_id: string
+  case_codes: string[]
+  cron_expression: string
+  timezone: string
+  misfire_policy: 'SKIP' | 'FIRE_ONCE'
+  misfire_grace_seconds: number
+  status: 'ACTIVE' | 'PAUSED' | 'ARCHIVED'
+  next_fire_at: string | null
+  last_scheduled_for: string | null
+  last_triggered_at: string | null
+  last_run_id: string | null
+  last_error: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface RegressionScheduleFiring {
+  id: string
+  schedule_id: string
+  run_id: string | null
+  scheduled_for: string
+  triggered_at: string | null
+  trigger_kind: 'SCHEDULED' | 'MISFIRE' | 'MANUAL'
+  status: 'TRIGGERED' | 'SKIPPED' | 'BLOCKED'
+  error_message: string | null
+  created_at: string
 }
 
 export interface RunnerPoolCatalog {
@@ -285,10 +432,13 @@ export interface Run {
   baseline_id: string
   automation_package_id: string
   runner_pool_id: string | null
+  regression_schedule_id: string | null
+  scheduled_for: string | null
   source_run_id: string | null
   retry_mode: 'FULL' | 'FAILED_ONLY' | null
   status: RunStatus
   case_count: number
+  timeout_seconds: number
   snapshot_digest: string
   result_digest: string | null
   cancel_requested: boolean
@@ -298,6 +448,7 @@ export interface Run {
   created_by: string
   created_at: string
   started_at: string | null
+  timeout_at: string | null
   finished_at: string | null
   error_message: string | null
 }

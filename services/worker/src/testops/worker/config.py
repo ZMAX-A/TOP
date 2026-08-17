@@ -85,7 +85,7 @@ class WorkerSettings:
             runner_worker_key=worker_key,
             runner_pool_key=pool_key,
             runner_display_name=os.getenv("RUNNER_DISPLAY_NAME", worker_key or "Legacy Worker"),
-            runner_version=os.getenv("RUNNER_VERSION", "0.10.0"),
+            runner_version=os.getenv("RUNNER_VERSION", "0.15.0"),
             runner_max_slots=max_slots,
             runner_capabilities=capabilities,
             runner_heartbeat_interval_seconds=heartbeat_interval,

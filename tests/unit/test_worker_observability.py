@@ -4,9 +4,14 @@ import json
 import tempfile
 import unittest
 from pathlib import Path
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 from uuid import UUID, uuid4
 
-from testops.worker.tasks import _reconcile_events
+from testops.contracts import RunSnapshot
+from testops.worker.tasks import _reconcile_events, execute_run
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 class RecordingControlPlane:
@@ -18,6 +23,35 @@ class RecordingControlPlane:
 
 
 class WorkerObservabilityTests(unittest.TestCase):
+    def test_terminal_run_is_ignored_before_local_result_recovery(self) -> None:
+        job = RunSnapshot.model_validate_json(
+            (ROOT / "tests/fixtures/run_snapshot.valid.json").read_text("utf-8")
+        )
+        control_plane = Mock()
+        control_plane.run_state.return_value = {
+            "status": "TIMED_OUT",
+            "cancel_requested": True,
+        }
+        settings = SimpleNamespace(
+            control_plane_url="http://control-plane.invalid",
+            runner_callback_token="runner-token",
+        )
+        with (
+            patch(
+                "testops.worker.tasks.WorkerSettings.from_environment",
+                return_value=settings,
+            ),
+            patch("testops.worker.tasks.ControlPlaneClient", return_value=control_plane),
+            patch(
+                "testops.worker.tasks._existing_result",
+                side_effect=AssertionError("terminal Run must not read local result"),
+            ),
+        ):
+            result = execute_run.run(job.model_dump(mode="json", exclude_none=True))
+
+        self.assertEqual(result["status"], "TIMED_OUT")
+        self.assertTrue(result["ignored"])
+
     def test_local_events_are_replayed_in_file_order(self) -> None:
         run_id = uuid4()
         documents = [

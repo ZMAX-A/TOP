@@ -1,6 +1,6 @@
 # TestOps Platform
 
-多项目自动化测试治理与执行平台，当前开发版本为 `0.10.0`。当前仓库是平台新代码的唯一开发目录；同级
+多项目自动化测试治理与执行平台，当前开发版本为 `0.15.0`。当前仓库是平台新代码的唯一开发目录；同级
 `../web` 是现有颜佳 AI Web 自动化项目，只作为首个 Web Runner 的迁移来源。
 
 ## 当前里程碑
@@ -9,8 +9,9 @@ M0（协议与工程骨架）、M0.5（旧 Excel 用例基线迁移）、M1（We
 登录模块纵向闭环）、M2（控制面持久化与 Run 调度）、M3（身份、用例治理与
 Vue 管理端）和 M4（执行可观测性与制品管理）已完成。
 M5.1（完整容器运行基座）、M5.2（系统管理中心）、M5.3（运行运营中心）和
-M6（发布加固）、M7.1（项目执行配额）和 M7.2（Runner Pool 与执行槽位）已实现。当前开发机未安装 Docker，真实容器构建、PostgreSQL 迁移
-往返和全链路冒烟将由 GitHub Actions 执行，本机仍无法完成这三项环境验收。
+M6（发布加固）、M7.1（项目执行配额）、M7.2（Runner Pool 与执行槽位）和
+M7.3（定时回归计划）、M7.4（运行可靠性与队列可观测性）、M7.5（项目质量分析与 SLO）和
+M7.6（目标、环境与基线质量维度）和 M7.7（Flaky Case 识别）已实现。
 
 - 统一动作和断言能力注册表；
 - 平台用例、Runner Job、Runner Result 契约；
@@ -51,8 +52,18 @@ M6（发布加固）、M7.1（项目执行配额）和 M7.2（Runner Pool 与执
   PostgreSQL 项目行锁保护的准入检查，项目设置页展示实时用量、预警和剩余容量；
 - Runner Pool 支持目标默认绑定、环境覆盖、Worker 心跳与能力标签；Outbox 按健康容量申请
   槽位租约并投递专属 Queue，运行列表和详情页可解释无健康节点、能力不匹配与容量耗尽；
+- 定时回归计划支持五字段 Cron、IANA 时区、错过执行的补跑或跳过策略、手动幂等触发和触发历史；
+  自动生成的 Run 继续经过项目配额、Runner Pool、Outbox 和审计边界，界面明确展示 UTC 计划时刻；
+- 项目执行策略为每个 Run 冻结超时上限，Runner 状态回调将槽位租约绑定到实际 Worker；独立
+  Reaper 幂等回收超时 Run、失联 Worker 租约和无人认领的已派发 Run，并保留事件与审计证据；
+- 项目质量分析在 UTC 滚动窗口内分别计算 Run/Case 通过率和执行可靠性，支持项目级目标通过率、
+  SLO 达标状态、日趋势，以及对 URL、UUID、数字和凭据字段归一化脱敏后的失败聚类；
+- 质量分析可按项目内目标、环境和 Released 基线独立或组合筛选，服务端校验资源归属及目标/环境关系，
+  汇总、趋势与失败聚类始终共享同一筛选边界；
+- Flaky Case 识别只分析 PASSED/FAILED 结果，要求至少 3 次有结论执行和 2 次状态切换，并公开样本数、
+  通过/失败分布、切换率、最新状态与截断边界，避免把一次性回归或修复误报为 Flaky；
 - 控制面输出低基数 Prometheus 指标，支持 Bearer 保护、数据库就绪指标和可选本地
-  Prometheus profile，并附带可直接加载的可用性、错误率、延迟和数据库告警规则；
+  Prometheus profile，并附带可用性、错误率、延迟、派发积压、计划延迟和僵尸租约告警规则；
 - GitHub Actions 对 Python、前端、契约制品、迁移图、真实 PostgreSQL 迁移往返、
   Compose 冒烟与 Prometheus 配置建立只读质量门，并在失败时保留 Compose 日志；
 - 备份恢复工具生成 PostgreSQL 自定义 dump、MinIO 当前对象和逐文件 SHA-256 清单；
@@ -248,5 +259,10 @@ python scripts/smoke_playwright.py
 [`M5.3-run-operations.md`](docs/milestones/M5.3-run-operations.md)，以及
 [`M6-release-hardening.md`](docs/milestones/M6-release-hardening.md) 和
 [`M7.1-execution-quotas.md`](docs/milestones/M7.1-execution-quotas.md) 和
-[`M7.2-runner-pools.md`](docs/milestones/M7.2-runner-pools.md)。发布前还必须完成
+[`M7.2-runner-pools.md`](docs/milestones/M7.2-runner-pools.md) 和
+[`M7.3-regression-schedules.md`](docs/milestones/M7.3-regression-schedules.md) 和
+[`M7.4-run-reliability.md`](docs/milestones/M7.4-run-reliability.md) 和
+[`M7.5-quality-analytics.md`](docs/milestones/M7.5-quality-analytics.md) 和
+[`M7.6-quality-dimensions.md`](docs/milestones/M7.6-quality-dimensions.md) 和
+[`M7.7-flaky-case-detection.md`](docs/milestones/M7.7-flaky-case-detection.md)。发布前还必须完成
 [`生产验收清单`](docs/operations/release-checklist.md)。

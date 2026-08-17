@@ -11,6 +11,11 @@ export function formatDate(value: string | null | undefined): string {
   }).format(new Date(value))
 }
 
+export function formatUtcDate(value: string | null | undefined): string {
+  if (!value) return '—'
+  return `${new Date(value).toISOString().slice(0, 16).replace('T', ' ')} UTC`
+}
+
 export function shortDigest(value: string): string {
   return `${value.slice(0, 14)}…${value.slice(-8)}`
 }

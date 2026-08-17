@@ -201,6 +201,7 @@ async def _execution_policy_payload(
         "project_id": project.id,
         "max_in_flight_runs": project.max_in_flight_runs,
         "max_daily_runs": project.max_daily_runs,
+        "run_timeout_seconds": project.run_timeout_seconds,
         **usage,
         "remaining_in_flight_runs": remaining_in_flight,
         "remaining_daily_runs": remaining_daily,
@@ -278,6 +279,11 @@ async def create_project(
         description=payload.description,
     )
     session.add(record)
+    try:
+        await session.flush()
+    except IntegrityError as exc:
+        await session.rollback()
+        raise ResourceConflict("project key already exists") from exc
     session.add(
         ProjectMemberRecord(
             id=uuid4(),
@@ -297,7 +303,7 @@ async def create_project(
             details={"key": record.key},
         )
     )
-    await _commit_unique(session, "project key already exists")
+    await session.commit()
     await session.refresh(record)
     return record
 
@@ -376,14 +382,18 @@ async def update_execution_policy(
     before = {
         "max_in_flight_runs": project.max_in_flight_runs,
         "max_daily_runs": project.max_daily_runs,
+        "run_timeout_seconds": project.run_timeout_seconds,
     }
     if payload.max_in_flight_runs is not None:
         project.max_in_flight_runs = payload.max_in_flight_runs
     if payload.max_daily_runs is not None:
         project.max_daily_runs = payload.max_daily_runs
+    if payload.run_timeout_seconds is not None:
+        project.run_timeout_seconds = payload.run_timeout_seconds
     after = {
         "max_in_flight_runs": project.max_in_flight_runs,
         "max_daily_runs": project.max_daily_runs,
+        "run_timeout_seconds": project.run_timeout_seconds,
     }
     session.add(
         _audit(
@@ -1162,8 +1172,12 @@ async def _queue_snapshot_run(
     request_hash: str,
     actor_id: UUID,
     runner_pool_id: UUID | None,
+    timeout_seconds: int,
     source_run_id: UUID | None = None,
     retry_mode: str | None = None,
+    regression_schedule_id: UUID | None = None,
+    scheduled_for: datetime | None = None,
+    commit: bool = True,
 ) -> tuple[TestRunRecord, bool]:
     snapshot_document = snapshot.model_dump(mode="json", exclude_none=True)
     snapshot_digest = canonical_sha256(snapshot)
@@ -1176,6 +1190,8 @@ async def _queue_snapshot_run(
         baseline_id=baseline_id,
         automation_package_id=automation_package_id,
         runner_pool_id=runner_pool_id,
+        regression_schedule_id=regression_schedule_id,
+        scheduled_for=scheduled_for,
         source_run_id=source_run_id,
         retry_mode=retry_mode,
         status=RunStatus.QUEUED.value,
@@ -1184,6 +1200,7 @@ async def _queue_snapshot_run(
         snapshot_digest=snapshot_digest,
         snapshot=snapshot_document,
         case_count=len(snapshot.cases),
+        timeout_seconds=timeout_seconds,
         created_by=actor_id,
         created_at=created_at,
         updated_at=created_at,
@@ -1193,10 +1210,14 @@ async def _queue_snapshot_run(
         "case_count": len(snapshot.cases),
         "snapshot_digest": snapshot_digest,
         "runner_pool_id": str(runner_pool_id) if runner_pool_id else None,
+        "timeout_seconds": timeout_seconds,
     }
     if source_run_id is not None:
         event_payload["source_run_id"] = str(source_run_id)
         event_payload["retry_mode"] = retry_mode or "FULL"
+    if regression_schedule_id is not None:
+        event_payload["regression_schedule_id"] = str(regression_schedule_id)
+        event_payload["scheduled_for"] = scheduled_for.isoformat() if scheduled_for else None
     await _append_run_event(
         session,
         record,
@@ -1229,10 +1250,17 @@ async def _queue_snapshot_run(
             },
         )
     )
+    audit_action = (
+        "run.scheduled"
+        if regression_schedule_id is not None
+        else "run.rerun_created"
+        if source_run_id is not None
+        else "run.created"
+    )
     session.add(
         _audit(
             actor_id=actor_id,
-            action="run.rerun_created" if source_run_id is not None else "run.created",
+            action=audit_action,
             resource_type="test_run",
             resource_id=record.id,
             project_id=project_id,
@@ -1240,7 +1268,10 @@ async def _queue_snapshot_run(
         )
     )
     try:
-        await session.commit()
+        if commit:
+            await session.commit()
+        else:
+            await session.flush()
     except IntegrityError as exc:
         await session.rollback()
         raced = await _existing_idempotent_run(
@@ -1263,6 +1294,9 @@ async def create_run(
     idempotency_key: str,
     actor_id: UUID,
     allowed_baseline_statuses: frozenset[str] = frozenset({"RELEASED"}),
+    regression_schedule_id: UUID | None = None,
+    scheduled_for: datetime | None = None,
+    commit: bool = True,
 ) -> tuple[TestRunRecord, bool]:
     request_hash = canonical_sha256(payload.model_dump(mode="json"))
     existing = await _existing_idempotent_run(
@@ -1357,6 +1391,10 @@ async def create_run(
         request_hash=request_hash,
         actor_id=actor_id,
         runner_pool_id=runner_pool_id,
+        timeout_seconds=project.run_timeout_seconds,
+        regression_schedule_id=regression_schedule_id,
+        scheduled_for=scheduled_for,
+        commit=commit,
     )
 
 
@@ -1433,6 +1471,7 @@ async def create_rerun(
         request_hash=request_hash,
         actor_id=actor_id,
         runner_pool_id=runner_pool_id,
+        timeout_seconds=project.run_timeout_seconds,
         source_run_id=source.id,
         retry_mode=mode,
     )
@@ -1609,25 +1648,66 @@ async def _release_runner_slot(session: AsyncSession, run_id: UUID) -> bool:
     return True
 
 
+async def _bind_runner_slot(
+    session: AsyncSession,
+    run: TestRunRecord,
+    worker_key: str | None,
+) -> bool:
+    if worker_key is None or run.runner_pool_id is None:
+        return False
+    lease = await session.scalar(
+        select(RunnerSlotLeaseRecord)
+        .where(
+            RunnerSlotLeaseRecord.run_id == run.id,
+            RunnerSlotLeaseRecord.status == "ACTIVE",
+        )
+        .with_for_update()
+    )
+    if lease is None:
+        raise ResourceConflict("pooled Run has no active Runner slot lease")
+    worker = await session.scalar(
+        select(RunnerWorkerRecord)
+        .where(RunnerWorkerRecord.worker_key == worker_key)
+        .with_for_update()
+    )
+    if worker is None or worker.pool_id != lease.pool_id:
+        raise InvalidRequest("Runner worker does not belong to the Run pool")
+    if worker.status != "ACTIVE":
+        raise ResourceConflict("Runner worker is not ACTIVE")
+    if lease.worker_id is not None and lease.worker_id != worker.id:
+        raise ResourceConflict("Runner slot lease is already bound to another worker")
+    lease.worker_id = worker.id
+    worker.last_heartbeat_at = utc_now()
+    return True
+
+
 async def update_run_status(
     session: AsyncSession,
     run_id: UUID,
     target: RunStatus,
+    *,
+    worker_key: str | None = None,
 ) -> tuple[TestRunRecord, bool]:
     if target not in {RunStatus.PREPARING, RunStatus.RUNNING}:
         raise InvalidRequest("Runner status callback only accepts PREPARING or RUNNING")
     record = await _locked_run(session, run_id)
     current = RunStatus(record.status)
+    lease_bound = await _bind_runner_slot(session, record, worker_key)
     if current == target:
+        if lease_bound:
+            await session.commit()
+            await session.refresh(record)
         return record, False
     try:
         require_run_transition(current, target)
     except InvalidRunTransition as exc:
         raise ResourceConflict(str(exc)) from exc
     record.status = target.value
-    if target == RunStatus.RUNNING and record.started_at is None:
-        record.started_at = utc_now()
     changed_at = utc_now()
+    if target in {RunStatus.PREPARING, RunStatus.RUNNING} and record.timeout_at is None:
+        record.timeout_at = changed_at + timedelta(seconds=record.timeout_seconds)
+    if target == RunStatus.RUNNING and record.started_at is None:
+        record.started_at = changed_at
     await _append_run_event(
         session,
         record,
@@ -1736,6 +1816,7 @@ async def record_run_result(
     )
     record.status = result.status.value
     record.started_at = result.started_at
+    record.timeout_at = None
     record.finished_at = result.finished_at
     record.result_digest = result_digest
     record.result_document = result_document

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from secrets import compare_digest
@@ -19,10 +20,12 @@ from .database import create_database_runtime, create_schema, database_ready
 from .governance_routes import router as governance_router
 from .identity_routes import router as identity_router
 from .observability import ApiMetrics, PrometheusMiddleware
+from .reliability_services import collect_reliability_snapshot
 from .routes import router
 from .services import ServiceError
 
-API_VERSION = "0.10.0"
+API_VERSION = "0.15.0"
+LOGGER = logging.getLogger(__name__)
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -97,7 +100,21 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     media_type="text/plain",
                     headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"},
                 )
-        metrics.database_ready.set(1 if await database_ready(engine) else 0)
+        ready = await database_ready(engine)
+        metrics.database_ready.set(1 if ready else 0)
+        if ready:
+            try:
+                metrics.update_reliability(
+                    await collect_reliability_snapshot(
+                        session_factory,
+                        heartbeat_ttl_seconds=(resolved_settings.runner_heartbeat_ttl_seconds),
+                    )
+                )
+            except Exception:
+                LOGGER.exception("Failed to collect the reliability metrics snapshot")
+                metrics.reliability_snapshot_success.set(0)
+        else:
+            metrics.reliability_snapshot_success.set(0)
         return Response(
             content=metrics.render(),
             headers={

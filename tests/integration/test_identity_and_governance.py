@@ -244,6 +244,43 @@ class IdentityAndGovernanceTests(unittest.TestCase):
             json={"max_in_flight_runs": 5},
         )
         self.assertEqual(denied_policy_update.status_code, 403, denied_policy_update.text)
+        schedule_url = f"/api/v1/projects/{resources['project_id']}/regression-schedules"
+        schedule_payload = {
+            "key": "nightly",
+            "name": "每日回归",
+            "target_id": resources["target_id"],
+            "environment_id": resources["environment_id"],
+            "baseline_id": resources["baseline_id"],
+            "automation_package_id": resources["package_id"],
+            "cron_expression": "0 2 * * *",
+            "timezone": "Asia/Shanghai",
+        }
+        schedule = self.client.post(
+            schedule_url,
+            headers=self.admin_headers,
+            json=schedule_payload,
+        )
+        self.assertEqual(schedule.status_code, 201, schedule.text)
+        readable_schedules = self.client.get(schedule_url, headers=viewer_headers)
+        self.assertEqual(readable_schedules.status_code, 200, readable_schedules.text)
+        self.assertEqual(readable_schedules.json()[0]["key"], "nightly")
+        denied_schedule_create = self.client.post(
+            schedule_url,
+            headers=viewer_headers,
+            json={**schedule_payload, "key": "denied"},
+        )
+        self.assertEqual(denied_schedule_create.status_code, 403, denied_schedule_create.text)
+        denied_schedule_update = self.client.patch(
+            f"{schedule_url}/{schedule.json()['id']}",
+            headers=viewer_headers,
+            json={"status": "PAUSED"},
+        )
+        self.assertEqual(denied_schedule_update.status_code, 403, denied_schedule_update.text)
+        denied_schedule_trigger = self.client.post(
+            f"{schedule_url}/{schedule.json()['id']}/trigger",
+            headers={**viewer_headers, "Idempotency-Key": "viewer-trigger-denied"},
+        )
+        self.assertEqual(denied_schedule_trigger.status_code, 403, denied_schedule_trigger.text)
         pool = self.client.post(
             "/api/v1/admin/runner-pools",
             headers=self.admin_headers,

@@ -2,7 +2,7 @@
 
 ## 适用范围
 
-本手册覆盖 `0.8.x` 控制面、Outbox、Celery Worker、PostgreSQL、Redis 和 MinIO 的发布、
+本手册覆盖 `0.12.x` 控制面、Outbox、Scheduler、Reaper、Celery Worker、PostgreSQL、Redis 和 MinIO 的发布、
 备份、恢复与基础故障处置。Compose 是单机验收基座，不替代生产 TLS、Ingress、托管
 数据库、对象存储权限和集中日志方案。
 
@@ -24,9 +24,9 @@
 
 ```powershell
 # 1. 先创建并验证备份（见下一节）
-docker compose stop outbox worker api
+docker compose stop scheduler reaper outbox worker api
 docker compose run --rm migrate
-docker compose up -d api outbox worker frontend
+docker compose up -d api outbox scheduler reaper worker frontend
 docker compose ps
 python scripts/smoke_compose.py
 ```
@@ -70,7 +70,7 @@ python scripts/backup_restore.py verify `
 ## 隔离恢复流程
 
 恢复会对 `DATABASE_URL` 指向的数据库执行 `pg_restore --clean --if-exists`，属于破坏性
-操作。先停止 API、Outbox 与 Worker，确认连接指向隔离或已批准的目标，并预创建目标
+操作。先停止 API、Outbox、Scheduler、Reaper 与 Worker，确认连接指向隔离或已批准的目标，并预创建目标
 数据库和 Bucket。工具在改写数据库前会校验全部文件并检查对象冲突。
 
 ```powershell
@@ -105,14 +105,18 @@ authorization:
 ```
 
 仓库告警规则覆盖：API 连续不可抓取、数据库就绪失败、5xx 比例持续超过 5%、五分钟
-p95 延迟持续超过 2 秒。上线前必须把这些规则接入实际通知接收器并执行一次测试告警。
+p95 延迟持续超过 2 秒，以及可靠性快照、派发积压、定时计划延迟和失联 Worker 租约。
+上线前必须把这些规则接入实际通知接收器并执行一次测试告警。
 
 ## 常见故障处置
 
 | 现象 | 首要检查 | 安全处置 |
 | --- | --- | --- |
 | `/readyz` 返回 503 | PostgreSQL 连接、证书、容量、迁移版本 | 保持 API 摘流，恢复数据库连通后再放量 |
-| Run 长时间停留 QUEUED | Outbox 日志、Redis、Celery ping、待发布记录 | 恢复发布器/Worker；不要直接改 Run 状态 |
+| Run 长时间停留 QUEUED | Outbox 日志、Redis、Celery ping、派发积压指标 | 恢复发布器/Worker；确认 Reaper 在线，不要直接改 Run 状态 |
+| Run 自动变为 TIMED_OUT | Run 冻结的 `timeout_seconds`、事件时间线、Runner 日志 | 判断是否合理调高项目策略，再从不可变 Snapshot 重跑 |
+| 失联 Worker 租约告警 | Worker 心跳、Reaper 日志、Pool 活动租约 | 隔离异常 Worker，确认租约自动回收后再恢复容量 |
+| 定时计划延迟告警 | Scheduler 日志、到期计划量、数据库锁与配额 | 恢复 Scheduler，核对补跑/跳过记录，禁止手工改 `next_fire_at` |
 | Runner 大量 INFRA_ERROR | 浏览器/网络/密钥引用、Runner 工作区容量 | 暂停新 Run，保留失败制品，修复后从来源 Snapshot 重跑 |
 | 制品下载失败 | MinIO 可用性、Bucket 权限、对象摘要 | 禁止覆盖冲突对象，从已验证备份恢复到隔离 Bucket |
 | 5xx 或延迟告警 | 按路由模板聚合指标、数据库慢查询、外部存储 | 限流或摘流，保存时间窗与日志，避免无证据重启循环 |

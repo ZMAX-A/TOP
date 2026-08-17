@@ -98,6 +98,18 @@ class ProjectRecord(TimestampMixin, Base):
             "max_daily_runs BETWEEN 1 AND 100000",
             name="max_daily_runs_range",
         ),
+        CheckConstraint(
+            "run_timeout_seconds BETWEEN 60 AND 86400",
+            name="run_timeout_seconds_range",
+        ),
+        CheckConstraint(
+            "quality_slo_target_percent BETWEEN 1 AND 100",
+            name="quality_slo_target_percent_range",
+        ),
+        CheckConstraint(
+            "quality_slo_window_days BETWEEN 7 AND 90",
+            name="quality_slo_window_days_range",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -116,6 +128,24 @@ class ProjectRecord(TimestampMixin, Base):
         nullable=False,
         default=500,
         server_default="500",
+    )
+    run_timeout_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3600,
+        server_default="3600",
+    )
+    quality_slo_target_percent: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=95,
+        server_default="95",
+    )
+    quality_slo_window_days: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=30,
+        server_default="30",
     )
 
 
@@ -360,11 +390,92 @@ class RunnerWorkerRecord(TimestampMixin, Base):
     )
 
 
+class RegressionScheduleRecord(TimestampMixin, Base):
+    __tablename__ = "regression_schedules"
+    __table_args__ = (
+        UniqueConstraint("project_id", "key"),
+        CheckConstraint(
+            "misfire_grace_seconds BETWEEN 60 AND 86400",
+            name="misfire_grace_seconds_range",
+        ),
+        Index("ix_regression_schedules_due", "status", "next_fire_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_id: Mapped[UUID] = mapped_column(
+        ForeignKey("test_targets.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    environment_id: Mapped[UUID] = mapped_column(
+        ForeignKey("environments.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    baseline_id: Mapped[UUID] = mapped_column(
+        ForeignKey("case_baselines.baseline_id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    automation_package_id: Mapped[UUID] = mapped_column(
+        ForeignKey("automation_packages.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+    key: Mapped[str] = mapped_column(String(64), nullable=False)
+    name: Mapped[str] = mapped_column(String(200), nullable=False)
+    description: Mapped[str | None] = mapped_column(Text)
+    case_codes: Mapped[list[str]] = mapped_column(JSON_DOCUMENT, nullable=False, default=list)
+    cron_expression: Mapped[str] = mapped_column(String(128), nullable=False)
+    timezone: Mapped[str] = mapped_column(String(64), nullable=False)
+    misfire_policy: Mapped[str] = mapped_column(String(32), nullable=False)
+    misfire_grace_seconds: Mapped[int] = mapped_column(Integer, nullable=False, default=300)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    next_fire_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("test_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    last_error: Mapped[str | None] = mapped_column(Text)
+    created_by: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="RESTRICT"),
+        nullable=False,
+    )
+
+
 class TestRunRecord(TimestampMixin, Base):
     __tablename__ = "test_runs"
     __table_args__ = (
         UniqueConstraint("project_id", "idempotency_key"),
+        CheckConstraint(
+            "timeout_seconds BETWEEN 60 AND 86400",
+            name="timeout_seconds_range",
+        ),
         Index("ix_test_runs_project_status_created", "project_id", "status", "created_at"),
+        Index(
+            "ix_test_runs_project_target_status_finished",
+            "project_id",
+            "target_id",
+            "status",
+            "finished_at",
+        ),
+        Index(
+            "ix_test_runs_project_environment_status_finished",
+            "project_id",
+            "environment_id",
+            "status",
+            "finished_at",
+        ),
+        Index(
+            "ix_test_runs_project_baseline_status_finished",
+            "project_id",
+            "baseline_id",
+            "status",
+            "finished_at",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -393,6 +504,12 @@ class TestRunRecord(TimestampMixin, Base):
         nullable=True,
         index=True,
     )
+    regression_schedule_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("regression_schedules.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
+    scheduled_for: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     source_run_id: Mapped[UUID | None] = mapped_column(
         ForeignKey("test_runs.id", ondelete="RESTRICT"),
         nullable=True,
@@ -407,6 +524,12 @@ class TestRunRecord(TimestampMixin, Base):
     result_digest: Mapped[str | None] = mapped_column(String(71))
     result_document: Mapped[dict[str, Any] | None] = mapped_column(JSON_DOCUMENT)
     case_count: Mapped[int] = mapped_column(Integer, nullable=False)
+    timeout_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3600,
+        server_default="3600",
+    )
     created_by: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
     cancel_requested: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     dispatch_state: Mapped[str] = mapped_column(
@@ -418,8 +541,37 @@ class TestRunRecord(TimestampMixin, Base):
     dispatch_wait_reason: Mapped[str | None] = mapped_column(String(64))
     dispatched_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    timeout_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
+
+
+class RegressionScheduleFiringRecord(Base):
+    __tablename__ = "regression_schedule_firings"
+    __table_args__ = (
+        UniqueConstraint("schedule_id", "scheduled_for"),
+        Index("ix_regression_schedule_firings_schedule_created", "schedule_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    schedule_id: Mapped[UUID] = mapped_column(
+        ForeignKey("regression_schedules.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("test_runs.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    scheduled_for: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    triggered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    trigger_kind: Mapped[str] = mapped_column(String(32), nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        default=utc_now,
+    )
 
 
 class RunnerSlotLeaseRecord(Base):
@@ -434,6 +586,11 @@ class RunnerSlotLeaseRecord(Base):
     run_id: Mapped[UUID] = mapped_column(
         ForeignKey("test_runs.id", ondelete="CASCADE"),
         nullable=False,
+    )
+    worker_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("runner_workers.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
     )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
     acquired_at: Mapped[datetime] = mapped_column(

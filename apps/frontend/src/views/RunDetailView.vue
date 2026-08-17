@@ -17,7 +17,7 @@ import { ElMessage } from 'element-plus'
 import { ApiError, api, streamRunEvents } from '@/api/client'
 import type { Artifact, ProjectMember, RunDetail, RunEvent, RunStatus } from '@/api/types'
 import { auth } from '@/auth'
-import { formatDate, runTagType, shortDigest } from '@/presentation'
+import { formatDate, formatUtcDate, runTagType, shortDigest } from '@/presentation'
 
 const TERMINAL_STATUSES = new Set<RunStatus>([
   'PASSED',
@@ -342,6 +342,15 @@ onBeforeUnmount(() => {
       :closable="false"
       class="stream-alert"
     />
+    <el-alert
+      v-if="run?.regression_schedule_id"
+      title="此 Run 由回归计划创建"
+      :description="`计划 ${run.regression_schedule_id.slice(0, 8)} · 计划时刻 ${formatUtcDate(run.scheduled_for)}`"
+      type="info"
+      :closable="false"
+      show-icon
+      class="schedule-origin-alert"
+    />
 
     <el-alert
       v-if="streamError && !terminal"
@@ -367,6 +376,11 @@ onBeforeUnmount(() => {
         <span class="metric-icon amber"><Timer /></span>
         <div><strong>{{ run.result ? formatDuration(run.result.case_results.reduce((sum, item) => sum + item.duration_ms, 0)) : '—' }}</strong><span>累计用例耗时</span></div>
         <small>{{ formatDate(run.started_at) }}</small>
+      </article>
+      <article class="metric-card">
+        <span class="metric-icon amber"><Timer /></span>
+        <div><strong>{{ run.timeout_at ? formatUtcDate(run.timeout_at) : '等待执行' }}</strong><span>超时截止（UTC）</span></div>
+        <small>上限 {{ run.timeout_seconds }} 秒</small>
       </article>
     </section>
 
@@ -558,6 +572,7 @@ onBeforeUnmount(() => {
 }
 
 .lineage-alert,
+.schedule-origin-alert,
 .stream-alert,
 .diagnostic-alert {
   margin-bottom: 18px;

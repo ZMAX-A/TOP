@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Annotated, Literal
 from uuid import UUID
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    field_validator,
+    model_validator,
+)
 
 from testops.contracts import (
     CaseBaseline,
@@ -20,9 +27,18 @@ from testops.contracts import (
     WebRunConfig,
 )
 
+from .cron import CronValidationError, normalize_cron_expression, validate_timezone
+
 ResourceKey = Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_-]*$")]
 NonEmptyText = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1)]
 Digest = Annotated[str, StringConstraints(pattern=r"^sha256:[0-9a-f]{64}$")]
+
+
+def _as_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    aware = value if value.tzinfo is not None else value.replace(tzinfo=UTC)
+    return aware.astimezone(UTC)
 
 
 class ApiModel(BaseModel):
@@ -60,6 +76,7 @@ class ProjectResponse(ApiModel):
 class ExecutionPolicyUpdate(ApiModel):
     max_in_flight_runs: Annotated[int, Field(ge=1, le=500)] | None = None
     max_daily_runs: Annotated[int, Field(ge=1, le=100_000)] | None = None
+    run_timeout_seconds: Annotated[int, Field(ge=60, le=86_400)] | None = None
 
     @model_validator(mode="after")
     def require_change(self) -> ExecutionPolicyUpdate:
@@ -74,6 +91,7 @@ class ExecutionPolicyResponse(ApiModel):
     project_id: UUID
     max_in_flight_runs: int
     max_daily_runs: int
+    run_timeout_seconds: int
     in_flight_runs: Annotated[int, Field(ge=0)]
     queued_runs: Annotated[int, Field(ge=0)]
     preparing_runs: Annotated[int, Field(ge=0)]
@@ -85,6 +103,266 @@ class ExecutionPolicyResponse(ApiModel):
     daily_window_started_at: datetime
     generated_at: datetime
     updated_at: datetime
+
+
+class QualityPolicyUpdate(ApiModel):
+    target_pass_rate_percent: Annotated[int, Field(ge=1, le=100)] | None = None
+    window_days: Annotated[int, Field(ge=7, le=90)] | None = None
+
+    @model_validator(mode="after")
+    def require_change(self) -> QualityPolicyUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one quality policy field must be provided")
+        if any(getattr(self, field) is None for field in self.model_fields_set):
+            raise ValueError("quality policy fields cannot be null")
+        return self
+
+
+class QualityPolicyResponse(ApiModel):
+    project_id: UUID
+    target_pass_rate_percent: Annotated[int, Field(ge=1, le=100)]
+    window_days: Annotated[int, Field(ge=7, le=90)]
+    updated_at: datetime
+
+
+class QualityRunSummary(ApiModel):
+    total_terminal_runs: Annotated[int, Field(ge=0)]
+    conclusive_runs: Annotated[int, Field(ge=0)]
+    passed_runs: Annotated[int, Field(ge=0)]
+    failed_runs: Annotated[int, Field(ge=0)]
+    canceled_runs: Annotated[int, Field(ge=0)]
+    timed_out_runs: Annotated[int, Field(ge=0)]
+    infra_error_runs: Annotated[int, Field(ge=0)]
+    pass_rate_percent: Annotated[float, Field(ge=0, le=100)] | None
+    execution_reliability_percent: Annotated[float, Field(ge=0, le=100)] | None
+
+
+class QualityCaseSummary(ApiModel):
+    total_terminal_cases: Annotated[int, Field(ge=0)]
+    conclusive_cases: Annotated[int, Field(ge=0)]
+    passed_cases: Annotated[int, Field(ge=0)]
+    failed_cases: Annotated[int, Field(ge=0)]
+    skipped_cases: Annotated[int, Field(ge=0)]
+    canceled_cases: Annotated[int, Field(ge=0)]
+    timed_out_cases: Annotated[int, Field(ge=0)]
+    infra_error_cases: Annotated[int, Field(ge=0)]
+    pass_rate_percent: Annotated[float, Field(ge=0, le=100)] | None
+
+
+class QualityTrendPoint(ApiModel):
+    bucket_started_at: datetime
+    total_terminal_runs: Annotated[int, Field(ge=0)]
+    passed_runs: Annotated[int, Field(ge=0)]
+    failed_runs: Annotated[int, Field(ge=0)]
+    canceled_runs: Annotated[int, Field(ge=0)]
+    timed_out_runs: Annotated[int, Field(ge=0)]
+    infra_error_runs: Annotated[int, Field(ge=0)]
+    pass_rate_percent: Annotated[float, Field(ge=0, le=100)] | None
+
+
+class FailureClusterResponse(ApiModel):
+    fingerprint: Digest
+    failure_category: str
+    message_pattern: str
+    occurrences: Annotated[int, Field(ge=1)]
+    affected_runs: Annotated[int, Field(ge=1)]
+    failed_occurrences: Annotated[int, Field(ge=0)]
+    timed_out_occurrences: Annotated[int, Field(ge=0)]
+    infra_error_occurrences: Annotated[int, Field(ge=0)]
+    case_codes: tuple[str, ...]
+    latest_at: datetime
+
+
+class FlakyCaseResponse(ApiModel):
+    case_id: UUID
+    case_code: str
+    conclusive_executions: Annotated[int, Field(ge=3)]
+    passed_executions: Annotated[int, Field(ge=1)]
+    failed_executions: Annotated[int, Field(ge=1)]
+    pass_rate_percent: Annotated[float, Field(ge=0, le=100)]
+    status_transitions: Annotated[int, Field(ge=2)]
+    transition_rate_percent: Annotated[float, Field(ge=0, le=100)]
+    latest_status: Literal["PASSED", "FAILED"]
+    latest_completed_at: datetime
+
+
+class FlakyCaseAnalysisResponse(ApiModel):
+    minimum_conclusive_executions: Annotated[int, Field(ge=3)]
+    minimum_status_transitions: Annotated[int, Field(ge=2)]
+    analyzed_executions: Annotated[int, Field(ge=0)]
+    detected_cases: Annotated[int, Field(ge=0)]
+    data_truncated: bool
+    cases: tuple[FlakyCaseResponse, ...]
+
+
+class QualityDimensionFilters(ApiModel):
+    target_id: UUID | None
+    environment_id: UUID | None
+    baseline_id: UUID | None
+
+
+class QualityAnalyticsResponse(ApiModel):
+    project_id: UUID
+    filters: QualityDimensionFilters
+    window_days: Annotated[int, Field(ge=1, le=90)]
+    window_started_at: datetime
+    window_ended_at: datetime
+    generated_at: datetime
+    target_pass_rate_percent: Annotated[int, Field(ge=1, le=100)]
+    slo_status: Literal["NO_DATA", "MET", "BREACHED"]
+    latest_completed_at: datetime | None
+    runs: QualityRunSummary
+    cases: QualityCaseSummary
+    trend: tuple[QualityTrendPoint, ...]
+    failure_clusters: tuple[FailureClusterResponse, ...]
+    failure_data_truncated: bool
+    flaky: FlakyCaseAnalysisResponse
+
+
+class RegressionScheduleCreate(ApiModel):
+    key: ResourceKey
+    name: NonEmptyText
+    description: str | None = None
+    target_id: UUID
+    environment_id: UUID
+    baseline_id: UUID
+    automation_package_id: UUID
+    case_codes: tuple[Annotated[str, StringConstraints(pattern=r"^TC-[A-Z0-9-]+$")], ...] = ()
+    cron_expression: Annotated[str, StringConstraints(strip_whitespace=True, max_length=128)]
+    timezone: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)]
+    misfire_policy: Literal["SKIP", "FIRE_ONCE"] = "FIRE_ONCE"
+    misfire_grace_seconds: Annotated[int, Field(ge=60, le=86_400)] = 300
+    status: Literal["ACTIVE", "PAUSED"] = "ACTIVE"
+
+    @field_validator("cron_expression")
+    @classmethod
+    def valid_cron_expression(cls, value: str) -> str:
+        try:
+            return normalize_cron_expression(value)
+        except CronValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value: str) -> str:
+        try:
+            return validate_timezone(value)
+        except CronValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
+    @model_validator(mode="after")
+    def unique_case_codes(self) -> RegressionScheduleCreate:
+        if len(self.case_codes) != len(set(self.case_codes)):
+            raise ValueError("case_codes contains duplicates")
+        return self
+
+
+class RegressionScheduleUpdate(ApiModel):
+    name: NonEmptyText | None = None
+    description: str | None = None
+    target_id: UUID | None = None
+    environment_id: UUID | None = None
+    baseline_id: UUID | None = None
+    automation_package_id: UUID | None = None
+    case_codes: tuple[Annotated[str, StringConstraints(pattern=r"^TC-[A-Z0-9-]+$")], ...] | None = (
+        None
+    )
+    cron_expression: (
+        Annotated[str, StringConstraints(strip_whitespace=True, max_length=128)] | None
+    ) = None
+    timezone: (
+        Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=64)] | None
+    ) = None
+    misfire_policy: Literal["SKIP", "FIRE_ONCE"] | None = None
+    misfire_grace_seconds: Annotated[int, Field(ge=60, le=86_400)] | None = None
+    status: Literal["ACTIVE", "PAUSED", "ARCHIVED"] | None = None
+
+    @field_validator("cron_expression")
+    @classmethod
+    def valid_cron_expression(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            return normalize_cron_expression(value)
+        except CronValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        try:
+            return validate_timezone(value)
+        except CronValidationError as exc:
+            raise ValueError(str(exc)) from exc
+
+    @model_validator(mode="after")
+    def require_change(self) -> RegressionScheduleUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one regression schedule field must be provided")
+        if any(
+            field != "description" and getattr(self, field) is None
+            for field in self.model_fields_set
+        ):
+            raise ValueError("regression schedule fields cannot be null")
+        if self.case_codes is not None and len(self.case_codes) != len(set(self.case_codes)):
+            raise ValueError("case_codes contains duplicates")
+        return self
+
+
+class RegressionScheduleResponse(ApiModel):
+    id: UUID
+    project_id: UUID
+    key: str
+    name: str
+    description: str | None
+    target_id: UUID
+    environment_id: UUID
+    baseline_id: UUID
+    automation_package_id: UUID
+    case_codes: tuple[str, ...]
+    cron_expression: str
+    timezone: str
+    misfire_policy: Literal["SKIP", "FIRE_ONCE"]
+    misfire_grace_seconds: int
+    status: Literal["ACTIVE", "PAUSED", "ARCHIVED"]
+    next_fire_at: datetime | None
+    last_scheduled_for: datetime | None
+    last_triggered_at: datetime | None
+    last_run_id: UUID | None
+    last_error: str | None
+    created_by: UUID
+    created_at: datetime
+    updated_at: datetime
+
+    @field_validator(
+        "next_fire_at",
+        "last_scheduled_for",
+        "last_triggered_at",
+        "created_at",
+        "updated_at",
+    )
+    @classmethod
+    def utc_timestamps(cls, value: datetime | None) -> datetime | None:
+        return _as_utc(value)
+
+
+class RegressionScheduleFiringResponse(ApiModel):
+    id: UUID
+    schedule_id: UUID
+    run_id: UUID | None
+    scheduled_for: datetime
+    triggered_at: datetime | None
+    trigger_kind: Literal["SCHEDULED", "MISFIRE", "MANUAL"]
+    status: Literal["TRIGGERED", "SKIPPED", "BLOCKED"]
+    error_message: str | None
+    created_at: datetime
+
+    @field_validator("scheduled_for", "triggered_at", "created_at")
+    @classmethod
+    def utc_timestamps(cls, value: datetime | None) -> datetime | None:
+        return _as_utc(value)
 
 
 class RunnerCapabilities(ApiModel):
@@ -321,10 +599,13 @@ class RunResponse(ApiModel):
     baseline_id: UUID
     automation_package_id: UUID
     runner_pool_id: UUID | None
+    regression_schedule_id: UUID | None
+    scheduled_for: datetime | None
     source_run_id: UUID | None
     retry_mode: Literal["FULL", "FAILED_ONLY"] | None
     status: RunStatus
     case_count: int
+    timeout_seconds: int
     snapshot_digest: Digest
     result_digest: Digest | None
     cancel_requested: bool
@@ -334,8 +615,14 @@ class RunResponse(ApiModel):
     created_by: UUID
     created_at: datetime
     started_at: datetime | None
+    timeout_at: datetime | None
     finished_at: datetime | None
     error_message: str | None
+
+    @field_validator("scheduled_for", "timeout_at")
+    @classmethod
+    def utc_run_time(cls, value: datetime | None) -> datetime | None:
+        return _as_utc(value)
 
 
 class RunCaseResponse(ApiModel):
@@ -396,6 +683,13 @@ class RunBatchCancelResponse(ApiModel):
 
 class InternalRunStatusUpdate(ApiModel):
     status: RunStatus
+    worker_key: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, pattern=r"^[a-z0-9][a-z0-9._-]{2,127}$"),
+        ]
+        | None
+    ) = None
 
 
 class InternalRunStatusResponse(ApiModel):
