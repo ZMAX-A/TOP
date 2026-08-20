@@ -91,6 +91,18 @@
           "pattern": "^sha256:[0-9a-fA-F]{64}$",
           "title": "Digest",
           "type": "string"
+        },
+        "runner_type": {
+          "const": "WEB_PLAYWRIGHT",
+          "default": "WEB_PLAYWRIGHT",
+          "title": "Runner Type",
+          "type": "string"
+        },
+        "image_repository": {
+          "default": "testops-worker",
+          "minLength": 1,
+          "title": "Image Repository",
+          "type": "string"
         }
       },
       "required": [

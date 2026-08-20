@@ -51,6 +51,25 @@ def test_frontend_proxy_preserves_authenticated_sse_streaming() -> None:
     assert "proxy_pass http://api:8000;" in nginx
     assert "proxy_buffering off;" in nginx
     assert "proxy_read_timeout 3600s;" in nginx
+    assert "client_max_body_size 1m;" in nginx
+    assert "server_tokens off;" in nginx
+
+
+def test_container_base_images_are_pinned_and_bootstrap_can_be_disabled() -> None:
+    compose = (ROOT / "compose.yaml").read_text("utf-8")
+    dockerfiles = "\n".join(
+        (ROOT / path).read_text("utf-8")
+        for path in (
+            "infra/docker/api.Dockerfile",
+            "infra/docker/worker.Dockerfile",
+            "infra/docker/frontend.Dockerfile",
+            "infra/smoke-target/Dockerfile",
+        )
+    )
+    assert "BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN-}" in compose
+    assert "change-me-one-time-bootstrap-token" not in compose
+    assert compose.count("@sha256:") >= 5
+    assert dockerfiles.count("@sha256:") == 5
 
 
 def test_compose_smoke_baseline_is_stable_and_contract_valid() -> None:

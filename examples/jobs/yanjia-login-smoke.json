@@ -1,7 +1,9 @@
 {
   "automation_package": {
-    "digest": "sha256:8cb04083c93e4603a92303e189b0ee7cbadf3e85550937f44e43d2776cd73605",
+    "digest": "sha256:e040482d91882b9be417b94cd0c404c072b7988bd61a04bb6d82da1f0b68f5e7",
+    "image_repository": "testops-worker",
     "name": "yanjia-web",
+    "runner_type": "WEB_PLAYWRIGHT",
     "version": "0.1.0"
   },
   "browser": "chromium",

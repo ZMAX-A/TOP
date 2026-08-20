@@ -216,6 +216,17 @@ class AutomationPackageRef(FrozenModel):
     name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9._-]*$")]
     version: NonEmptyStr
     digest: Sha256Digest
+    runner_type: Literal["WEB_PLAYWRIGHT"] = "WEB_PLAYWRIGHT"
+    image_repository: NonEmptyStr = "testops-worker"
+
+    @field_validator("image_repository")
+    @classmethod
+    def repository_without_mutable_reference(cls, value: str) -> str:
+        if "://" in value or "@" in value or any(character.isspace() for character in value):
+            raise ValueError("image_repository must be an OCI repository without scheme or digest")
+        if ":" in value.rsplit("/", 1)[-1]:
+            raise ValueError("image_repository must not contain a mutable image tag")
+        return value
 
 
 class RunSnapshot(FrozenModel):

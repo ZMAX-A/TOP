@@ -18,6 +18,7 @@ from prometheus_client import (
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 if TYPE_CHECKING:
+    from .quality_operations_services import QualityOperationsSnapshot
     from .reliability_services import ReliabilitySnapshot
 
 HTTP_DURATION_BUCKETS = (
@@ -115,6 +116,45 @@ class ApiMetrics:
             registry=self.registry,
         )
         self.reliability_snapshot_success.set(0)
+        self.quality_alert_evaluation_due_configs = Gauge(
+            "testops_quality_alert_evaluation_due_configs",
+            "Enabled quality alert configurations currently due for evaluation.",
+            registry=self.registry,
+        )
+        self.quality_alert_evaluation_lag_seconds = Gauge(
+            "testops_quality_alert_evaluation_lag_seconds",
+            "Lag of the oldest due quality alert evaluation.",
+            registry=self.registry,
+        )
+        self.quality_alert_active_silences = Gauge(
+            "testops_quality_alert_active_silences",
+            "Enabled quality alert configurations with an active silence window.",
+            registry=self.registry,
+        )
+        self.quality_webhook_deliveries = Gauge(
+            "testops_quality_webhook_deliveries",
+            "Current quality Webhook delivery records by operational status.",
+            ("status",),
+            registry=self.registry,
+        )
+        for status in ("PENDING", "FAILED"):
+            self.quality_webhook_deliveries.labels(status=status).set(0)
+        self.quality_webhook_oldest_pending_age_seconds = Gauge(
+            "testops_quality_webhook_oldest_pending_age_seconds",
+            "Age of the oldest pending quality Webhook delivery.",
+            registry=self.registry,
+        )
+        self.quality_webhook_replay_deliveries = Gauge(
+            "testops_quality_webhook_replay_deliveries",
+            "Persisted quality Webhook deliveries created by manual replay.",
+            registry=self.registry,
+        )
+        self.quality_operations_snapshot_success = Gauge(
+            "testops_quality_operations_snapshot_success",
+            "Whether the latest quality operations snapshot query succeeded.",
+            registry=self.registry,
+        )
+        self.quality_operations_snapshot_success.set(0)
 
     def update_reliability(self, snapshot: ReliabilitySnapshot) -> None:
         self.runs_in_flight.labels(status="QUEUED").set(snapshot.queued_runs)
@@ -126,6 +166,16 @@ class ApiMetrics:
         self.schedule_lag_seconds.set(snapshot.schedule_lag_seconds)
         self.stale_runner_leases.set(snapshot.stale_runner_leases)
         self.reliability_snapshot_success.set(1)
+
+    def update_quality_operations(self, snapshot: QualityOperationsSnapshot) -> None:
+        self.quality_alert_evaluation_due_configs.set(snapshot.due_evaluations)
+        self.quality_alert_evaluation_lag_seconds.set(snapshot.evaluation_lag_seconds)
+        self.quality_alert_active_silences.set(snapshot.active_silences)
+        self.quality_webhook_deliveries.labels(status="PENDING").set(snapshot.pending_deliveries)
+        self.quality_webhook_deliveries.labels(status="FAILED").set(snapshot.failed_deliveries)
+        self.quality_webhook_oldest_pending_age_seconds.set(snapshot.oldest_pending_age_seconds)
+        self.quality_webhook_replay_deliveries.set(snapshot.replay_deliveries)
+        self.quality_operations_snapshot_success.set(1)
 
     def render(self) -> bytes:
         return generate_latest(self.registry)

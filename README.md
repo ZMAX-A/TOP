@@ -1,6 +1,6 @@
 # TestOps Platform
 
-多项目自动化测试治理与执行平台，当前开发版本为 `0.15.0`。当前仓库是平台新代码的唯一开发目录；同级
+多项目自动化测试治理与执行平台，当前开发版本为 `0.22.0`。当前仓库是平台新代码的唯一开发目录；同级
 `../web` 是现有颜佳 AI Web 自动化项目，只作为首个 Web Runner 的迁移来源。
 
 ## 当前里程碑
@@ -11,7 +11,10 @@ Vue 管理端）和 M4（执行可观测性与制品管理）已完成。
 M5.1（完整容器运行基座）、M5.2（系统管理中心）、M5.3（运行运营中心）和
 M6（发布加固）、M7.1（项目执行配额）、M7.2（Runner Pool 与执行槽位）和
 M7.3（定时回归计划）、M7.4（运行可靠性与队列可观测性）、M7.5（项目质量分析与 SLO）和
-M7.6（目标、环境与基线质量维度）和 M7.7（Flaky Case 识别）已实现。
+M7.6（目标、环境与基线质量维度）、M7.7（Flaky Case 识别）、M8.1（相邻窗口质量波动告警）和
+M8.2（质量告警 Webhook 可靠投递基础）、M8.3（质量告警自动评估状态机）和
+M8.4（质量告警人工确认与限时静默）、M8.5（失败投递人工重放）和
+M8.6（质量运营可观测性）已实现，M8 质量告警闭环开发完成。M9.1（自动化包生命周期控制面）已实现。
 
 - 统一动作和断言能力注册表；
 - 平台用例、Runner Job、Runner Result 契约；
@@ -22,7 +25,8 @@ M7.6（目标、环境与基线质量维度）和 M7.7（Flaky Case 识别）已
 - 已发布 `case-v1.0.1`，只修复成功登录用例会误通过的弱 URL 断言；
 - Web Runner 可执行登录模块 JSON Job，隔离运行目录并产出结构化 Result/Artifact；
 - PostgreSQL/SQLAlchemy 控制面模型和首个 Alembic 迁移；
-- 项目、目标、环境、不可变基线、自动化包和 Run REST API；
+- 项目、目标、环境、不可变基线、自动化包生命周期和 Run REST API；
+- 自动化包支持草稿、全量验证、激活、弃用和吊销，Runner 类型、OCI 仓库与不可变摘要进入 Run Snapshot；
 - 幂等 Run 创建、不可变 Run Snapshot、显式状态机和事务 Outbox；
 - Redis/Celery Worker 投递、取消轮询、Runner 状态/结果回调和制品元数据入库；
 - 本地身份提供者使用 scrypt 密码哈希和只保存 SHA-256 摘要的不透明会话令牌；
@@ -62,6 +66,18 @@ M7.6（目标、环境与基线质量维度）和 M7.7（Flaky Case 识别）已
   汇总、趋势与失败聚类始终共享同一筛选边界；
 - Flaky Case 识别只分析 PASSED/FAILED 结果，要求至少 3 次有结论执行和 2 次状态切换，并公开样本数、
   通过/失败分布、切换率、最新状态与截断边界，避免把一次性回归或修复误报为 Flaky；
+- 质量波动告警在完全相同的维度筛选下比较等长相邻 UTC 窗口，对 Run 通过率、Case 通过率和执行可靠性
+  分别给出百分点变化；项目可配置警告/严重下降阈值，缺少前后样本时明确标记为无可比数据；
+- 项目级质量 Webhook 支持脱敏地址展示、可选环境密钥 HMAC-SHA256 签名、持久化测试事件、投递历史和
+  有界指数退避；独立 dispatcher 不与 Run/Celery Outbox 混用，响应正文和真实密钥均不落库；
+- 独立 `quality-alerts` evaluator 按持久化到期时间计算项目级相邻 UTC 窗口，自动生成触发、升级、降级与
+  恢复事件；每个指标保存状态、信号指纹、通知序号和冷却期，重复评估不会重复入队；
+- 项目管理员可对 WARNING/CRITICAL 指标记录人工确认说明，并为项目设置最长 30 天的限时静默；状态变化会
+  自动清除旧确认，静默期间仍更新质量事实且不推进已通知状态，解除或到期后可补发待处理的升级/恢复事件；
+- FAILED 质量 Webhook 投递可由项目管理员填写原因后人工重放；原失败记录保持不变，新记录使用当前配置并
+  保留原事件 ID，重放来源和操作人可审计且同一失败节点不会重复入队；
+- 静默、确认和重放 API 返回当前操作人显示名；Prometheus 公开 evaluator 到期量/延迟、活跃静默、Webhook
+  PENDING/FAILED、最老等待时间和重放量，并为快照失败、评估延迟和投递积压提供低基数告警；
 - 控制面输出低基数 Prometheus 指标，支持 Bearer 保护、数据库就绪指标和可选本地
   Prometheus profile，并附带可用性、错误率、延迟、派发积压、计划延迟和僵尸租约告警规则；
 - GitHub Actions 对 Python、前端、契约制品、迁移图、真实 PostgreSQL 迁移往返、
@@ -79,7 +95,7 @@ packages/contracts/          平台与 Runner 共用契约
 packages/migrations/         只读旧资产迁移器
 baselines/                   已发布不可变用例基线
 runners/web_playwright/      WebPlaywrightAdapter
-services/worker/             Outbox 发布与 Celery 执行 Worker
+services/worker/             Outbox、质量 Webhook 发布与 Celery 执行 Worker
 .github/                     CI 与依赖更新策略
 infra/                       本地基础设施与 Prometheus 规则
 docs/                        ADR、里程碑与生产运行手册
@@ -133,7 +149,7 @@ python scripts/smoke_compose.py --exercise-recovery
 
 ```powershell
 docker compose --profile smoke ps
-docker compose logs --tail 200 api outbox worker
+docker compose logs --tail 200 api outbox quality-alerts quality-webhooks worker
 ```
 
 常规开发不需要靶站时使用 `docker compose up -d --build`。停止服务使用
@@ -252,6 +268,8 @@ python scripts/smoke_playwright.py
 11. 重跑必须保留来源执行时的配置、基线和自动化包，不能静默切换到当前资源版本。
 12. 任何恢复都必须先离线验证完整备份，并显式确认目标数据库；不允许在未知对象冲突
     或仍有写入流量时执行覆盖恢复。
+13. 普通 Run 和定时回归只能使用已激活自动化包；候选包必须通过 Released 基线全量验证后才能激活。
+14. 弃用包保留历史重跑能力；吊销包禁止新的普通执行、计划引用和历史重跑。
 
 阶段设计与验证证据见 [`docs/milestones`](docs/milestones)，M5 与 M6 详见
 [`M5.1-full-stack-runtime.md`](docs/milestones/M5.1-full-stack-runtime.md)、
@@ -264,5 +282,12 @@ python scripts/smoke_playwright.py
 [`M7.4-run-reliability.md`](docs/milestones/M7.4-run-reliability.md) 和
 [`M7.5-quality-analytics.md`](docs/milestones/M7.5-quality-analytics.md) 和
 [`M7.6-quality-dimensions.md`](docs/milestones/M7.6-quality-dimensions.md) 和
-[`M7.7-flaky-case-detection.md`](docs/milestones/M7.7-flaky-case-detection.md)。发布前还必须完成
+[`M7.7-flaky-case-detection.md`](docs/milestones/M7.7-flaky-case-detection.md)、
+[`M8.1-quality-change-alerts.md`](docs/milestones/M8.1-quality-change-alerts.md)、
+[`M8.2-quality-webhook-delivery.md`](docs/milestones/M8.2-quality-webhook-delivery.md) 和
+[`M8.3-quality-alert-automation.md`](docs/milestones/M8.3-quality-alert-automation.md) 和
+[`M8.4-quality-alert-operations.md`](docs/milestones/M8.4-quality-alert-operations.md) 和
+[`M8.5-quality-webhook-replay.md`](docs/milestones/M8.5-quality-webhook-replay.md) 和
+[`M8.6-quality-operations-observability.md`](docs/milestones/M8.6-quality-operations-observability.md)，以及
+[`M9.1-automation-package-lifecycle.md`](docs/milestones/M9.1-automation-package-lifecycle.md)。发布前还必须完成
 [`生产验收清单`](docs/operations/release-checklist.md)。

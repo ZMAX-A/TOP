@@ -19,6 +19,9 @@ from testops.api.persistence import (
     AuditLogRecord,
     DispatchOutboxRecord,
     ProjectMemberRecord,
+    QualityAlertStateRecord,
+    QualityWebhookConfigRecord,
+    QualityWebhookDeliveryRecord,
     RegressionScheduleFiringRecord,
     RegressionScheduleRecord,
     RunCaseRecord,
@@ -27,10 +30,12 @@ from testops.api.persistence import (
     RunnerWorkerRecord,
 )
 from testops.api.persistence import TestRunRecord as RunRecord
+from testops.api.quality_alert_services import evaluate_quality_alert_batch
 from testops.api.reliability_services import process_run_reliability
 from testops.api.schedule_services import process_due_schedules
 from testops.contracts import CaseBaseline, canonical_sha256
 from testops.worker.outbox import dispatch_outbox_batch
+from testops.worker.quality_webhooks import dispatch_quality_webhook_batch
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNNER_HEADERS = {"X-Runner-Token": "integration-runner-token"}
@@ -73,6 +78,20 @@ class RecordingArtifactStore:
             url="https://objects.example.invalid/signed-artifact",
             expires_in_seconds=120,
         )
+
+
+class RecordingQualityWebhookSender:
+    def __init__(self, *statuses: int):
+        self.statuses = list(statuses or (204,))
+        self.calls: list[tuple[str, str, str | None]] = []
+
+    async def send(
+        self,
+        config: QualityWebhookConfigRecord,
+        delivery: QualityWebhookDeliveryRecord,
+    ) -> int:
+        self.calls.append((config.endpoint_url, delivery.event_type, config.signing_secret_name))
+        return self.statuses.pop(0)
 
 
 class ControlPlaneApiTests(unittest.TestCase):
@@ -199,6 +218,247 @@ class ControlPlaneApiTests(unittest.TestCase):
             "automation_package_id": resources["package_id"],
             "case_codes": list(case_codes),
         }
+
+    def test_automation_package_draft_validation_activation_and_retirement(self) -> None:
+        resources = self._bootstrap()
+        packages_url = (
+            f"/api/v1/projects/{resources['project_id']}/targets/"
+            f"{resources['target_id']}/automation-packages"
+        )
+        draft_payload = {
+            "name": "yanjia-web",
+            "version": "0.2.0",
+            "digest": "sha256:" + "9" * 64,
+            "runner_type": "WEB_PLAYWRIGHT",
+            "image_repository": "registry.example.invalid/testops/yanjia-web",
+            "supersedes_id": resources["package_id"],
+        }
+        invalid_repository = self.client.post(
+            f"{packages_url}/drafts",
+            headers=self.headers,
+            json={**draft_payload, "image_repository": "yanjia-web:latest"},
+        )
+        self.assertEqual(invalid_repository.status_code, 422, invalid_repository.text)
+
+        drafted = self.client.post(
+            f"{packages_url}/drafts",
+            headers=self.headers,
+            json=draft_payload,
+        )
+        self.assertEqual(drafted.status_code, 201, drafted.text)
+        draft = drafted.json()
+        self.assertEqual(draft["status"], "DRAFT")
+        self.assertEqual(draft["runner_type"], "WEB_PLAYWRIGHT")
+        self.assertEqual(draft["supersedes_id"], resources["package_id"])
+        self.assertIsNone(draft["validated_run_id"])
+        duplicate = self.client.post(
+            f"{packages_url}/drafts",
+            headers=self.headers,
+            json=draft_payload,
+        )
+        self.assertEqual(duplicate.status_code, 409, duplicate.text)
+
+        draft_run_payload = {
+            **self._run_payload(resources),
+            "automation_package_id": draft["id"],
+        }
+        ordinary_draft_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "draft-ordinary-run"},
+            json=draft_run_payload,
+        )
+        self.assertEqual(ordinary_draft_run.status_code, 422, ordinary_draft_run.text)
+
+        validation_url = f"{packages_url}/{draft['id']}/validation-runs"
+        validation_payload = {
+            "environment_id": resources["environment_id"],
+            "baseline_id": resources["baseline_id"],
+        }
+        validation = self.client.post(
+            validation_url,
+            headers={**self.headers, "Idempotency-Key": "package-validation-0001"},
+            json=validation_payload,
+        )
+        self.assertEqual(validation.status_code, 201, validation.text)
+        validation_run = validation.json()
+        self.assertEqual(validation_run["automation_package_id"], draft["id"])
+        self.assertEqual(validation_run["case_count"], 89)
+        replayed_validation = self.client.post(
+            validation_url,
+            headers={**self.headers, "Idempotency-Key": "package-validation-0001"},
+            json=validation_payload,
+        )
+        self.assertEqual(replayed_validation.status_code, 200, replayed_validation.text)
+        self.assertEqual(replayed_validation.json()["id"], validation_run["id"])
+
+        activation_url = f"{packages_url}/{draft['id']}/activate"
+        premature_activation = self.client.post(
+            activation_url,
+            headers=self.headers,
+            json={"validation_run_id": validation_run["id"]},
+        )
+        self.assertEqual(premature_activation.status_code, 409, premature_activation.text)
+
+        async def complete_validation_run() -> None:
+            async with self.app.state.session_factory() as session:
+                record = await session.get(RunRecord, UUID(validation_run["id"]))
+                assert record is not None
+                record.status = "PASSED"
+                record.result_digest = "sha256:" + "8" * 64
+                record.result_document = {"status": "PASSED"}
+                record.finished_at = datetime.now(UTC)
+                await session.commit()
+
+        asyncio.run(complete_validation_run())
+        activated = self.client.post(
+            activation_url,
+            headers=self.headers,
+            json={"validation_run_id": validation_run["id"]},
+        )
+        self.assertEqual(activated.status_code, 200, activated.text)
+        active_package = activated.json()
+        self.assertEqual(active_package["status"], "ACTIVE")
+        self.assertEqual(active_package["validated_run_id"], validation_run["id"])
+        self.assertIsNotNone(active_package["activated_at"])
+        repeated_activation = self.client.post(
+            activation_url,
+            headers=self.headers,
+            json={"validation_run_id": validation_run["id"]},
+        )
+        self.assertEqual(repeated_activation.status_code, 200, repeated_activation.text)
+
+        ordinary_active_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "active-package-run"},
+            json=draft_run_payload,
+        )
+        self.assertEqual(ordinary_active_run.status_code, 201, ordinary_active_run.text)
+        package_detail = self.client.get(
+            f"{packages_url}/{draft['id']}",
+            headers=self.headers,
+        )
+        self.assertEqual(package_detail.status_code, 200, package_detail.text)
+        self.assertEqual(package_detail.json()["digest"], draft_payload["digest"])
+
+        schedule_url = f"/api/v1/projects/{resources['project_id']}/regression-schedules"
+        schedule = self.client.post(
+            schedule_url,
+            headers=self.headers,
+            json={
+                "key": "package-lifecycle-nightly",
+                "name": "Package lifecycle nightly",
+                "target_id": resources["target_id"],
+                "environment_id": resources["environment_id"],
+                "baseline_id": resources["baseline_id"],
+                "automation_package_id": draft["id"],
+                "cron_expression": "0 2 * * *",
+                "timezone": "Asia/Shanghai",
+            },
+        )
+        self.assertEqual(schedule.status_code, 201, schedule.text)
+        deprecate_url = f"{packages_url}/{draft['id']}/deprecate"
+        in_use_deprecation = self.client.post(
+            deprecate_url,
+            headers=self.headers,
+            json={"reason": "superseded after rollout"},
+        )
+        self.assertEqual(in_use_deprecation.status_code, 409, in_use_deprecation.text)
+        paused_schedule = self.client.patch(
+            f"{schedule_url}/{schedule.json()['id']}",
+            headers=self.headers,
+            json={"status": "PAUSED"},
+        )
+        self.assertEqual(paused_schedule.status_code, 200, paused_schedule.text)
+        deprecated = self.client.post(
+            deprecate_url,
+            headers=self.headers,
+            json={"reason": "superseded after rollout"},
+        )
+        self.assertEqual(deprecated.status_code, 200, deprecated.text)
+        self.assertEqual(deprecated.json()["status"], "DEPRECATED")
+        deprecated_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "deprecated-package-run"},
+            json=draft_run_payload,
+        )
+        self.assertEqual(deprecated_run.status_code, 422, deprecated_run.text)
+        revoked = self.client.post(
+            f"{packages_url}/{draft['id']}/revoke",
+            headers=self.headers,
+            json={"reason": "dependency security incident"},
+        )
+        self.assertEqual(revoked.status_code, 200, revoked.text)
+        self.assertEqual(revoked.json()["status"], "REVOKED")
+        repeated_revoke = self.client.post(
+            f"{packages_url}/{draft['id']}/revoke",
+            headers=self.headers,
+            json={"reason": "dependency security incident"},
+        )
+        self.assertEqual(repeated_revoke.status_code, 200, repeated_revoke.text)
+
+        async def lifecycle_audits() -> set[str]:
+            async with self.app.state.session_factory() as session:
+                rows = await session.scalars(
+                    select(AuditLogRecord.action).where(AuditLogRecord.resource_id == draft["id"])
+                )
+                return set(rows)
+
+        self.assertTrue(
+            {
+                "automation_package.draft_created",
+                "automation_package.validation_run_created",
+                "automation_package.activated",
+                "automation_package.deprecated",
+                "automation_package.revoked",
+            }.issubset(asyncio.run(lifecycle_audits()))
+        )
+
+        project_admin = self.client.post(
+            "/api/v1/users",
+            headers=self.headers,
+            json={
+                "username": "package-admin",
+                "display_name": "Package Admin",
+                "password": "package-admin-password",
+            },
+        )
+        self.assertEqual(project_admin.status_code, 201, project_admin.text)
+        membership = self.client.put(
+            f"/api/v1/projects/{resources['project_id']}/members",
+            headers=self.headers,
+            json={"user_id": project_admin.json()["id"], "role": "PROJECT_ADMIN"},
+        )
+        self.assertEqual(membership.status_code, 200, membership.text)
+        project_admin_login = self.client.post(
+            "/api/v1/auth/login",
+            json={"username": "package-admin", "password": "package-admin-password"},
+        )
+        project_admin_headers = {
+            "Authorization": f"Bearer {project_admin_login.json()['access_token']}"
+        }
+        delegated_payload = {
+            "name": "delegated-web",
+            "version": "1.0.0",
+            "digest": "sha256:" + "7" * 64,
+            "image_repository": "registry.example.invalid/testops/delegated-web",
+        }
+        denied_legacy_registration = self.client.post(
+            packages_url,
+            headers=project_admin_headers,
+            json=delegated_payload,
+        )
+        self.assertEqual(
+            denied_legacy_registration.status_code,
+            403,
+            denied_legacy_registration.text,
+        )
+        delegated_draft = self.client.post(
+            f"{packages_url}/drafts",
+            headers=project_admin_headers,
+            json=delegated_payload,
+        )
+        self.assertEqual(delegated_draft.status_code, 201, delegated_draft.text)
+        self.assertEqual(delegated_draft.json()["status"], "DRAFT")
 
     def test_project_creation_persists_creator_membership_and_audit(self) -> None:
         first = self.client.post(
@@ -907,6 +1167,56 @@ class ControlPlaneApiTests(unittest.TestCase):
                 run_record.dispatch_wait_reason = "NO_HEALTHY_RUNNER"
                 run_record.created_at = moment - timedelta(minutes=10)
                 schedule_record.next_fire_at = moment - timedelta(minutes=5)
+                operator_id = uuid4()
+                webhook_config = QualityWebhookConfigRecord(
+                    id=uuid4(),
+                    project_id=UUID(resources["project_id"]),
+                    enabled=True,
+                    endpoint_url="https://metrics.example.invalid/receiver",
+                    minimum_alert_status="WARNING",
+                    cooldown_seconds=3600,
+                    next_evaluation_at=moment - timedelta(minutes=12),
+                    silenced_until=moment + timedelta(hours=1),
+                    silenced_by=operator_id,
+                    silence_reason="metrics fixture",
+                )
+                session.add(webhook_config)
+                await session.flush()
+                failed_delivery = QualityWebhookDeliveryRecord(
+                    id=uuid4(),
+                    project_id=UUID(resources["project_id"]),
+                    webhook_config_id=webhook_config.id,
+                    event_type="quality.alert.triggered",
+                    dedupe_key=f"metrics-failed:{uuid4()}",
+                    destination_display="https://metrics.example.invalid/***",
+                    payload={"event_type": "quality.alert.triggered"},
+                    status="FAILED",
+                    attempts=1,
+                    available_at=moment - timedelta(minutes=20),
+                    response_status=400,
+                    last_error="Webhook endpoint returned HTTP 400",
+                    created_at=moment - timedelta(minutes=20),
+                )
+                session.add(failed_delivery)
+                await session.flush()
+                session.add(
+                    QualityWebhookDeliveryRecord(
+                        id=uuid4(),
+                        project_id=UUID(resources["project_id"]),
+                        webhook_config_id=webhook_config.id,
+                        event_type="quality.alert.triggered",
+                        dedupe_key=f"metrics-replay:{uuid4()}",
+                        destination_display="https://metrics.example.invalid/***",
+                        payload={"event_type": "quality.alert.triggered"},
+                        status="PENDING",
+                        attempts=0,
+                        available_at=moment - timedelta(minutes=15),
+                        replay_of_id=failed_delivery.id,
+                        replayed_by=operator_id,
+                        replay_reason="metrics fixture replay",
+                        created_at=moment - timedelta(minutes=15),
+                    )
+                )
                 await session.commit()
 
         asyncio.run(age_backlogs())
@@ -916,6 +1226,18 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertIn("testops_dispatch_waiting_runs 1.0", metrics.text)
         self.assertIn("testops_schedule_due_backlog 1.0", metrics.text)
         self.assertIn("testops_reliability_snapshot_success 1.0", metrics.text)
+        self.assertIn("testops_quality_alert_evaluation_due_configs 1.0", metrics.text)
+        self.assertIn("testops_quality_alert_active_silences 1.0", metrics.text)
+        self.assertIn(
+            'testops_quality_webhook_deliveries{status="PENDING"} 1.0',
+            metrics.text,
+        )
+        self.assertIn(
+            'testops_quality_webhook_deliveries{status="FAILED"} 1.0',
+            metrics.text,
+        )
+        self.assertIn("testops_quality_webhook_replay_deliveries 1.0", metrics.text)
+        self.assertIn("testops_quality_operations_snapshot_success 1.0", metrics.text)
 
     def test_project_quality_policy_trends_and_failure_clusters(self) -> None:
         resources = self._bootstrap()
@@ -924,6 +1246,8 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertEqual(initial_policy.status_code, 200, initial_policy.text)
         self.assertEqual(initial_policy.json()["target_pass_rate_percent"], 95)
         self.assertEqual(initial_policy.json()["window_days"], 30)
+        self.assertEqual(initial_policy.json()["alert_warning_drop_percentage_points"], 5)
+        self.assertEqual(initial_policy.json()["alert_critical_drop_percentage_points"], 10)
 
         invalid_policy = self.client.patch(
             policy_url,
@@ -934,11 +1258,24 @@ class ControlPlaneApiTests(unittest.TestCase):
         policy = self.client.patch(
             policy_url,
             headers=self.headers,
-            json={"target_pass_rate_percent": 80, "window_days": 14},
+            json={
+                "target_pass_rate_percent": 80,
+                "window_days": 14,
+                "alert_warning_drop_percentage_points": 7,
+                "alert_critical_drop_percentage_points": 15,
+            },
         )
         self.assertEqual(policy.status_code, 200, policy.text)
         self.assertEqual(policy.json()["target_pass_rate_percent"], 80)
         self.assertEqual(policy.json()["window_days"], 14)
+        self.assertEqual(policy.json()["alert_warning_drop_percentage_points"], 7)
+        self.assertEqual(policy.json()["alert_critical_drop_percentage_points"], 15)
+        invalid_alert_order = self.client.patch(
+            policy_url,
+            headers=self.headers,
+            json={"alert_warning_drop_percentage_points": 15},
+        )
+        self.assertEqual(invalid_alert_order.status_code, 422, invalid_alert_order.text)
 
         statuses = ("PASSED", "FAILED", "FAILED", "INFRA_ERROR", "TIMED_OUT", "CANCELED")
         run_ids: list[UUID] = []
@@ -950,6 +1287,19 @@ class ControlPlaneApiTests(unittest.TestCase):
             )
             self.assertEqual(created.status_code, 201, created.text)
             run_ids.append(UUID(created.json()["id"]))
+
+        previous_run_ids: list[UUID] = []
+        for index in range(3):
+            created = self.client.post(
+                "/api/v1/runs",
+                headers={
+                    **self.headers,
+                    "Idempotency-Key": f"quality-previous-run-{index:04d}",
+                },
+                json=self._run_payload(resources, "TC-LOGIN-001"),
+            )
+            self.assertEqual(created.status_code, 201, created.text)
+            previous_run_ids.append(UUID(created.json()["id"]))
 
         moment = datetime.now(UTC)
         assertion_messages = (
@@ -986,6 +1336,17 @@ class ControlPlaneApiTests(unittest.TestCase):
                         run_case.error_message = "Run timed out after 3600 seconds"
                     else:
                         run_case.status = "CANCELED"
+                for index, run_id in enumerate(previous_run_ids):
+                    run = await session.get(RunRecord, run_id)
+                    run_case = await session.scalar(
+                        select(RunCaseRecord).where(RunCaseRecord.run_id == run_id)
+                    )
+                    assert run is not None and run_case is not None
+                    finished_at = moment - timedelta(days=20, minutes=index)
+                    run.status = "PASSED"
+                    run.started_at = finished_at - timedelta(seconds=2)
+                    run.finished_at = finished_at
+                    run_case.status = "PASSED"
                 await session.commit()
 
         asyncio.run(seed_quality_history())
@@ -1000,6 +1361,23 @@ class ControlPlaneApiTests(unittest.TestCase):
         )
         self.assertEqual(payload["target_pass_rate_percent"], 80)
         self.assertEqual(payload["slo_status"], "BREACHED")
+        self.assertEqual(payload["comparison"]["alert_status"], "CRITICAL")
+        self.assertEqual(payload["comparison"]["warning_drop_percentage_points"], 7)
+        self.assertEqual(payload["comparison"]["critical_drop_percentage_points"], 15)
+        self.assertEqual(
+            payload["comparison"]["previous_window_ended_at"],
+            payload["window_started_at"],
+        )
+        comparison_signals = {
+            signal["metric"]: signal for signal in payload["comparison"]["signals"]
+        }
+        self.assertEqual(comparison_signals["RUN_PASS_RATE"]["previous_percent"], 100.0)
+        self.assertEqual(comparison_signals["RUN_PASS_RATE"]["current_percent"], 33.33)
+        self.assertEqual(
+            comparison_signals["RUN_PASS_RATE"]["delta_percentage_points"],
+            -66.67,
+        )
+        self.assertEqual(comparison_signals["EXECUTION_RELIABILITY"]["current_percent"], 60.0)
         self.assertEqual(payload["runs"]["total_terminal_runs"], 6)
         self.assertEqual(payload["runs"]["conclusive_runs"], 3)
         self.assertEqual(payload["runs"]["pass_rate_percent"], 33.33)
@@ -1196,6 +1574,604 @@ class ControlPlaneApiTests(unittest.TestCase):
                 return int(count or 0)
 
         self.assertEqual(asyncio.run(policy_audit_count()), 1)
+
+    def test_quality_webhook_configuration_test_delivery_and_retry(self) -> None:
+        resources = self._bootstrap()
+        project_id = resources["project_id"]
+        config_url = f"/api/v1/projects/{project_id}/quality/webhook"
+        deliveries_url = f"{config_url}/deliveries"
+
+        initial = self.client.get(config_url, headers=self.headers)
+        self.assertEqual(initial.status_code, 200, initial.text)
+        self.assertEqual(
+            initial.json(),
+            {
+                "project_id": project_id,
+                "enabled": False,
+                "endpoint_configured": False,
+                "endpoint_display": None,
+                "minimum_alert_status": "WARNING",
+                "cooldown_seconds": 3600,
+                "signing_configured": False,
+                "last_evaluated_at": None,
+                "next_evaluation_at": None,
+                "silenced_until": None,
+                "silenced_by": None,
+                "silenced_by_display_name": None,
+                "silence_reason": None,
+                "updated_at": None,
+            },
+        )
+        unavailable_test = self.client.post(f"{config_url}/test", headers=self.headers)
+        self.assertEqual(unavailable_test.status_code, 409, unavailable_test.text)
+        unavailable_silence = self.client.put(
+            f"{config_url}/silence",
+            headers=self.headers,
+            json={
+                "silenced_until": (datetime.now(UTC) + timedelta(hours=1)).isoformat(),
+                "reason": "maintenance",
+            },
+        )
+        self.assertEqual(unavailable_silence.status_code, 409, unavailable_silence.text)
+        insecure = self.client.patch(
+            config_url,
+            headers=self.headers,
+            json={"endpoint_url": "http://127.0.0.1/internal", "enabled": True},
+        )
+        self.assertEqual(insecure.status_code, 422, insecure.text)
+
+        endpoint = "https://hooks.example.invalid/private-token"
+        configured = self.client.patch(
+            config_url,
+            headers=self.headers,
+            json={
+                "enabled": True,
+                "endpoint_url": endpoint,
+                "minimum_alert_status": "CRITICAL",
+                "cooldown_seconds": 900,
+                "signing_secret_name": "QUALITY_WEBHOOK_YANJIA",
+                "signing_secret_ref": "secret://quality/yanjia/webhook-signing",
+            },
+        )
+        self.assertEqual(configured.status_code, 200, configured.text)
+        configured_payload = configured.json()
+        self.assertTrue(configured_payload["enabled"])
+        self.assertEqual(
+            configured_payload["endpoint_display"],
+            "https://hooks.example.invalid/***",
+        )
+        self.assertEqual(configured_payload["minimum_alert_status"], "CRITICAL")
+        self.assertEqual(configured_payload["cooldown_seconds"], 900)
+        self.assertIsNotNone(configured_payload["next_evaluation_at"])
+        self.assertTrue(configured_payload["signing_configured"])
+        self.assertNotIn("private-token", configured.text)
+        self.assertNotIn("webhook-signing", configured.text)
+        for invalid_silence_until in (
+            datetime.now(UTC) - timedelta(seconds=1),
+            datetime.now(UTC) + timedelta(days=31),
+        ):
+            invalid_silence = self.client.put(
+                f"{config_url}/silence",
+                headers=self.headers,
+                json={
+                    "silenced_until": invalid_silence_until.isoformat(),
+                    "reason": "invalid window",
+                },
+            )
+            self.assertEqual(invalid_silence.status_code, 422, invalid_silence.text)
+
+        queued = self.client.post(f"{config_url}/test", headers=self.headers)
+        self.assertEqual(queued.status_code, 202, queued.text)
+        self.assertEqual(queued.json()["status"], "PENDING")
+        self.assertEqual(queued.json()["attempts"], 0)
+
+        sender = RecordingQualityWebhookSender(204)
+        delivered_summary = asyncio.run(
+            dispatch_quality_webhook_batch(self.app.state.session_factory, sender)
+        )
+        self.assertEqual(
+            (
+                delivered_summary.selected,
+                delivered_summary.delivered,
+                delivered_summary.retrying,
+                delivered_summary.failed,
+            ),
+            (1, 1, 0, 0),
+        )
+        self.assertEqual(
+            sender.calls,
+            [(endpoint, "quality.alert.test", "QUALITY_WEBHOOK_YANJIA")],
+        )
+        delivered = self.client.get(deliveries_url, headers=self.headers)
+        self.assertEqual(delivered.status_code, 200, delivered.text)
+        self.assertEqual(delivered.json()[0]["status"], "DELIVERED")
+        self.assertEqual(delivered.json()[0]["attempts"], 1)
+        self.assertEqual(delivered.json()[0]["response_status"], 204)
+        self.assertIsNotNone(delivered.json()[0]["delivered_at"])
+
+        queued_retry = self.client.post(f"{config_url}/test", headers=self.headers)
+        self.assertEqual(queued_retry.status_code, 202, queued_retry.text)
+        retry_moment = datetime.now(UTC)
+        retry_summary = asyncio.run(
+            dispatch_quality_webhook_batch(
+                self.app.state.session_factory,
+                RecordingQualityWebhookSender(503),
+                now=retry_moment,
+            )
+        )
+        self.assertEqual(
+            (retry_summary.selected, retry_summary.retrying, retry_summary.failed),
+            (1, 1, 0),
+        )
+        failed_summary = asyncio.run(
+            dispatch_quality_webhook_batch(
+                self.app.state.session_factory,
+                RecordingQualityWebhookSender(400),
+                now=retry_moment + timedelta(seconds=10),
+            )
+        )
+        self.assertEqual(
+            (failed_summary.selected, failed_summary.retrying, failed_summary.failed),
+            (1, 0, 1),
+        )
+        history = self.client.get(f"{deliveries_url}?limit=1", headers=self.headers)
+        self.assertEqual(history.status_code, 200, history.text)
+        failed_delivery = history.json()[0]
+        self.assertEqual(failed_delivery["status"], "FAILED")
+        self.assertEqual(failed_delivery["attempts"], 2)
+        self.assertEqual(failed_delivery["response_status"], 400)
+        self.assertEqual(failed_delivery["last_error"], "Webhook endpoint returned HTTP 400")
+        self.assertIsNone(failed_delivery["replay_of_id"])
+
+        replay_delivered = self.client.post(
+            f"{deliveries_url}/{queued.json()['id']}/replay",
+            headers=self.headers,
+            json={"reason": "should not replay a delivered event"},
+        )
+        self.assertEqual(replay_delivered.status_code, 409, replay_delivered.text)
+        invalid_replay = self.client.post(
+            f"{deliveries_url}/{failed_delivery['id']}/replay",
+            headers=self.headers,
+            json={"reason": " "},
+        )
+        self.assertEqual(invalid_replay.status_code, 422, invalid_replay.text)
+
+        recovered_endpoint = "https://recovered.example.invalid/new-token"
+        reconfigured = self.client.patch(
+            config_url,
+            headers=self.headers,
+            json={"endpoint_url": recovered_endpoint},
+        )
+        self.assertEqual(reconfigured.status_code, 200, reconfigured.text)
+        replayed = self.client.post(
+            f"{deliveries_url}/{failed_delivery['id']}/replay",
+            headers=self.headers,
+            json={"reason": "receiver contract fixed"},
+        )
+        self.assertEqual(replayed.status_code, 202, replayed.text)
+        replayed_payload = replayed.json()
+        self.assertEqual(replayed_payload["status"], "PENDING")
+        self.assertEqual(replayed_payload["attempts"], 0)
+        self.assertIsNone(replayed_payload["response_status"])
+        self.assertEqual(replayed_payload["replay_of_id"], failed_delivery["id"])
+        self.assertEqual(replayed_payload["replayed_by_display_name"], "Integration Admin")
+        self.assertEqual(replayed_payload["replay_reason"], "receiver contract fixed")
+        self.assertEqual(
+            replayed_payload["destination_display"],
+            "https://recovered.example.invalid/***",
+        )
+
+        duplicate_replay = self.client.post(
+            f"{deliveries_url}/{failed_delivery['id']}/replay",
+            headers=self.headers,
+            json={"reason": "duplicate operator action"},
+        )
+        self.assertEqual(duplicate_replay.status_code, 409, duplicate_replay.text)
+        replay_pending = self.client.post(
+            f"{deliveries_url}/{replayed_payload['id']}/replay",
+            headers=self.headers,
+            json={"reason": "pending records cannot be replayed"},
+        )
+        self.assertEqual(replay_pending.status_code, 409, replay_pending.text)
+
+        replay_sender = RecordingQualityWebhookSender(204)
+        replay_summary = asyncio.run(
+            dispatch_quality_webhook_batch(self.app.state.session_factory, replay_sender)
+        )
+        self.assertEqual(
+            (replay_summary.selected, replay_summary.delivered, replay_summary.failed),
+            (1, 1, 0),
+        )
+        self.assertEqual(
+            replay_sender.calls,
+            [(recovered_endpoint, "quality.alert.test", "QUALITY_WEBHOOK_YANJIA")],
+        )
+        replay_history = self.client.get(f"{deliveries_url}?limit=3", headers=self.headers)
+        self.assertEqual(replay_history.status_code, 200, replay_history.text)
+        replay_rows = replay_history.json()
+        self.assertEqual(replay_rows[0]["id"], replayed_payload["id"])
+        self.assertEqual(replay_rows[0]["status"], "DELIVERED")
+        self.assertEqual(replay_rows[1]["id"], failed_delivery["id"])
+        self.assertEqual(replay_rows[1]["status"], "FAILED")
+
+        cleared = self.client.patch(
+            config_url,
+            headers=self.headers,
+            json={"clear_signing_secret": True},
+        )
+        self.assertEqual(cleared.status_code, 200, cleared.text)
+        self.assertFalse(cleared.json()["signing_configured"])
+
+        async def inspect_sensitive_state() -> tuple[str, str, int, int, str, str]:
+            async with self.app.state.session_factory() as session:
+                config = await session.scalar(
+                    select(QualityWebhookConfigRecord).where(
+                        QualityWebhookConfigRecord.project_id == UUID(project_id)
+                    )
+                )
+                audit_rows = tuple(
+                    await session.scalars(
+                        select(AuditLogRecord).where(
+                            AuditLogRecord.project_id == UUID(project_id),
+                            AuditLogRecord.action.in_(
+                                (
+                                    "project.quality_webhook_updated",
+                                    "project.quality_webhook_test_queued",
+                                    "project.quality_webhook_delivery_replayed",
+                                )
+                            ),
+                        )
+                    )
+                )
+                assert config is not None
+                source = await session.get(
+                    QualityWebhookDeliveryRecord,
+                    UUID(failed_delivery["id"]),
+                )
+                replay = await session.get(
+                    QualityWebhookDeliveryRecord,
+                    UUID(replayed_payload["id"]),
+                )
+                assert source is not None
+                assert replay is not None
+                audit_json = json.dumps(
+                    [row.details for row in audit_rows],
+                    ensure_ascii=False,
+                )
+                return (
+                    config.endpoint_url,
+                    audit_json,
+                    len(audit_rows),
+                    len(
+                        tuple(
+                            await session.scalars(
+                                select(QualityWebhookDeliveryRecord).where(
+                                    QualityWebhookDeliveryRecord.project_id == UUID(project_id)
+                                )
+                            )
+                        )
+                    ),
+                    str(source.payload["event_id"]),
+                    str(replay.payload["event_id"]),
+                )
+
+        (
+            stored_endpoint,
+            audit_json,
+            audit_count,
+            delivery_count,
+            source_event_id,
+            replay_event_id,
+        ) = asyncio.run(inspect_sensitive_state())
+        self.assertEqual(stored_endpoint, recovered_endpoint)
+        self.assertNotIn("private-token", audit_json)
+        self.assertNotIn("new-token", audit_json)
+        self.assertNotIn("webhook-signing", audit_json)
+        self.assertEqual(audit_count, 6)
+        self.assertEqual(delivery_count, 3)
+        self.assertEqual(source_event_id, replay_event_id)
+
+    def test_quality_alert_evaluator_transitions_cooldown_and_idempotency(self) -> None:
+        resources = self._bootstrap()
+        project_id = resources["project_id"]
+        config_url = f"/api/v1/projects/{project_id}/quality/webhook"
+        configured = self.client.patch(
+            config_url,
+            headers=self.headers,
+            json={
+                "enabled": True,
+                "endpoint_url": "https://quality.example.invalid/receiver-token",
+                "minimum_alert_status": "WARNING",
+                "cooldown_seconds": 3600,
+            },
+        )
+        self.assertEqual(configured.status_code, 200, configured.text)
+
+        previous_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "quality-alert-previous-0001"},
+            json=self._run_payload(resources, "TC-LOGIN-001"),
+        )
+        current_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "quality-alert-current-0001"},
+            json=self._run_payload(resources, "TC-LOGIN-001"),
+        )
+        self.assertEqual(previous_run.status_code, 201, previous_run.text)
+        self.assertEqual(current_run.status_code, 201, current_run.text)
+        previous_run_id = UUID(previous_run.json()["id"])
+        current_run_id = UUID(current_run.json()["id"])
+        moment = datetime.now(UTC) + timedelta(seconds=5)
+
+        async def seed_windows() -> None:
+            async with self.app.state.session_factory() as session:
+                previous = await session.get(RunRecord, previous_run_id)
+                current = await session.get(RunRecord, current_run_id)
+                previous_case = await session.scalar(
+                    select(RunCaseRecord).where(RunCaseRecord.run_id == previous_run_id)
+                )
+                current_case = await session.scalar(
+                    select(RunCaseRecord).where(RunCaseRecord.run_id == current_run_id)
+                )
+                assert previous is not None and current is not None
+                assert previous_case is not None and current_case is not None
+                previous.status = "PASSED"
+                previous.started_at = moment - timedelta(days=40, seconds=1)
+                previous.finished_at = moment - timedelta(days=40)
+                previous_case.status = "PASSED"
+                current.status = "FAILED"
+                current.started_at = moment - timedelta(days=1, seconds=1)
+                current.finished_at = moment - timedelta(days=1)
+                current_case.status = "FAILED"
+                await session.commit()
+
+        async def set_current_status(status_value: str) -> None:
+            async with self.app.state.session_factory() as session:
+                current = await session.get(RunRecord, current_run_id)
+                current_case = await session.scalar(
+                    select(RunCaseRecord).where(RunCaseRecord.run_id == current_run_id)
+                )
+                assert current is not None and current_case is not None
+                current.status = status_value
+                current_case.status = status_value
+                await session.commit()
+
+        asyncio.run(seed_windows())
+        first = asyncio.run(
+            evaluate_quality_alert_batch(
+                self.app.state.session_factory,
+                now=moment,
+                evaluation_interval_seconds=60,
+            )
+        )
+        self.assertEqual(
+            (first.selected, first.evaluated, first.transitions, first.queued),
+            (1, 1, 3, 2),
+        )
+        states = self.client.get(f"{config_url}/states", headers=self.headers)
+        self.assertEqual(states.status_code, 200, states.text)
+        self.assertEqual(len(states.json()), 3)
+        critical_states = [
+            state for state in states.json() if state["current_status"] == "CRITICAL"
+        ]
+        self.assertEqual(len(critical_states), 2)
+        self.assertTrue(
+            all(state["active_notification_status"] == "CRITICAL" for state in critical_states)
+        )
+        first_history = self.client.get(
+            f"{config_url}/deliveries",
+            headers=self.headers,
+        )
+        self.assertEqual(first_history.status_code, 200, first_history.text)
+        self.assertEqual(len(first_history.json()), 2)
+        self.assertEqual(
+            {item["event_type"] for item in first_history.json()},
+            {"quality.alert.triggered"},
+        )
+
+        acknowledged_metric = critical_states[0]["metric"]
+        acknowledgement_url = f"{config_url}/states/{acknowledged_metric}/acknowledgement"
+        acknowledged = self.client.put(
+            acknowledgement_url,
+            headers=self.headers,
+            json={"note": "Investigating the quality regression"},
+        )
+        self.assertEqual(acknowledged.status_code, 200, acknowledged.text)
+        self.assertIsNotNone(acknowledged.json()["acknowledged_at"])
+        self.assertEqual(
+            acknowledged.json()["acknowledged_by_display_name"],
+            "Integration Admin",
+        )
+        self.assertEqual(
+            acknowledged.json()["acknowledgement_note"],
+            "Investigating the quality regression",
+        )
+        cleared_acknowledgement = self.client.delete(
+            acknowledgement_url,
+            headers=self.headers,
+        )
+        self.assertEqual(
+            cleared_acknowledgement.status_code,
+            200,
+            cleared_acknowledgement.text,
+        )
+        self.assertIsNone(cleared_acknowledgement.json()["acknowledged_at"])
+        acknowledged_again = self.client.put(
+            acknowledgement_url,
+            headers=self.headers,
+            json={"note": "Keep this acknowledged until the signal changes"},
+        )
+        self.assertEqual(acknowledged_again.status_code, 200, acknowledged_again.text)
+
+        stable_state = next(state for state in states.json() if state["current_status"] == "STABLE")
+        invalid_acknowledgement = self.client.put(
+            f"{config_url}/states/{stable_state['metric']}/acknowledgement",
+            headers=self.headers,
+            json={"note": "This should be rejected"},
+        )
+        self.assertEqual(
+            invalid_acknowledgement.status_code,
+            409,
+            invalid_acknowledgement.text,
+        )
+
+        repeated = asyncio.run(
+            evaluate_quality_alert_batch(
+                self.app.state.session_factory,
+                now=moment + timedelta(seconds=60),
+                evaluation_interval_seconds=60,
+            )
+        )
+        self.assertEqual((repeated.transitions, repeated.queued), (0, 0))
+
+        silence_until = moment + timedelta(seconds=123)
+        silenced = self.client.put(
+            f"{config_url}/silence",
+            headers=self.headers,
+            json={
+                "silenced_until": silence_until.isoformat(),
+                "reason": "Release maintenance window",
+            },
+        )
+        self.assertEqual(silenced.status_code, 200, silenced.text)
+        self.assertEqual(silenced.json()["silence_reason"], "Release maintenance window")
+        self.assertIsNotNone(silenced.json()["silenced_by"])
+        self.assertEqual(silenced.json()["silenced_by_display_name"], "Integration Admin")
+
+        asyncio.run(set_current_status("PASSED"))
+        silence_suppressed = asyncio.run(
+            evaluate_quality_alert_batch(
+                self.app.state.session_factory,
+                now=moment + timedelta(seconds=120),
+                evaluation_interval_seconds=60,
+            )
+        )
+        self.assertEqual(
+            (
+                silence_suppressed.transitions,
+                silence_suppressed.queued,
+                silence_suppressed.silence_suppressed,
+            ),
+            (2, 0, 2),
+        )
+        states_during_silence = self.client.get(
+            f"{config_url}/states",
+            headers=self.headers,
+        )
+        self.assertEqual(states_during_silence.status_code, 200, states_during_silence.text)
+        previously_critical = [
+            state
+            for state in states_during_silence.json()
+            if state["metric"] in {item["metric"] for item in critical_states}
+        ]
+        self.assertTrue(all(state["current_status"] == "STABLE" for state in previously_critical))
+        self.assertTrue(
+            all(state["active_notification_status"] == "CRITICAL" for state in previously_critical)
+        )
+        self.assertTrue(all(state["acknowledged_at"] is None for state in previously_critical))
+
+        recovered = asyncio.run(
+            evaluate_quality_alert_batch(
+                self.app.state.session_factory,
+                now=moment + timedelta(seconds=125),
+                evaluation_interval_seconds=60,
+            )
+        )
+        self.assertEqual((recovered.transitions, recovered.queued), (0, 2))
+        cleared_silence = self.client.delete(
+            f"{config_url}/silence",
+            headers=self.headers,
+        )
+        self.assertEqual(cleared_silence.status_code, 200, cleared_silence.text)
+        self.assertIsNone(cleared_silence.json()["silenced_until"])
+
+        asyncio.run(set_current_status("FAILED"))
+        suppressed = asyncio.run(
+            evaluate_quality_alert_batch(
+                self.app.state.session_factory,
+                now=moment + timedelta(seconds=190),
+                evaluation_interval_seconds=60,
+            )
+        )
+        self.assertEqual(
+            (suppressed.transitions, suppressed.queued, suppressed.cooldown_suppressed),
+            (2, 0, 2),
+        )
+        retriggered = asyncio.run(
+            evaluate_quality_alert_batch(
+                self.app.state.session_factory,
+                now=moment + timedelta(seconds=3700),
+                evaluation_interval_seconds=60,
+            )
+        )
+        self.assertEqual((retriggered.transitions, retriggered.queued), (0, 2))
+
+        async def inspect_automatic_records() -> tuple[int, int, int, set[str], set[int]]:
+            async with self.app.state.session_factory() as session:
+                deliveries = tuple(
+                    await session.scalars(
+                        select(QualityWebhookDeliveryRecord).where(
+                            QualityWebhookDeliveryRecord.project_id == UUID(project_id)
+                        )
+                    )
+                )
+                alert_states = tuple(
+                    await session.scalars(
+                        select(QualityAlertStateRecord).where(
+                            QualityAlertStateRecord.project_id == UUID(project_id)
+                        )
+                    )
+                )
+                audit_count = await session.scalar(
+                    select(func.count())
+                    .select_from(AuditLogRecord)
+                    .where(
+                        AuditLogRecord.project_id == UUID(project_id),
+                        AuditLogRecord.action == "project.quality_alert_queued",
+                    )
+                )
+                operation_audit_count = await session.scalar(
+                    select(func.count())
+                    .select_from(AuditLogRecord)
+                    .where(
+                        AuditLogRecord.project_id == UUID(project_id),
+                        AuditLogRecord.action.in_(
+                            (
+                                "project.quality_alert_acknowledged",
+                                "project.quality_alert_acknowledgement_cleared",
+                                "project.quality_alert_silenced",
+                                "project.quality_alert_silence_cleared",
+                            )
+                        ),
+                    )
+                )
+                return (
+                    len(deliveries),
+                    int(audit_count or 0),
+                    int(operation_audit_count or 0),
+                    {delivery.event_type for delivery in deliveries},
+                    {
+                        state.notification_sequence
+                        for state in alert_states
+                        if state.metric != "EXECUTION_RELIABILITY"
+                    },
+                )
+
+        (
+            delivery_count,
+            audit_count,
+            operation_audit_count,
+            event_types,
+            notification_sequences,
+        ) = asyncio.run(inspect_automatic_records())
+        self.assertEqual(delivery_count, 6)
+        self.assertEqual(audit_count, 6)
+        self.assertEqual(operation_audit_count, 5)
+        self.assertEqual(
+            event_types,
+            {"quality.alert.triggered", "quality.alert.recovered"},
+        )
+        self.assertEqual(notification_sequences, {3})
 
     def test_published_baseline_is_idempotent_but_immutable(self) -> None:
         resources = self._bootstrap()

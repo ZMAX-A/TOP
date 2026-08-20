@@ -20,11 +20,12 @@ from .database import create_database_runtime, create_schema, database_ready
 from .governance_routes import router as governance_router
 from .identity_routes import router as identity_router
 from .observability import ApiMetrics, PrometheusMiddleware
+from .quality_operations_services import collect_quality_operations_snapshot
 from .reliability_services import collect_reliability_snapshot
 from .routes import router
 from .services import ServiceError
 
-API_VERSION = "0.15.0"
+API_VERSION = "0.22.0"
 LOGGER = logging.getLogger(__name__)
 
 
@@ -113,8 +114,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
             except Exception:
                 LOGGER.exception("Failed to collect the reliability metrics snapshot")
                 metrics.reliability_snapshot_success.set(0)
+            try:
+                metrics.update_quality_operations(
+                    await collect_quality_operations_snapshot(session_factory)
+                )
+            except Exception:
+                LOGGER.exception("Failed to collect the quality operations metrics snapshot")
+                metrics.quality_operations_snapshot_success.set(0)
         else:
             metrics.reliability_snapshot_success.set(0)
+            metrics.quality_operations_snapshot_success.set(0)
         return Response(
             content=metrics.render(),
             headers={

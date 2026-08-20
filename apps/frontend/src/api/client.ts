@@ -14,9 +14,13 @@ import type {
   Project,
   ProjectMember,
   ProjectMemberCandidate,
+  QualityAlertMetric,
+  QualityAlertState,
   QualityAnalytics,
   QualityAnalyticsQuery,
   QualityPolicy,
+  QualityWebhookConfig,
+  QualityWebhookDelivery,
   RegressionSchedule,
   RegressionScheduleFiring,
   Run,
@@ -180,6 +184,49 @@ export const api = {
       `/api/v1/projects/${projectId}/quality-policy`,
       json('PATCH', payload),
     ),
+  qualityWebhook: (projectId: string) =>
+    request<QualityWebhookConfig>(`/api/v1/projects/${projectId}/quality/webhook`),
+  updateQualityWebhook: (projectId: string, payload: unknown) =>
+    request<QualityWebhookConfig>(
+      `/api/v1/projects/${projectId}/quality/webhook`,
+      json('PATCH', payload),
+    ),
+  silenceQualityAlerts: (projectId: string, payload: unknown) =>
+    request<QualityWebhookConfig>(
+      `/api/v1/projects/${projectId}/quality/webhook/silence`,
+      json('PUT', payload),
+    ),
+  clearQualityAlertSilence: (projectId: string) =>
+    request<QualityWebhookConfig>(
+      `/api/v1/projects/${projectId}/quality/webhook/silence`,
+      { method: 'DELETE' },
+    ),
+  testQualityWebhook: (projectId: string) =>
+    request<QualityWebhookDelivery>(
+      `/api/v1/projects/${projectId}/quality/webhook/test`,
+      json('POST'),
+    ),
+  qualityWebhookDeliveries: (projectId: string, limit = 20) =>
+    request<QualityWebhookDelivery[]>(
+      withQuery(`/api/v1/projects/${projectId}/quality/webhook/deliveries`, { limit }),
+    ),
+  replayQualityWebhookDelivery: (projectId: string, deliveryId: string, reason: string) =>
+    request<QualityWebhookDelivery>(
+      `/api/v1/projects/${projectId}/quality/webhook/deliveries/${deliveryId}/replay`,
+      json('POST', { reason }),
+    ),
+  qualityWebhookStates: (projectId: string) =>
+    request<QualityAlertState[]>(`/api/v1/projects/${projectId}/quality/webhook/states`),
+  acknowledgeQualityAlert: (projectId: string, metric: QualityAlertMetric, note: string) =>
+    request<QualityAlertState>(
+      `/api/v1/projects/${projectId}/quality/webhook/states/${metric}/acknowledgement`,
+      json('PUT', { note }),
+    ),
+  clearQualityAlertAcknowledgement: (projectId: string, metric: QualityAlertMetric) =>
+    request<QualityAlertState>(
+      `/api/v1/projects/${projectId}/quality/webhook/states/${metric}/acknowledgement`,
+      { method: 'DELETE' },
+    ),
   qualityAnalytics: (projectId: string, query: QualityAnalyticsQuery = {}) =>
     request<QualityAnalytics>(
       withQuery(`/api/v1/projects/${projectId}/quality/analytics`, {
@@ -254,6 +301,56 @@ export const api = {
   packages: (projectId: string, targetId: string) =>
     request<AutomationPackage[]>(
       `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages`,
+    ),
+  package: (projectId: string, targetId: string, packageId: string) =>
+    request<AutomationPackage>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}`,
+    ),
+  createPackageDraft: (projectId: string, targetId: string, payload: unknown) =>
+    request<AutomationPackage>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/drafts`,
+      json('POST', payload),
+    ),
+  createPackageValidationRun: (
+    projectId: string,
+    targetId: string,
+    packageId: string,
+    idempotencyKey: string,
+    payload: unknown,
+  ) =>
+    request<Run>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}/validation-runs`,
+      json('POST', payload, { 'Idempotency-Key': idempotencyKey }),
+    ),
+  activatePackage: (
+    projectId: string,
+    targetId: string,
+    packageId: string,
+    validationRunId: string,
+  ) =>
+    request<AutomationPackage>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}/activate`,
+      json('POST', { validation_run_id: validationRunId }),
+    ),
+  deprecatePackage: (
+    projectId: string,
+    targetId: string,
+    packageId: string,
+    reason: string,
+  ) =>
+    request<AutomationPackage>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}/deprecate`,
+      json('POST', { reason }),
+    ),
+  revokePackage: (
+    projectId: string,
+    targetId: string,
+    packageId: string,
+    reason: string,
+  ) =>
+    request<AutomationPackage>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}/revoke`,
+      json('POST', { reason }),
     ),
   baselines: (projectId: string) =>
     request<Baseline[]>(`/api/v1/projects/${projectId}/baselines`),

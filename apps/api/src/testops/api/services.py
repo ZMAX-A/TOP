@@ -34,6 +34,7 @@ from .persistence import (
     EnvironmentRecord,
     ProjectMemberRecord,
     ProjectRecord,
+    RegressionScheduleRecord,
     RunCaseRecord,
     RunEventRecord,
     RunnerPoolRecord,
@@ -44,7 +45,11 @@ from .persistence import (
     utc_now,
 )
 from .schemas import (
+    AutomationPackageActivateRequest,
     AutomationPackageCreate,
+    AutomationPackageDraftCreate,
+    AutomationPackageStatusChangeRequest,
+    AutomationPackageValidationRunCreate,
     BaselinePublishRequest,
     EnvironmentCreate,
     EnvironmentUpdate,
@@ -1065,13 +1070,31 @@ async def create_automation_package(
     session: AsyncSession,
     project_id: UUID,
     target_id: UUID,
-    payload: AutomationPackageCreate,
+    payload: AutomationPackageCreate | AutomationPackageDraftCreate,
     actor_id: UUID,
+    *,
+    status: str = "ACTIVE",
 ) -> AutomationPackageRecord:
     await _project(session, project_id)
     target = await session.get(TestTargetRecord, target_id)
     if target is None or target.project_id != project_id:
         raise ResourceNotFound("target not found in project")
+    if target.target_type != TargetType.WEB.value or payload.runner_type != "WEB_PLAYWRIGHT":
+        raise InvalidRequest("WEB_PLAYWRIGHT packages require a WEB target")
+    supersedes_id = (
+        payload.supersedes_id if isinstance(payload, AutomationPackageDraftCreate) else None
+    )
+    if supersedes_id is not None:
+        superseded = await session.get(AutomationPackageRecord, supersedes_id)
+        if (
+            superseded is None
+            or superseded.project_id != project_id
+            or superseded.target_id != target_id
+            or superseded.name != payload.name
+        ):
+            raise InvalidRequest("supersedes_id must reference the same target and package name")
+        if superseded.status == "REVOKED":
+            raise ResourceConflict("a revoked automation package cannot be superseded")
     record = AutomationPackageRecord(
         id=uuid4(),
         project_id=project_id,
@@ -1079,16 +1102,32 @@ async def create_automation_package(
         name=payload.name,
         version=payload.version,
         digest=payload.digest,
+        runner_type=payload.runner_type,
+        image_repository=payload.image_repository,
+        status=status,
+        supersedes_id=supersedes_id,
     )
     session.add(record)
     session.add(
         _audit(
             actor_id=actor_id,
-            action="automation_package.created",
+            action=(
+                "automation_package.draft_created"
+                if status == "DRAFT"
+                else "automation_package.created"
+            ),
             resource_type="automation_package",
             resource_id=record.id,
             project_id=project_id,
-            details={"name": record.name, "version": record.version, "digest": record.digest},
+            details={
+                "name": record.name,
+                "version": record.version,
+                "digest": record.digest,
+                "runner_type": record.runner_type,
+                "image_repository": record.image_repository,
+                "status": record.status,
+                "supersedes_id": str(supersedes_id) if supersedes_id else None,
+            },
         )
     )
     await _commit_unique(session, "automation package version already exists for target")
@@ -1111,6 +1150,172 @@ async def list_automation_packages(
         .order_by(AutomationPackageRecord.created_at)
     )
     return tuple(result)
+
+
+async def get_automation_package(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    *,
+    lock: bool = False,
+) -> AutomationPackageRecord:
+    statement = select(AutomationPackageRecord).where(
+        AutomationPackageRecord.id == package_id,
+        AutomationPackageRecord.project_id == project_id,
+        AutomationPackageRecord.target_id == target_id,
+    )
+    if lock:
+        statement = statement.with_for_update()
+    record = await session.scalar(statement)
+    if record is None:
+        raise ResourceNotFound("automation package not found for target")
+    return record
+
+
+async def activate_automation_package(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageActivateRequest,
+    actor_id: UUID,
+) -> AutomationPackageRecord:
+    package = await get_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        lock=True,
+    )
+    if package.status == "ACTIVE" and package.validated_run_id == payload.validation_run_id:
+        return package
+    if package.status != "DRAFT":
+        raise ResourceConflict("only a DRAFT automation package can be activated")
+    validation_run = await session.get(TestRunRecord, payload.validation_run_id)
+    if (
+        validation_run is None
+        or validation_run.project_id != project_id
+        or validation_run.target_id != target_id
+        or validation_run.automation_package_id != package.id
+    ):
+        raise InvalidRequest("validation_run_id does not validate this automation package")
+    if validation_run.status != RunStatus.PASSED.value or validation_run.result_digest is None:
+        raise ResourceConflict("automation package validation Run must finish PASSED")
+    baseline_record = await session.get(CaseBaselineRecord, validation_run.baseline_id)
+    if baseline_record is None or baseline_record.status != "RELEASED":
+        raise ResourceConflict("automation package validation requires a RELEASED baseline")
+    baseline = CaseBaseline.model_validate(baseline_record.document)
+    enabled_case_count = sum(case.enabled for case in baseline.cases)
+    if validation_run.case_count != enabled_case_count:
+        raise ResourceConflict(
+            "automation package activation requires a full enabled-case regression"
+        )
+
+    package.status = "ACTIVE"
+    package.validated_run_id = validation_run.id
+    package.activated_by = actor_id
+    package.activated_at = utc_now()
+    package.status_reason = None
+    session.add(
+        _audit(
+            actor_id=actor_id,
+            action="automation_package.activated",
+            resource_type="automation_package",
+            resource_id=package.id,
+            project_id=project_id,
+            details={
+                "validation_run_id": str(validation_run.id),
+                "digest": package.digest,
+                "version": package.version,
+            },
+        )
+    )
+    await session.commit()
+    await session.refresh(package)
+    return package
+
+
+async def deprecate_automation_package(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageStatusChangeRequest,
+    actor_id: UUID,
+) -> AutomationPackageRecord:
+    package = await get_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        lock=True,
+    )
+    if package.status == "DEPRECATED" and package.status_reason == payload.reason:
+        return package
+    if package.status != "ACTIVE":
+        raise ResourceConflict("only an ACTIVE automation package can be deprecated")
+    active_schedule_id = await session.scalar(
+        select(RegressionScheduleRecord.id)
+        .where(
+            RegressionScheduleRecord.automation_package_id == package.id,
+            RegressionScheduleRecord.status == "ACTIVE",
+        )
+        .limit(1)
+    )
+    if active_schedule_id is not None:
+        raise ResourceConflict("automation package is still used by an ACTIVE regression schedule")
+    package.status = "DEPRECATED"
+    package.status_reason = payload.reason
+    session.add(
+        _audit(
+            actor_id=actor_id,
+            action="automation_package.deprecated",
+            resource_type="automation_package",
+            resource_id=package.id,
+            project_id=project_id,
+            details={"reason": payload.reason, "version": package.version},
+        )
+    )
+    await session.commit()
+    await session.refresh(package)
+    return package
+
+
+async def revoke_automation_package(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageStatusChangeRequest,
+    actor_id: UUID,
+) -> AutomationPackageRecord:
+    package = await get_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        lock=True,
+    )
+    if package.status == "REVOKED" and package.status_reason == payload.reason:
+        return package
+    if package.status == "REVOKED":
+        raise ResourceConflict("automation package is already revoked")
+    package.status = "REVOKED"
+    package.status_reason = payload.reason
+    session.add(
+        _audit(
+            actor_id=actor_id,
+            action="automation_package.revoked",
+            resource_type="automation_package",
+            resource_id=package.id,
+            project_id=project_id,
+            details={"reason": payload.reason, "version": package.version},
+        )
+    )
+    await session.commit()
+    await session.refresh(package)
+    return package
 
 
 def _environment_contract(
@@ -1294,6 +1499,7 @@ async def create_run(
     idempotency_key: str,
     actor_id: UUID,
     allowed_baseline_statuses: frozenset[str] = frozenset({"RELEASED"}),
+    allowed_package_statuses: frozenset[str] = frozenset({"ACTIVE"}),
     regression_schedule_id: UUID | None = None,
     scheduled_for: datetime | None = None,
     commit: bool = True,
@@ -1338,6 +1544,10 @@ async def create_run(
         )
     if package is None or package.project_id != project.id or package.target_id != target.id:
         raise ResourceNotFound("automation package not found for target")
+    if package.status not in allowed_package_statuses:
+        raise InvalidRequest(
+            f"automation package status {package.status} cannot be scheduled through this endpoint"
+        )
     if target.target_type != TargetType.WEB.value:
         raise InvalidRequest("M2 Runner dispatch currently supports WEB targets only")
 
@@ -1369,6 +1579,8 @@ async def create_run(
             name=package.name,
             version=package.version,
             digest=package.digest,
+            runner_type=package.runner_type,
+            image_repository=package.image_repository,
         ),
         cases=cases,
         browser=target.browser,
@@ -1396,6 +1608,58 @@ async def create_run(
         scheduled_for=scheduled_for,
         commit=commit,
     )
+
+
+async def create_automation_package_validation_run(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageValidationRunCreate,
+    *,
+    idempotency_key: str,
+    actor_id: UUID,
+) -> tuple[TestRunRecord, bool]:
+    package = await get_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+    )
+    if package.status != "DRAFT":
+        raise ResourceConflict("only a DRAFT automation package can start validation")
+    run, created = await create_run(
+        session,
+        RunCreate(
+            project_id=project_id,
+            target_id=target_id,
+            environment_id=payload.environment_id,
+            baseline_id=payload.baseline_id,
+            automation_package_id=package_id,
+        ),
+        idempotency_key=idempotency_key,
+        actor_id=actor_id,
+        allowed_package_statuses=frozenset({"DRAFT"}),
+        commit=False,
+    )
+    if created:
+        session.add(
+            _audit(
+                actor_id=actor_id,
+                action="automation_package.validation_run_created",
+                resource_type="automation_package",
+                resource_id=package.id,
+                project_id=project_id,
+                details={
+                    "validation_run_id": str(run.id),
+                    "baseline_id": str(payload.baseline_id),
+                    "environment_id": str(payload.environment_id),
+                },
+            )
+        )
+    await session.commit()
+    await session.refresh(run)
+    return run, created
 
 
 async def create_rerun(
@@ -1432,8 +1696,11 @@ async def create_rerun(
     source_snapshot = RunSnapshot.model_validate(source.snapshot)
     target = await session.get(TestTargetRecord, source.target_id)
     environment = await session.get(EnvironmentRecord, source.environment_id)
-    if target is None or environment is None:
+    package = await session.get(AutomationPackageRecord, source.automation_package_id)
+    if target is None or environment is None or package is None:
         raise ResourceNotFound("source Run scheduling resources no longer exist")
+    if package.status == "REVOKED":
+        raise ResourceConflict("a Run using a revoked automation package cannot be rerun")
     runner_pool_id = environment.runner_pool_id or target.runner_pool_id
     cases = source_snapshot.cases
     if mode == "FAILED_ONLY":

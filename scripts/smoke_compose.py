@@ -35,7 +35,7 @@ PROJECT_KEY = "platform-smoke"
 TARGET_KEY = "web"
 ENVIRONMENT_KEY = "compose"
 PACKAGE_NAME = "compose-smoke-runner"
-PACKAGE_VERSION = "0.15.0"
+PACKAGE_VERSION = "0.22.0"
 PASS_CASE_CODE = "TC-SMOKE-PASS"
 FAIL_CASE_CODE = "TC-SMOKE-FAIL"
 
@@ -215,9 +215,9 @@ def build_smoke_baseline() -> CaseBaseline:
     )
     source_digest = "sha256:" + hashlib.sha256(b"testops-compose-smoke-v1").hexdigest()
     return CaseBaseline(
-        baseline_id=uuid5(NAMESPACE_URL, "testops-platform/compose-smoke/baseline-v0.15.0"),
+        baseline_id=uuid5(NAMESPACE_URL, "testops-platform/compose-smoke/baseline-v0.22.0"),
         project_key=PROJECT_KEY,
-        version="case-v0.15.0",
+        version="case-v0.22.0",
         source=CaseBaselineSource(
             file_name="compose-smoke.json",
             file_digest=source_digest,

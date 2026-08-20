@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import re
 from collections import Counter
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, time, timedelta
-from typing import Any
+from typing import Any, Literal
 from uuid import UUID
 
 from sqlalchemy import func, select
@@ -28,11 +29,13 @@ from .schemas import (
     FlakyCaseResponse,
     QualityAnalyticsResponse,
     QualityCaseSummary,
+    QualityChangeSignal,
     QualityDimensionFilters,
     QualityPolicyResponse,
     QualityPolicyUpdate,
     QualityRunSummary,
     QualityTrendPoint,
+    QualityWindowComparison,
 )
 from .services import InvalidRequest, ResourceNotFound
 
@@ -64,6 +67,18 @@ _NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?\b")
 _WHITESPACE_PATTERN = re.compile(r"\s+")
 
 
+@dataclass(frozen=True, slots=True)
+class QualityComparisonSnapshot:
+    window_started_at: datetime
+    window_ended_at: datetime
+    runs: QualityRunSummary
+    previous_runs: QualityRunSummary
+    cases: QualityCaseSummary
+    previous_cases: QualityCaseSummary
+    comparison: QualityWindowComparison
+    latest_completed_at: datetime | None
+
+
 async def _project(session: AsyncSession, project_id: UUID) -> ProjectRecord:
     record = await session.get(ProjectRecord, project_id)
     if record is None:
@@ -85,6 +100,8 @@ def _policy_response(project: ProjectRecord) -> QualityPolicyResponse:
         project_id=project.id,
         target_pass_rate_percent=project.quality_slo_target_percent,
         window_days=project.quality_slo_window_days,
+        alert_warning_drop_percentage_points=project.quality_alert_warning_drop_points,
+        alert_critical_drop_percentage_points=project.quality_alert_critical_drop_points,
         updated_at=project.updated_at,
     )
 
@@ -106,14 +123,32 @@ async def update_quality_policy(
     before = {
         "target_pass_rate_percent": project.quality_slo_target_percent,
         "window_days": project.quality_slo_window_days,
+        "alert_warning_drop_percentage_points": project.quality_alert_warning_drop_points,
+        "alert_critical_drop_percentage_points": project.quality_alert_critical_drop_points,
     }
+    warning_drop = (
+        payload.alert_warning_drop_percentage_points
+        if payload.alert_warning_drop_percentage_points is not None
+        else project.quality_alert_warning_drop_points
+    )
+    critical_drop = (
+        payload.alert_critical_drop_percentage_points
+        if payload.alert_critical_drop_percentage_points is not None
+        else project.quality_alert_critical_drop_points
+    )
+    if warning_drop >= critical_drop:
+        raise InvalidRequest("quality warning drop must be lower than critical drop")
     if payload.target_pass_rate_percent is not None:
         project.quality_slo_target_percent = payload.target_pass_rate_percent
     if payload.window_days is not None:
         project.quality_slo_window_days = payload.window_days
+    project.quality_alert_warning_drop_points = warning_drop
+    project.quality_alert_critical_drop_points = critical_drop
     after = {
         "target_pass_rate_percent": project.quality_slo_target_percent,
         "window_days": project.quality_slo_window_days,
+        "alert_warning_drop_percentage_points": project.quality_alert_warning_drop_points,
+        "alert_critical_drop_percentage_points": project.quality_alert_critical_drop_points,
     }
     session.add(
         AuditLogRecord(
@@ -166,6 +201,230 @@ def _cluster_fingerprint(category: str, pattern: str) -> str:
 
 def _count_map(rows: Any) -> dict[str, int]:
     return {str(status): int(count) for status, count in rows}
+
+
+def _run_summary(counts: dict[str, int]) -> QualityRunSummary:
+    passed = counts.get("PASSED", 0)
+    failed = counts.get("FAILED", 0)
+    timed_out = counts.get("TIMED_OUT", 0)
+    infra_error = counts.get("INFRA_ERROR", 0)
+    conclusive = passed + failed
+    return QualityRunSummary(
+        total_terminal_runs=sum(counts.values()),
+        conclusive_runs=conclusive,
+        passed_runs=passed,
+        failed_runs=failed,
+        canceled_runs=counts.get("CANCELED", 0),
+        timed_out_runs=timed_out,
+        infra_error_runs=infra_error,
+        pass_rate_percent=_percentage(passed, conclusive),
+        execution_reliability_percent=_percentage(
+            conclusive,
+            conclusive + timed_out + infra_error,
+        ),
+    )
+
+
+def _case_summary(counts: dict[str, int]) -> QualityCaseSummary:
+    passed = counts.get("PASSED", 0)
+    failed = counts.get("FAILED", 0)
+    conclusive = passed + failed
+    return QualityCaseSummary(
+        total_terminal_cases=sum(counts.values()),
+        conclusive_cases=conclusive,
+        passed_cases=passed,
+        failed_cases=failed,
+        skipped_cases=counts.get("SKIPPED", 0),
+        canceled_cases=counts.get("CANCELED", 0),
+        timed_out_cases=counts.get("TIMED_OUT", 0),
+        infra_error_cases=counts.get("INFRA_ERROR", 0),
+        pass_rate_percent=_percentage(passed, conclusive),
+    )
+
+
+def _quality_change_signal(
+    metric: Literal["RUN_PASS_RATE", "CASE_PASS_RATE", "EXECUTION_RELIABILITY"],
+    current_percent: float | None,
+    previous_percent: float | None,
+    *,
+    warning_drop_points: int,
+    critical_drop_points: int,
+) -> QualityChangeSignal:
+    if current_percent is None or previous_percent is None:
+        return QualityChangeSignal(
+            metric=metric,
+            current_percent=current_percent,
+            previous_percent=previous_percent,
+            delta_percentage_points=None,
+            alert_status="NO_DATA",
+        )
+    delta = round(current_percent - previous_percent, 2)
+    drop = -delta
+    if drop >= critical_drop_points:
+        status = "CRITICAL"
+    elif drop >= warning_drop_points:
+        status = "WARNING"
+    else:
+        status = "STABLE"
+    return QualityChangeSignal(
+        metric=metric,
+        current_percent=current_percent,
+        previous_percent=previous_percent,
+        delta_percentage_points=delta,
+        alert_status=status,
+    )
+
+
+def _quality_alert_status(
+    signals: tuple[QualityChangeSignal, ...],
+) -> Literal["NO_DATA", "STABLE", "WARNING", "CRITICAL"]:
+    rank = {"NO_DATA": 0, "STABLE": 1, "WARNING": 2, "CRITICAL": 3}
+    comparable = [signal.alert_status for signal in signals if signal.alert_status != "NO_DATA"]
+    if not comparable:
+        return "NO_DATA"
+    return max(comparable, key=rank.__getitem__)
+
+
+def _quality_run_filter(
+    project_id: UUID,
+    completed_at: Any,
+    *,
+    started_at: datetime,
+    ended_at: datetime,
+    include_end: bool,
+    target_id: UUID | None = None,
+    environment_id: UUID | None = None,
+    baseline_id: UUID | None = None,
+) -> list[Any]:
+    conditions = [
+        TestRunRecord.project_id == project_id,
+        TestRunRecord.status.in_(TERMINAL_RUN_STATUSES),
+        completed_at >= started_at,
+        completed_at <= ended_at if include_end else completed_at < ended_at,
+    ]
+    if target_id is not None:
+        conditions.append(TestRunRecord.target_id == target_id)
+    if environment_id is not None:
+        conditions.append(TestRunRecord.environment_id == environment_id)
+    if baseline_id is not None:
+        conditions.append(TestRunRecord.baseline_id == baseline_id)
+    return conditions
+
+
+async def calculate_quality_comparison(
+    session: AsyncSession,
+    project: ProjectRecord,
+    *,
+    window_days: int | None = None,
+    target_id: UUID | None = None,
+    environment_id: UUID | None = None,
+    baseline_id: UUID | None = None,
+    now: datetime | None = None,
+) -> QualityComparisonSnapshot:
+    """Calculate adjacent UTC windows without loading trend or failure analysis."""
+
+    days = window_days or project.quality_slo_window_days
+    if not 1 <= days <= 90:
+        raise InvalidRequest("quality window days must be between 1 and 90")
+    moment = _aware(now or utc_now()).astimezone(UTC)
+    window_started_at = datetime.combine(
+        moment.date() - timedelta(days=days - 1),
+        time.min,
+        tzinfo=UTC,
+    )
+    completed_at = func.coalesce(TestRunRecord.finished_at, TestRunRecord.updated_at)
+    run_filter = _quality_run_filter(
+        project.id,
+        completed_at,
+        started_at=window_started_at,
+        ended_at=moment,
+        include_end=True,
+        target_id=target_id,
+        environment_id=environment_id,
+        baseline_id=baseline_id,
+    )
+    run_rows = await session.execute(
+        select(TestRunRecord.status, func.count()).where(*run_filter).group_by(TestRunRecord.status)
+    )
+    runs = _run_summary(_count_map(run_rows))
+    case_rows = await session.execute(
+        select(RunCaseRecord.status, func.count())
+        .join(TestRunRecord, TestRunRecord.id == RunCaseRecord.run_id)
+        .where(*run_filter, RunCaseRecord.status.in_(TERMINAL_CASE_STATUSES))
+        .group_by(RunCaseRecord.status)
+    )
+    cases = _case_summary(_count_map(case_rows))
+
+    comparison_duration = moment - window_started_at
+    previous_window_ended_at = window_started_at
+    previous_window_started_at = previous_window_ended_at - comparison_duration
+    previous_filter = _quality_run_filter(
+        project.id,
+        completed_at,
+        started_at=previous_window_started_at,
+        ended_at=previous_window_ended_at,
+        include_end=False,
+        target_id=target_id,
+        environment_id=environment_id,
+        baseline_id=baseline_id,
+    )
+    previous_run_rows = await session.execute(
+        select(TestRunRecord.status, func.count())
+        .where(*previous_filter)
+        .group_by(TestRunRecord.status)
+    )
+    previous_runs = _run_summary(_count_map(previous_run_rows))
+    previous_case_rows = await session.execute(
+        select(RunCaseRecord.status, func.count())
+        .join(TestRunRecord, TestRunRecord.id == RunCaseRecord.run_id)
+        .where(*previous_filter, RunCaseRecord.status.in_(TERMINAL_CASE_STATUSES))
+        .group_by(RunCaseRecord.status)
+    )
+    previous_cases = _case_summary(_count_map(previous_case_rows))
+    signals = (
+        _quality_change_signal(
+            "RUN_PASS_RATE",
+            runs.pass_rate_percent,
+            previous_runs.pass_rate_percent,
+            warning_drop_points=project.quality_alert_warning_drop_points,
+            critical_drop_points=project.quality_alert_critical_drop_points,
+        ),
+        _quality_change_signal(
+            "CASE_PASS_RATE",
+            cases.pass_rate_percent,
+            previous_cases.pass_rate_percent,
+            warning_drop_points=project.quality_alert_warning_drop_points,
+            critical_drop_points=project.quality_alert_critical_drop_points,
+        ),
+        _quality_change_signal(
+            "EXECUTION_RELIABILITY",
+            runs.execution_reliability_percent,
+            previous_runs.execution_reliability_percent,
+            warning_drop_points=project.quality_alert_warning_drop_points,
+            critical_drop_points=project.quality_alert_critical_drop_points,
+        ),
+    )
+    comparison = QualityWindowComparison(
+        previous_window_started_at=previous_window_started_at,
+        previous_window_ended_at=previous_window_ended_at,
+        warning_drop_percentage_points=project.quality_alert_warning_drop_points,
+        critical_drop_percentage_points=project.quality_alert_critical_drop_points,
+        alert_status=_quality_alert_status(signals),
+        signals=signals,
+    )
+    latest_completed_at = await session.scalar(select(func.max(completed_at)).where(*run_filter))
+    return QualityComparisonSnapshot(
+        window_started_at=window_started_at,
+        window_ended_at=moment,
+        runs=runs,
+        previous_runs=previous_runs,
+        cases=cases,
+        previous_cases=previous_cases,
+        comparison=comparison,
+        latest_completed_at=(
+            _aware(latest_completed_at) if latest_completed_at is not None else None
+        ),
+    )
 
 
 def _detect_flaky_cases(rows: Any) -> tuple[tuple[FlakyCaseResponse, ...], int]:
@@ -268,54 +527,32 @@ async def get_quality_analytics(
         environment_id=environment_id,
         baseline_id=baseline_id,
     )
+    snapshot = await calculate_quality_comparison(
+        session,
+        project,
+        window_days=window_days,
+        target_id=target_id,
+        environment_id=environment_id,
+        baseline_id=baseline_id,
+        now=now,
+    )
     days = window_days or project.quality_slo_window_days
-    moment = _aware(now or utc_now()).astimezone(UTC)
-    window_started_at = datetime.combine(
-        moment.date() - timedelta(days=days - 1),
-        time.min,
-        tzinfo=UTC,
-    )
+    moment = snapshot.window_ended_at
+    window_started_at = snapshot.window_started_at
     completed_at = func.coalesce(TestRunRecord.finished_at, TestRunRecord.updated_at)
-    run_filter = [
-        TestRunRecord.project_id == project_id,
-        TestRunRecord.status.in_(TERMINAL_RUN_STATUSES),
-        completed_at >= window_started_at,
-        completed_at <= moment,
-    ]
-    if target_id is not None:
-        run_filter.append(TestRunRecord.target_id == target_id)
-    if environment_id is not None:
-        run_filter.append(TestRunRecord.environment_id == environment_id)
-    if baseline_id is not None:
-        run_filter.append(TestRunRecord.baseline_id == baseline_id)
-
-    run_status_rows = await session.execute(
-        select(TestRunRecord.status, func.count()).where(*run_filter).group_by(TestRunRecord.status)
+    run_filter = _quality_run_filter(
+        project_id,
+        completed_at,
+        started_at=window_started_at,
+        ended_at=moment,
+        include_end=True,
+        target_id=target_id,
+        environment_id=environment_id,
+        baseline_id=baseline_id,
     )
-    run_counts = _count_map(run_status_rows)
-    passed_runs = run_counts.get("PASSED", 0)
-    failed_runs = run_counts.get("FAILED", 0)
-    canceled_runs = run_counts.get("CANCELED", 0)
-    timed_out_runs = run_counts.get("TIMED_OUT", 0)
-    infra_error_runs = run_counts.get("INFRA_ERROR", 0)
-    conclusive_runs = passed_runs + failed_runs
-    reliability_denominator = conclusive_runs + timed_out_runs + infra_error_runs
-    total_terminal_runs = sum(run_counts.values())
-
-    case_status_rows = await session.execute(
-        select(RunCaseRecord.status, func.count())
-        .join(TestRunRecord, TestRunRecord.id == RunCaseRecord.run_id)
-        .where(*run_filter, RunCaseRecord.status.in_(TERMINAL_CASE_STATUSES))
-        .group_by(RunCaseRecord.status)
-    )
-    case_counts = _count_map(case_status_rows)
-    passed_cases = case_counts.get("PASSED", 0)
-    failed_cases = case_counts.get("FAILED", 0)
-    skipped_cases = case_counts.get("SKIPPED", 0)
-    canceled_cases = case_counts.get("CANCELED", 0)
-    timed_out_cases = case_counts.get("TIMED_OUT", 0)
-    infra_error_cases = case_counts.get("INFRA_ERROR", 0)
-    conclusive_cases = passed_cases + failed_cases
+    run_summary = snapshot.runs
+    case_summary = snapshot.cases
+    comparison = snapshot.comparison
 
     bucket_expression = func.date(completed_at)
     trend_rows = await session.execute(
@@ -429,8 +666,7 @@ async def get_quality_analytics(
     flaky_rows = list(flaky_result)
     flaky_data_truncated = len(flaky_rows) > MAX_FLAKY_ROWS
     flaky_cases, flaky_case_count = _detect_flaky_cases(flaky_rows[:MAX_FLAKY_ROWS])
-    latest_completed_at = await session.scalar(select(func.max(completed_at)).where(*run_filter))
-    pass_rate = _percentage(passed_runs, conclusive_runs)
+    pass_rate = run_summary.pass_rate_percent
     if pass_rate is None:
         slo_status = "NO_DATA"
     elif pass_rate >= project.quality_slo_target_percent:
@@ -451,34 +687,10 @@ async def get_quality_analytics(
         generated_at=moment,
         target_pass_rate_percent=project.quality_slo_target_percent,
         slo_status=slo_status,
-        latest_completed_at=(
-            _aware(latest_completed_at) if latest_completed_at is not None else None
-        ),
-        runs=QualityRunSummary(
-            total_terminal_runs=total_terminal_runs,
-            conclusive_runs=conclusive_runs,
-            passed_runs=passed_runs,
-            failed_runs=failed_runs,
-            canceled_runs=canceled_runs,
-            timed_out_runs=timed_out_runs,
-            infra_error_runs=infra_error_runs,
-            pass_rate_percent=pass_rate,
-            execution_reliability_percent=_percentage(
-                conclusive_runs,
-                reliability_denominator,
-            ),
-        ),
-        cases=QualityCaseSummary(
-            total_terminal_cases=sum(case_counts.values()),
-            conclusive_cases=conclusive_cases,
-            passed_cases=passed_cases,
-            failed_cases=failed_cases,
-            skipped_cases=skipped_cases,
-            canceled_cases=canceled_cases,
-            timed_out_cases=timed_out_cases,
-            infra_error_cases=infra_error_cases,
-            pass_rate_percent=_percentage(passed_cases, conclusive_cases),
-        ),
+        comparison=comparison,
+        latest_completed_at=snapshot.latest_completed_at,
+        runs=run_summary,
+        cases=case_summary,
         trend=tuple(trend),
         failure_clusters=failure_clusters,
         failure_data_truncated=failure_data_truncated,

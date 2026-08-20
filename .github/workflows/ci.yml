@@ -76,7 +76,7 @@ jobs:
     timeout-minutes: 15
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17-alpine@sha256:d4bb0a8c1b7bb2e29f976d099e7bfb9a5d8858cffe9e46b35cd302cd1f1f8168
         env:
           POSTGRES_DB: testops
           POSTGRES_USER: testops
@@ -166,5 +166,5 @@ jobs:
           docker run --rm
           --entrypoint /bin/promtool
           --volume "${PWD}/infra/observability:/etc/prometheus:ro"
-          prom/prometheus:v3.13.1
+          prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
           check config /etc/prometheus/prometheus.yml

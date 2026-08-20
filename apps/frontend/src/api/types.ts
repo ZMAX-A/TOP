@@ -10,6 +10,10 @@ export type RunStatus =
   | 'CANCELED'
   | 'TIMED_OUT'
   | 'INFRA_ERROR'
+export type QualityAlertMetric =
+  | 'RUN_PASS_RATE'
+  | 'CASE_PASS_RATE'
+  | 'EXECUTION_RELIABILITY'
 
 export interface User {
   id: string
@@ -59,7 +63,63 @@ export interface QualityPolicy {
   project_id: string
   target_pass_rate_percent: number
   window_days: number
+  alert_warning_drop_percentage_points: number
+  alert_critical_drop_percentage_points: number
   updated_at: string
+}
+
+export interface QualityWebhookConfig {
+  project_id: string
+  enabled: boolean
+  endpoint_configured: boolean
+  endpoint_display: string | null
+  minimum_alert_status: 'WARNING' | 'CRITICAL'
+  cooldown_seconds: number
+  signing_configured: boolean
+  last_evaluated_at: string | null
+  next_evaluation_at: string | null
+  silenced_until: string | null
+  silenced_by: string | null
+  silenced_by_display_name: string | null
+  silence_reason: string | null
+  updated_at: string | null
+}
+
+export interface QualityWebhookDelivery {
+  id: string
+  project_id: string
+  event_type: string
+  destination_display: string
+  status: 'PENDING' | 'DELIVERED' | 'FAILED'
+  attempts: number
+  response_status: number | null
+  last_error: string | null
+  replay_of_id: string | null
+  replayed_by: string | null
+  replayed_by_display_name: string | null
+  replay_reason: string | null
+  created_at: string
+  delivered_at: string | null
+}
+
+export interface QualityAlertState {
+  project_id: string
+  metric: QualityAlertMetric
+  current_status: QualityChangeAlertStatus
+  active_notification_status: 'WARNING' | 'CRITICAL' | null
+  current_percent: number | null
+  previous_percent: number | null
+  delta_percentage_points: number | null
+  notification_sequence: number
+  last_evaluated_at: string
+  last_transition_at: string
+  last_notified_at: string | null
+  cooldown_until: string | null
+  last_delivery_id: string | null
+  acknowledged_at: string | null
+  acknowledged_by: string | null
+  acknowledged_by_display_name: string | null
+  acknowledgement_note: string | null
 }
 
 export interface QualityRunSummary {
@@ -145,6 +205,25 @@ export interface QualityAnalyticsQuery {
   baselineId?: string
 }
 
+export type QualityChangeAlertStatus = 'NO_DATA' | 'STABLE' | 'WARNING' | 'CRITICAL'
+
+export interface QualityChangeSignal {
+  metric: 'RUN_PASS_RATE' | 'CASE_PASS_RATE' | 'EXECUTION_RELIABILITY'
+  current_percent: number | null
+  previous_percent: number | null
+  delta_percentage_points: number | null
+  alert_status: QualityChangeAlertStatus
+}
+
+export interface QualityWindowComparison {
+  previous_window_started_at: string
+  previous_window_ended_at: string
+  warning_drop_percentage_points: number
+  critical_drop_percentage_points: number
+  alert_status: QualityChangeAlertStatus
+  signals: QualityChangeSignal[]
+}
+
 export interface QualityAnalytics {
   project_id: string
   filters: QualityAnalyticsFilters
@@ -154,6 +233,7 @@ export interface QualityAnalytics {
   generated_at: string
   target_pass_rate_percent: number
   slo_status: 'NO_DATA' | 'MET' | 'BREACHED'
+  comparison: QualityWindowComparison
   latest_completed_at: string | null
   runs: QualityRunSummary
   cases: QualityCaseSummary
@@ -337,6 +417,16 @@ export interface AutomationPackage {
   name: string
   version: string
   digest: string
+  runner_type: 'WEB_PLAYWRIGHT'
+  image_repository: string
+  status: 'DRAFT' | 'ACTIVE' | 'DEPRECATED' | 'REVOKED'
+  supersedes_id: string | null
+  validated_run_id: string | null
+  activated_by: string | null
+  activated_at: string | null
+  status_reason: string | null
+  created_at: string
+  updated_at: string
 }
 
 export interface Baseline {

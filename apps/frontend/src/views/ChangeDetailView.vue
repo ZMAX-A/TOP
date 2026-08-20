@@ -119,9 +119,9 @@ async function loadTargetResources(targetId: string): Promise<void> {
     api.packages(projectId.value, targetId),
   ])
   environments.value = environmentList
-  packages.value = packageList
+  packages.value = packageList.filter((item) => item.status === 'ACTIVE')
   runForm.environment_id = environmentList[0]?.id ?? ''
-  runForm.automation_package_id = packageList[0]?.id ?? ''
+  runForm.automation_package_id = packages.value[0]?.id ?? ''
 }
 
 async function openRunDialog(kind: 'validation' | 'regression'): Promise<void> {

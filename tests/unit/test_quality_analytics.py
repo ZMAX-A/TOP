@@ -4,7 +4,57 @@ import unittest
 from datetime import UTC, datetime, timedelta
 from uuid import uuid4
 
-from testops.api.quality_services import _detect_flaky_cases
+from testops.api.quality_services import (
+    _detect_flaky_cases,
+    _quality_alert_status,
+    _quality_change_signal,
+)
+
+
+class QualityChangeSignalTests(unittest.TestCase):
+    def test_classifies_drops_and_missing_comparisons(self) -> None:
+        stable = _quality_change_signal(
+            "RUN_PASS_RATE",
+            97.0,
+            96.0,
+            warning_drop_points=5,
+            critical_drop_points=10,
+        )
+        warning = _quality_change_signal(
+            "CASE_PASS_RATE",
+            89.0,
+            95.0,
+            warning_drop_points=5,
+            critical_drop_points=10,
+        )
+        critical = _quality_change_signal(
+            "EXECUTION_RELIABILITY",
+            82.5,
+            95.0,
+            warning_drop_points=5,
+            critical_drop_points=10,
+        )
+        missing = _quality_change_signal(
+            "RUN_PASS_RATE",
+            None,
+            95.0,
+            warning_drop_points=5,
+            critical_drop_points=10,
+        )
+
+        self.assertEqual(stable.alert_status, "STABLE")
+        self.assertEqual(stable.delta_percentage_points, 1.0)
+        self.assertEqual(warning.alert_status, "WARNING")
+        self.assertEqual(warning.delta_percentage_points, -6.0)
+        self.assertEqual(critical.alert_status, "CRITICAL")
+        self.assertEqual(critical.delta_percentage_points, -12.5)
+        self.assertEqual(missing.alert_status, "NO_DATA")
+        self.assertIsNone(missing.delta_percentage_points)
+        self.assertEqual(
+            _quality_alert_status((stable, warning, critical, missing)),
+            "CRITICAL",
+        )
+        self.assertEqual(_quality_alert_status((missing,)), "NO_DATA")
 
 
 class FlakyCaseDetectionTests(unittest.TestCase):

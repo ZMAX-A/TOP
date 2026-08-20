@@ -11,6 +11,7 @@ from sqlalchemy import (
     Boolean,
     CheckConstraint,
     DateTime,
+    Float,
     ForeignKey,
     Index,
     Integer,
@@ -110,6 +111,18 @@ class ProjectRecord(TimestampMixin, Base):
             "quality_slo_window_days BETWEEN 7 AND 90",
             name="quality_slo_window_days_range",
         ),
+        CheckConstraint(
+            "quality_alert_warning_drop_points BETWEEN 1 AND 100",
+            name="quality_alert_warning_drop_points_range",
+        ),
+        CheckConstraint(
+            "quality_alert_critical_drop_points BETWEEN 1 AND 100",
+            name="quality_alert_critical_drop_points_range",
+        ),
+        CheckConstraint(
+            "quality_alert_warning_drop_points < quality_alert_critical_drop_points",
+            name="quality_alert_drop_points_order",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -146,6 +159,18 @@ class ProjectRecord(TimestampMixin, Base):
         nullable=False,
         default=30,
         server_default="30",
+    )
+    quality_alert_warning_drop_points: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=5,
+        server_default="5",
+    )
+    quality_alert_critical_drop_points: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=10,
+        server_default="10",
     )
 
 
@@ -322,7 +347,17 @@ class ApprovalRecord(Base):
 
 class AutomationPackageRecord(TimestampMixin, Base):
     __tablename__ = "automation_packages"
-    __table_args__ = (UniqueConstraint("target_id", "name", "version"),)
+    __table_args__ = (
+        UniqueConstraint("target_id", "name", "version"),
+        CheckConstraint(
+            "runner_type IN ('WEB_PLAYWRIGHT')",
+            name="runner_type_allowed",
+        ),
+        CheckConstraint(
+            "status IN ('DRAFT', 'ACTIVE', 'DEPRECATED', 'REVOKED')",
+            name="status_allowed",
+        ),
+    )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
     project_id: Mapped[UUID] = mapped_column(
@@ -338,7 +373,30 @@ class AutomationPackageRecord(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(128), nullable=False)
     version: Mapped[str] = mapped_column(String(64), nullable=False)
     digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    runner_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="WEB_PLAYWRIGHT",
+        server_default="WEB_PLAYWRIGHT",
+    )
+    image_repository: Mapped[str] = mapped_column(
+        String(500),
+        nullable=False,
+        default="testops-worker",
+        server_default="testops-worker",
+    )
     status: Mapped[str] = mapped_column(String(32), nullable=False, default="ACTIVE")
+    supersedes_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("automation_packages.id", ondelete="RESTRICT"),
+        index=True,
+    )
+    validated_run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("test_runs.id", ondelete="SET NULL"),
+        index=True,
+    )
+    activated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
+    activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    status_reason: Mapped[str | None] = mapped_column(String(500))
 
 
 class RunnerPoolRecord(TimestampMixin, Base):
@@ -703,6 +761,204 @@ class DispatchOutboxRecord(Base):
     )
     processed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     last_error: Mapped[str | None] = mapped_column(Text)
+
+
+class QualityWebhookConfigRecord(TimestampMixin, Base):
+    __tablename__ = "quality_webhook_configs"
+    __table_args__ = (
+        UniqueConstraint("project_id"),
+        CheckConstraint(
+            "minimum_alert_status IN ('WARNING', 'CRITICAL')",
+            name="minimum_alert_status_values",
+        ),
+        CheckConstraint(
+            "(signing_secret_name IS NULL AND signing_secret_ref IS NULL) "
+            "OR (signing_secret_name IS NOT NULL AND signing_secret_ref IS NOT NULL)",
+            name="signing_secret_pair",
+        ),
+        CheckConstraint(
+            "cooldown_seconds BETWEEN 60 AND 86400",
+            name="cooldown_seconds_range",
+        ),
+        CheckConstraint(
+            "(silenced_until IS NULL AND silenced_by IS NULL AND silence_reason IS NULL) "
+            "OR (silenced_until IS NOT NULL AND silenced_by IS NOT NULL "
+            "AND silence_reason IS NOT NULL)",
+            name="silence_fields_consistent",
+        ),
+        Index(
+            "ix_quality_webhook_configs_enabled_due",
+            "enabled",
+            "next_evaluation_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    endpoint_url: Mapped[str] = mapped_column(Text, nullable=False)
+    minimum_alert_status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="WARNING",
+        server_default="WARNING",
+    )
+    signing_secret_name: Mapped[str | None] = mapped_column(String(100))
+    signing_secret_ref: Mapped[str | None] = mapped_column(String(500))
+    cooldown_seconds: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=3600,
+        server_default="3600",
+    )
+    last_evaluated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    next_evaluation_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    silenced_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    silenced_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    silence_reason: Mapped[str | None] = mapped_column(String(500))
+
+
+class QualityWebhookDeliveryRecord(Base):
+    __tablename__ = "quality_webhook_deliveries"
+    __table_args__ = (
+        UniqueConstraint("dedupe_key"),
+        UniqueConstraint("replay_of_id"),
+        CheckConstraint(
+            "status IN ('PENDING', 'DELIVERED', 'FAILED')",
+            name="status_values",
+        ),
+        CheckConstraint("attempts >= 0", name="attempts_non_negative"),
+        CheckConstraint(
+            "response_status IS NULL OR response_status BETWEEN 100 AND 599",
+            name="response_status_range",
+        ),
+        CheckConstraint(
+            "(replay_of_id IS NULL AND replayed_by IS NULL AND replay_reason IS NULL) "
+            "OR (replay_of_id IS NOT NULL AND replayed_by IS NOT NULL "
+            "AND replay_reason IS NOT NULL)",
+            name="replay_fields_consistent",
+        ),
+        Index(
+            "ix_quality_webhook_deliveries_status_available",
+            "status",
+            "available_at",
+        ),
+        Index(
+            "ix_quality_webhook_deliveries_project_created",
+            "project_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    webhook_config_id: Mapped[UUID] = mapped_column(
+        ForeignKey("quality_webhook_configs.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(200), nullable=False)
+    destination_display: Mapped[str] = mapped_column(String(500), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    status: Mapped[str] = mapped_column(String(32), nullable=False, default="PENDING")
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    available_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    response_status: Mapped[int | None] = mapped_column(Integer)
+    last_error: Mapped[str | None] = mapped_column(Text)
+    replay_of_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("quality_webhook_deliveries.id", ondelete="CASCADE")
+    )
+    replayed_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    replay_reason: Mapped[str | None] = mapped_column(String(500))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class QualityAlertStateRecord(TimestampMixin, Base):
+    __tablename__ = "quality_alert_states"
+    __table_args__ = (
+        UniqueConstraint("project_id", "metric"),
+        CheckConstraint(
+            "metric IN ('RUN_PASS_RATE', 'CASE_PASS_RATE', 'EXECUTION_RELIABILITY')",
+            name="metric_values",
+        ),
+        CheckConstraint(
+            "current_status IN ('NO_DATA', 'STABLE', 'WARNING', 'CRITICAL')",
+            name="current_status_values",
+        ),
+        CheckConstraint(
+            "active_notification_status IS NULL "
+            "OR active_notification_status IN ('WARNING', 'CRITICAL')",
+            name="active_notification_status_values",
+        ),
+        CheckConstraint(
+            "current_percent IS NULL OR current_percent BETWEEN 0 AND 100",
+            name="current_percent_range",
+        ),
+        CheckConstraint(
+            "previous_percent IS NULL OR previous_percent BETWEEN 0 AND 100",
+            name="previous_percent_range",
+        ),
+        CheckConstraint(
+            "delta_percentage_points IS NULL OR delta_percentage_points BETWEEN -100 AND 100",
+            name="delta_percentage_points_range",
+        ),
+        CheckConstraint(
+            "notification_sequence >= 0",
+            name="notification_sequence_non_negative",
+        ),
+        CheckConstraint(
+            "(acknowledged_at IS NULL AND acknowledged_by IS NULL "
+            "AND acknowledgement_note IS NULL) "
+            "OR (acknowledged_at IS NOT NULL AND acknowledged_by IS NOT NULL "
+            "AND acknowledgement_note IS NOT NULL)",
+            name="acknowledgement_fields_consistent",
+        ),
+        Index("ix_quality_alert_states_project_status", "project_id", "current_status"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    metric: Mapped[str] = mapped_column(String(32), nullable=False)
+    current_status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="NO_DATA",
+    )
+    active_notification_status: Mapped[str | None] = mapped_column(String(16))
+    current_percent: Mapped[float | None] = mapped_column(Float)
+    previous_percent: Mapped[float | None] = mapped_column(Float)
+    delta_percentage_points: Mapped[float | None] = mapped_column(Float)
+    signal_fingerprint: Mapped[str] = mapped_column(String(71), nullable=False)
+    notification_sequence: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_evaluated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_transition_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    cooldown_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    last_delivery_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("quality_webhook_deliveries.id", ondelete="SET NULL")
+    )
+    acknowledged_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    acknowledged_by: Mapped[UUID | None] = mapped_column(Uuid(as_uuid=True))
+    acknowledgement_note: Mapped[str | None] = mapped_column(String(500))
 
 
 class AuditLogRecord(Base):

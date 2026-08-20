@@ -57,6 +57,18 @@ from .quality_services import (
     get_quality_policy,
     update_quality_policy,
 )
+from .quality_webhook_services import (
+    acknowledge_quality_alert,
+    clear_quality_alert_acknowledgement,
+    clear_quality_alert_silence,
+    enqueue_quality_webhook_test,
+    get_quality_webhook_config,
+    list_quality_alert_states,
+    list_quality_webhook_deliveries,
+    replay_failed_quality_webhook_delivery,
+    set_quality_alert_silence,
+    update_quality_webhook_config,
+)
 from .schedule_services import (
     create_regression_schedule,
     list_regression_schedule_firings,
@@ -67,8 +79,12 @@ from .schedule_services import (
 from .schemas import (
     ArtifactAccessResponse,
     ArtifactResponse,
+    AutomationPackageActivateRequest,
     AutomationPackageCreate,
+    AutomationPackageDraftCreate,
     AutomationPackageResponse,
+    AutomationPackageStatusChangeRequest,
+    AutomationPackageValidationRunCreate,
     BaselinePublishRequest,
     BaselineResponse,
     EnvironmentCreate,
@@ -83,9 +99,17 @@ from .schemas import (
     ProjectCreate,
     ProjectResponse,
     ProjectUpdate,
+    QualityAlertAcknowledgementUpdate,
+    QualityAlertMetric,
+    QualityAlertSilenceUpdate,
+    QualityAlertStateResponse,
     QualityAnalyticsResponse,
     QualityPolicyResponse,
     QualityPolicyUpdate,
+    QualityWebhookConfigResponse,
+    QualityWebhookConfigUpdate,
+    QualityWebhookDeliveryResponse,
+    QualityWebhookReplayRequest,
     RegressionScheduleCreate,
     RegressionScheduleFiringResponse,
     RegressionScheduleResponse,
@@ -112,16 +136,20 @@ from .schemas import (
 )
 from .services import (
     TERMINAL_RUN_STATUSES,
+    activate_automation_package,
     audit_artifact_access,
     cancel_run,
     cancel_runs,
     create_automation_package,
+    create_automation_package_validation_run,
     create_environment,
     create_project,
     create_rerun,
     create_run,
     create_runner_pool,
     create_target,
+    deprecate_automation_package,
+    get_automation_package,
     get_baseline,
     get_execution_policy,
     get_run,
@@ -141,6 +169,7 @@ from .services import (
     publish_baseline,
     record_run_event,
     record_run_result,
+    revoke_automation_package,
     update_environment,
     update_execution_policy,
     update_project,
@@ -532,6 +561,178 @@ async def patch_project_quality_policy(
 
 
 @router.get(
+    "/projects/{project_id}/quality/webhook",
+    response_model=QualityWebhookConfigResponse,
+    tags=["quality-analytics"],
+)
+async def get_project_quality_webhook(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityWebhookConfigResponse:
+    await authorize_project(session, principal, project_id, "project:read")
+    return await get_quality_webhook_config(session, project_id)
+
+
+@router.patch(
+    "/projects/{project_id}/quality/webhook",
+    response_model=QualityWebhookConfigResponse,
+    tags=["quality-analytics"],
+)
+async def patch_project_quality_webhook(
+    project_id: UUID,
+    payload: QualityWebhookConfigUpdate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityWebhookConfigResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await update_quality_webhook_config(session, project_id, payload, principal.user_id)
+
+
+@router.put(
+    "/projects/{project_id}/quality/webhook/silence",
+    response_model=QualityWebhookConfigResponse,
+    tags=["quality-analytics"],
+)
+async def put_project_quality_alert_silence(
+    project_id: UUID,
+    payload: QualityAlertSilenceUpdate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityWebhookConfigResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await set_quality_alert_silence(
+        session,
+        project_id,
+        payload,
+        principal.user_id,
+    )
+
+
+@router.delete(
+    "/projects/{project_id}/quality/webhook/silence",
+    response_model=QualityWebhookConfigResponse,
+    tags=["quality-analytics"],
+)
+async def delete_project_quality_alert_silence(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityWebhookConfigResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await clear_quality_alert_silence(session, project_id, principal.user_id)
+
+
+@router.post(
+    "/projects/{project_id}/quality/webhook/test",
+    response_model=QualityWebhookDeliveryResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["quality-analytics"],
+)
+async def test_project_quality_webhook(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityWebhookDeliveryResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await enqueue_quality_webhook_test(session, project_id, principal.user_id)
+
+
+@router.get(
+    "/projects/{project_id}/quality/webhook/deliveries",
+    response_model=list[QualityWebhookDeliveryResponse],
+    tags=["quality-analytics"],
+)
+async def get_project_quality_webhook_deliveries(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+    limit: Annotated[int, Query(ge=1, le=100)] = 20,
+) -> tuple[QualityWebhookDeliveryResponse, ...]:
+    await authorize_project(session, principal, project_id, "project:read")
+    return await list_quality_webhook_deliveries(session, project_id, limit=limit)
+
+
+@router.post(
+    "/projects/{project_id}/quality/webhook/deliveries/{delivery_id}/replay",
+    response_model=QualityWebhookDeliveryResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["quality-analytics"],
+)
+async def replay_project_quality_webhook_delivery(
+    project_id: UUID,
+    delivery_id: UUID,
+    payload: QualityWebhookReplayRequest,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityWebhookDeliveryResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await replay_failed_quality_webhook_delivery(
+        session,
+        project_id,
+        delivery_id,
+        payload,
+        principal.user_id,
+    )
+
+
+@router.get(
+    "/projects/{project_id}/quality/webhook/states",
+    response_model=list[QualityAlertStateResponse],
+    tags=["quality-analytics"],
+)
+async def get_project_quality_alert_states(
+    project_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> tuple[QualityAlertStateResponse, ...]:
+    await authorize_project(session, principal, project_id, "project:read")
+    return await list_quality_alert_states(session, project_id)
+
+
+@router.put(
+    "/projects/{project_id}/quality/webhook/states/{metric}/acknowledgement",
+    response_model=QualityAlertStateResponse,
+    tags=["quality-analytics"],
+)
+async def put_project_quality_alert_acknowledgement(
+    project_id: UUID,
+    metric: QualityAlertMetric,
+    payload: QualityAlertAcknowledgementUpdate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityAlertStateResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await acknowledge_quality_alert(
+        session,
+        project_id,
+        metric,
+        payload,
+        principal.user_id,
+    )
+
+
+@router.delete(
+    "/projects/{project_id}/quality/webhook/states/{metric}/acknowledgement",
+    response_model=QualityAlertStateResponse,
+    tags=["quality-analytics"],
+)
+async def delete_project_quality_alert_acknowledgement(
+    project_id: UUID,
+    metric: QualityAlertMetric,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> QualityAlertStateResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    return await clear_quality_alert_acknowledgement(
+        session,
+        project_id,
+        metric,
+        principal.user_id,
+    )
+
+
+@router.get(
     "/projects/{project_id}/quality/analytics",
     response_model=QualityAnalyticsResponse,
     tags=["quality-analytics"],
@@ -835,9 +1036,37 @@ async def post_automation_package(
     principal: CurrentPrincipal,
     session: Session,
 ) -> AutomationPackageResponse:
+    # Backward-compatible ACTIVE registration is reserved for initial/legacy imports.
+    # Normal package releases must use the governed draft/validation/activation flow.
+    require_system_admin(principal)
     await authorize_project(session, principal, project_id, "project:manage")
     record = await create_automation_package(
         session, project_id, target_id, payload, principal.user_id
+    )
+    return _package_response(record)
+
+
+@router.post(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/drafts",
+    response_model=AutomationPackageResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["automation-packages"],
+)
+async def post_automation_package_draft(
+    project_id: UUID,
+    target_id: UUID,
+    payload: AutomationPackageDraftCreate,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> AutomationPackageResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record = await create_automation_package(
+        session,
+        project_id,
+        target_id,
+        payload,
+        principal.user_id,
+        status="DRAFT",
     )
     return _package_response(record)
 
@@ -856,6 +1085,132 @@ async def get_automation_packages(
     await authorize_project(session, principal, project_id, "project:read")
     records = await list_automation_packages(session, project_id, target_id)
     return tuple(_package_response(record) for record in records)
+
+
+@router.get(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}",
+    response_model=AutomationPackageResponse,
+    tags=["automation-packages"],
+)
+async def get_automation_package_detail(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> AutomationPackageResponse:
+    await authorize_project(session, principal, project_id, "project:read")
+    record = await get_automation_package(session, project_id, target_id, package_id)
+    return _package_response(record)
+
+
+@router.post(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/validation-runs",
+    response_model=RunResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["automation-packages"],
+)
+async def post_automation_package_validation_run(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageValidationRunCreate,
+    principal: CurrentPrincipal,
+    session: Session,
+    response: Response,
+    idempotency_key: Annotated[
+        str,
+        Header(alias="Idempotency-Key", min_length=8, max_length=128),
+    ],
+) -> RunResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record, created = await create_automation_package_validation_run(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        payload,
+        idempotency_key=idempotency_key,
+        actor_id=principal.user_id,
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return _run_response(record)
+
+
+@router.post(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/activate",
+    response_model=AutomationPackageResponse,
+    tags=["automation-packages"],
+)
+async def post_automation_package_activation(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageActivateRequest,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> AutomationPackageResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record = await activate_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        payload,
+        principal.user_id,
+    )
+    return _package_response(record)
+
+
+@router.post(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/deprecate",
+    response_model=AutomationPackageResponse,
+    tags=["automation-packages"],
+)
+async def post_automation_package_deprecation(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageStatusChangeRequest,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> AutomationPackageResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record = await deprecate_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        payload,
+        principal.user_id,
+    )
+    return _package_response(record)
+
+
+@router.post(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/revoke",
+    response_model=AutomationPackageResponse,
+    tags=["automation-packages"],
+)
+async def post_automation_package_revocation(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageStatusChangeRequest,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> AutomationPackageResponse:
+    await authorize_project(session, principal, project_id, "project:manage")
+    record = await revoke_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        payload,
+        principal.user_id,
+    )
+    return _package_response(record)
 
 
 @router.post(

@@ -10,7 +10,7 @@ x-control-plane-environment: &control-plane-environment
   DATABASE_ECHO: "false"
   AUTO_CREATE_SCHEMA: "false"
   RUNNER_CALLBACK_TOKEN: ${RUNNER_CALLBACK_TOKEN:-change-me-runner-callback-token}
-  BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN:-change-me-one-time-bootstrap-token}
+  BOOTSTRAP_ADMIN_TOKEN: ${BOOTSTRAP_ADMIN_TOKEN-}
   SESSION_TTL_HOURS: ${SESSION_TTL_HOURS:-8}
   CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:8080,http://localhost:8080}
   MINIO_ENDPOINT: http://minio:9000
@@ -24,6 +24,13 @@ x-control-plane-environment: &control-plane-environment
   RUN_EVENT_HEARTBEAT_SECONDS: ${RUN_EVENT_HEARTBEAT_SECONDS:-15}
   RUNNER_HEARTBEAT_TTL_SECONDS: ${RUNNER_HEARTBEAT_TTL_SECONDS:-45}
   RUN_DISPATCH_START_TIMEOUT_SECONDS: ${RUN_DISPATCH_START_TIMEOUT_SECONDS:-300}
+  QUALITY_WEBHOOK_BATCH_SIZE: ${QUALITY_WEBHOOK_BATCH_SIZE:-20}
+  QUALITY_WEBHOOK_TIMEOUT_SECONDS: ${QUALITY_WEBHOOK_TIMEOUT_SECONDS:-10}
+  QUALITY_WEBHOOK_MAX_ATTEMPTS: ${QUALITY_WEBHOOK_MAX_ATTEMPTS:-8}
+  QUALITY_WEBHOOK_ALLOW_PRIVATE_NETWORKS: ${QUALITY_WEBHOOK_ALLOW_PRIVATE_NETWORKS:-false}
+  QUALITY_ALERT_POLL_SECONDS: ${QUALITY_ALERT_POLL_SECONDS:-5}
+  QUALITY_ALERT_EVALUATION_INTERVAL_SECONDS: ${QUALITY_ALERT_EVALUATION_INTERVAL_SECONDS:-60}
+  QUALITY_ALERT_BATCH_SIZE: ${QUALITY_ALERT_BATCH_SIZE:-50}
   METRICS_TOKEN: ${METRICS_TOKEN:-}
 
 x-worker-environment: &worker-environment
@@ -37,7 +44,7 @@ x-worker-environment: &worker-environment
   RUNNER_WORKER_KEY: ${RUNNER_WORKER_KEY:-compose-web-1}
   RUNNER_POOL_KEY: ${RUNNER_POOL_KEY:-default-web}
   RUNNER_DISPLAY_NAME: ${RUNNER_DISPLAY_NAME:-Compose Web Worker 1}
-  RUNNER_VERSION: ${RUNNER_VERSION:-0.15.0}
+  RUNNER_VERSION: ${RUNNER_VERSION:-0.22.0}
   RUNNER_MAX_SLOTS: ${RUNNER_MAX_SLOTS:-1}
   RUNNER_HEARTBEAT_INTERVAL_SECONDS: ${RUNNER_HEARTBEAT_INTERVAL_SECONDS:-15}
   RUNNER_CAPABILITIES: '${RUNNER_CAPABILITIES:-{"target_types":["WEB"],"browsers":["chromium"],"labels":{"runtime":"compose","os":"linux"}}}'
@@ -52,7 +59,7 @@ x-worker-environment: &worker-environment
 
 services:
   postgres:
-    image: postgres:${POSTGRES_IMAGE_TAG:-17-alpine}
+    image: ${POSTGRES_IMAGE:-postgres:17-alpine@sha256:d4bb0a8c1b7bb2e29f976d099e7bfb9a5d8858cffe9e46b35cd302cd1f1f8168}
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-testops}
       POSTGRES_USER: ${POSTGRES_USER:-testops}
@@ -68,7 +75,7 @@ services:
       retries: 20
 
   redis:
-    image: redis:${REDIS_IMAGE_TAG:-7-alpine}
+    image: ${REDIS_IMAGE:-redis:7-alpine@sha256:e7723ff73d963f5cc6d9c4643ea3d989527a402a319239054e9472a7fb9219a2}
     command: ["redis-server", "--appendonly", "yes"]
     ports:
       - "${REDIS_PORT:-6379}:6379"
@@ -81,7 +88,7 @@ services:
       retries: 20
 
   minio:
-    image: quay.io/minio/minio:${MINIO_IMAGE_TAG:-latest}
+    image: ${MINIO_IMAGE:-quay.io/minio/minio@sha256:14cea493d9a34af32f524e538b8346cf79f3321eff8e708c1e2960462bd8936e}
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: ${MINIO_ROOT_USER:-testops-local}
@@ -98,7 +105,7 @@ services:
       retries: 20
 
   minio-init:
-    image: minio/mc:${MINIO_MC_IMAGE_TAG:-latest}
+    image: ${MINIO_MC_IMAGE:-minio/mc@sha256:a7fe349ef4bd8521fb8497f55c6042871b2ae640607cf99d9bede5e9bdf11727}
     entrypoint:
       - /bin/sh
       - -c
@@ -116,7 +123,7 @@ services:
     restart: "no"
 
   migrate:
-    image: testops-api:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
     build: *api-build
     command: ["python", "scripts/db_upgrade.py"]
     environment: *control-plane-environment
@@ -126,7 +133,7 @@ services:
     restart: "no"
 
   api:
-    image: testops-api:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
     build: *api-build
     command:
       - python
@@ -159,7 +166,7 @@ services:
     restart: unless-stopped
 
   outbox:
-    image: testops-api:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
     build: *api-build
     command:
       - python
@@ -176,8 +183,44 @@ services:
     init: true
     restart: unless-stopped
 
+  quality-webhooks:
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
+    build: *api-build
+    command:
+      - python
+      - scripts/dispatch_quality_webhooks.py
+      - --watch
+      - --interval-seconds
+      - "1"
+    environment: *control-plane-environment
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+  quality-alerts:
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
+    build: *api-build
+    command:
+      - python
+      - scripts/evaluate_quality_alerts.py
+      - --watch
+      - --poll-seconds
+      - ${QUALITY_ALERT_POLL_SECONDS:-5}
+      - --evaluation-interval-seconds
+      - ${QUALITY_ALERT_EVALUATION_INTERVAL_SECONDS:-60}
+      - --batch-size
+      - ${QUALITY_ALERT_BATCH_SIZE:-50}
+    environment: *control-plane-environment
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
   scheduler:
-    image: testops-api:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
     build: *api-build
     command:
       - python
@@ -195,7 +238,7 @@ services:
     restart: unless-stopped
 
   reaper:
-    image: testops-api:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.22.0}
     build: *api-build
     command:
       - python
@@ -213,7 +256,7 @@ services:
     restart: unless-stopped
 
   worker:
-    image: testops-worker:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-worker:${TESTOPS_IMAGE_TAG:-0.22.0}
     build:
       context: .
       dockerfile: infra/docker/worker.Dockerfile
@@ -252,7 +295,7 @@ services:
     restart: unless-stopped
 
   frontend:
-    image: testops-frontend:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-frontend:${TESTOPS_IMAGE_TAG:-0.22.0}
     build:
       context: .
       dockerfile: infra/docker/frontend.Dockerfile
@@ -270,7 +313,7 @@ services:
 
   smoke-target:
     profiles: ["smoke"]
-    image: testops-smoke-target:${TESTOPS_IMAGE_TAG:-0.15.0}
+    image: testops-smoke-target:${TESTOPS_IMAGE_TAG:-0.22.0}
     build:
       context: infra/smoke-target
     ports:
@@ -284,7 +327,7 @@ services:
 
   prometheus:
     profiles: ["observability"]
-    image: prom/prometheus:${PROMETHEUS_IMAGE_TAG:-v3.13.1}
+    image: ${PROMETHEUS_IMAGE:-prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893}
     command:
       - --config.file=/etc/prometheus/prometheus.yml
       - --storage.tsdb.path=/prometheus

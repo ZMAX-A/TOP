@@ -43,6 +43,8 @@ def main(argv: Sequence[str] | None = None) -> int:
                 "name": job.automation_package.name,
                 "version": job.automation_package.version,
                 "digest": job.automation_package.digest,
+                "runner_type": job.automation_package.runner_type,
+                "image_repository": job.automation_package.image_repository,
             },
             "secret_binding_count": len(job.secret_bindings),
         }

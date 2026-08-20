@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from ipaddress import ip_address
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 from uuid import UUID
 
 from pydantic import (
@@ -108,6 +110,8 @@ class ExecutionPolicyResponse(ApiModel):
 class QualityPolicyUpdate(ApiModel):
     target_pass_rate_percent: Annotated[int, Field(ge=1, le=100)] | None = None
     window_days: Annotated[int, Field(ge=7, le=90)] | None = None
+    alert_warning_drop_percentage_points: Annotated[int, Field(ge=1, le=100)] | None = None
+    alert_critical_drop_percentage_points: Annotated[int, Field(ge=1, le=100)] | None = None
 
     @model_validator(mode="after")
     def require_change(self) -> QualityPolicyUpdate:
@@ -115,6 +119,13 @@ class QualityPolicyUpdate(ApiModel):
             raise ValueError("at least one quality policy field must be provided")
         if any(getattr(self, field) is None for field in self.model_fields_set):
             raise ValueError("quality policy fields cannot be null")
+        if (
+            self.alert_warning_drop_percentage_points is not None
+            and self.alert_critical_drop_percentage_points is not None
+            and self.alert_warning_drop_percentage_points
+            >= self.alert_critical_drop_percentage_points
+        ):
+            raise ValueError("quality warning drop must be lower than critical drop")
         return self
 
 
@@ -122,7 +133,161 @@ class QualityPolicyResponse(ApiModel):
     project_id: UUID
     target_pass_rate_percent: Annotated[int, Field(ge=1, le=100)]
     window_days: Annotated[int, Field(ge=7, le=90)]
+    alert_warning_drop_percentage_points: Annotated[int, Field(ge=1, le=100)]
+    alert_critical_drop_percentage_points: Annotated[int, Field(ge=1, le=100)]
     updated_at: datetime
+
+
+WebhookEndpoint = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=2048),
+]
+WebhookSecretName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^[A-Z][A-Z0-9_]{0,99}$"),
+]
+WebhookSecretRef = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, pattern=r"^secret://[^\s]{1,490}$"),
+]
+QualityAlertMetric = Literal["RUN_PASS_RATE", "CASE_PASS_RATE", "EXECUTION_RELIABILITY"]
+QualityAlertOperatorNote = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+]
+
+
+class QualityWebhookConfigUpdate(ApiModel):
+    enabled: bool | None = None
+    endpoint_url: WebhookEndpoint | None = None
+    minimum_alert_status: Literal["WARNING", "CRITICAL"] | None = None
+    cooldown_seconds: Annotated[int, Field(ge=60, le=86400)] | None = None
+    signing_secret_name: WebhookSecretName | None = None
+    signing_secret_ref: WebhookSecretRef | None = None
+    clear_signing_secret: bool = False
+
+    @model_validator(mode="after")
+    def validate_update(self) -> QualityWebhookConfigUpdate:
+        if not self.model_fields_set:
+            raise ValueError("at least one quality webhook field must be provided")
+        for field in ("enabled", "minimum_alert_status", "cooldown_seconds"):
+            if field in self.model_fields_set and getattr(self, field) is None:
+                raise ValueError(f"{field} cannot be null")
+        if "endpoint_url" in self.model_fields_set:
+            if self.endpoint_url is None:
+                raise ValueError("endpoint_url cannot be null")
+            if any(ord(character) < 32 for character in self.endpoint_url):
+                raise ValueError("quality webhook endpoint cannot contain control characters")
+            parsed = urlsplit(self.endpoint_url)
+            if parsed.scheme.lower() != "https" or not parsed.hostname:
+                raise ValueError("quality webhook endpoint must be an HTTPS URL")
+            if parsed.username or parsed.password or parsed.fragment:
+                raise ValueError(
+                    "quality webhook endpoint cannot contain credentials or a fragment"
+                )
+            try:
+                port = parsed.port
+            except ValueError as exc:
+                raise ValueError("quality webhook endpoint has an invalid port") from exc
+            if port not in {None, 443}:
+                raise ValueError("quality webhook endpoint must use port 443")
+            hostname = parsed.hostname.lower()
+            if hostname == "localhost" or hostname.endswith(".localhost"):
+                raise ValueError("quality webhook endpoint cannot use localhost")
+            try:
+                address = ip_address(hostname)
+            except ValueError:
+                pass
+            else:
+                if not address.is_global:
+                    raise ValueError("quality webhook endpoint cannot use a private IP address")
+        secret_fields = {"signing_secret_name", "signing_secret_ref"}
+        supplied_secret_fields = secret_fields.intersection(self.model_fields_set)
+        if supplied_secret_fields and supplied_secret_fields != secret_fields:
+            raise ValueError("signing secret name and ref must be provided together")
+        if supplied_secret_fields and (
+            self.signing_secret_name is None or self.signing_secret_ref is None
+        ):
+            raise ValueError("signing secret name and ref cannot be null")
+        if supplied_secret_fields and self.clear_signing_secret:
+            raise ValueError("cannot replace and clear the signing secret together")
+        if self.model_fields_set == {"clear_signing_secret"} and not self.clear_signing_secret:
+            raise ValueError("clear_signing_secret must be true when used alone")
+        return self
+
+
+class QualityWebhookConfigResponse(ApiModel):
+    project_id: UUID
+    enabled: bool
+    endpoint_configured: bool
+    endpoint_display: str | None
+    minimum_alert_status: Literal["WARNING", "CRITICAL"]
+    cooldown_seconds: Annotated[int, Field(ge=60, le=86400)]
+    signing_configured: bool
+    last_evaluated_at: datetime | None
+    next_evaluation_at: datetime | None
+    silenced_until: datetime | None
+    silenced_by: UUID | None
+    silenced_by_display_name: str | None
+    silence_reason: str | None
+    updated_at: datetime | None
+
+
+class QualityAlertSilenceUpdate(ApiModel):
+    silenced_until: datetime
+    reason: QualityAlertOperatorNote
+
+    @field_validator("silenced_until")
+    @classmethod
+    def normalize_silenced_until(cls, value: datetime) -> datetime:
+        normalized = _as_utc(value)
+        assert normalized is not None
+        return normalized
+
+
+class QualityAlertAcknowledgementUpdate(ApiModel):
+    note: QualityAlertOperatorNote
+
+
+class QualityWebhookReplayRequest(ApiModel):
+    reason: QualityAlertOperatorNote
+
+
+class QualityWebhookDeliveryResponse(ApiModel):
+    id: UUID
+    project_id: UUID
+    event_type: str
+    destination_display: str
+    status: Literal["PENDING", "DELIVERED", "FAILED"]
+    attempts: Annotated[int, Field(ge=0)]
+    response_status: Annotated[int, Field(ge=100, le=599)] | None
+    last_error: str | None
+    replay_of_id: UUID | None
+    replayed_by: UUID | None
+    replayed_by_display_name: str | None
+    replay_reason: str | None
+    created_at: datetime
+    delivered_at: datetime | None
+
+
+class QualityAlertStateResponse(ApiModel):
+    project_id: UUID
+    metric: QualityAlertMetric
+    current_status: Literal["NO_DATA", "STABLE", "WARNING", "CRITICAL"]
+    active_notification_status: Literal["WARNING", "CRITICAL"] | None
+    current_percent: Annotated[float, Field(ge=0, le=100)] | None
+    previous_percent: Annotated[float, Field(ge=0, le=100)] | None
+    delta_percentage_points: Annotated[float, Field(ge=-100, le=100)] | None
+    notification_sequence: Annotated[int, Field(ge=0)]
+    last_evaluated_at: datetime
+    last_transition_at: datetime
+    last_notified_at: datetime | None
+    cooldown_until: datetime | None
+    last_delivery_id: UUID | None
+    acknowledged_at: datetime | None
+    acknowledged_by: UUID | None
+    acknowledged_by_display_name: str | None
+    acknowledgement_note: str | None
 
 
 class QualityRunSummary(ApiModel):
@@ -201,6 +366,23 @@ class QualityDimensionFilters(ApiModel):
     baseline_id: UUID | None
 
 
+class QualityChangeSignal(ApiModel):
+    metric: Literal["RUN_PASS_RATE", "CASE_PASS_RATE", "EXECUTION_RELIABILITY"]
+    current_percent: Annotated[float, Field(ge=0, le=100)] | None
+    previous_percent: Annotated[float, Field(ge=0, le=100)] | None
+    delta_percentage_points: Annotated[float, Field(ge=-100, le=100)] | None
+    alert_status: Literal["NO_DATA", "STABLE", "WARNING", "CRITICAL"]
+
+
+class QualityWindowComparison(ApiModel):
+    previous_window_started_at: datetime
+    previous_window_ended_at: datetime
+    warning_drop_percentage_points: Annotated[int, Field(ge=1, le=100)]
+    critical_drop_percentage_points: Annotated[int, Field(ge=1, le=100)]
+    alert_status: Literal["NO_DATA", "STABLE", "WARNING", "CRITICAL"]
+    signals: tuple[QualityChangeSignal, ...]
+
+
 class QualityAnalyticsResponse(ApiModel):
     project_id: UUID
     filters: QualityDimensionFilters
@@ -210,6 +392,7 @@ class QualityAnalyticsResponse(ApiModel):
     generated_at: datetime
     target_pass_rate_percent: Annotated[int, Field(ge=1, le=100)]
     slo_status: Literal["NO_DATA", "MET", "BREACHED"]
+    comparison: QualityWindowComparison
     latest_completed_at: datetime | None
     runs: QualityRunSummary
     cases: QualityCaseSummary
@@ -569,6 +752,34 @@ class AutomationPackageCreate(ApiModel):
     name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9._-]*$")]
     version: NonEmptyText
     digest: Digest
+    runner_type: Literal["WEB_PLAYWRIGHT"] = "WEB_PLAYWRIGHT"
+    image_repository: NonEmptyText = "testops-worker"
+
+    @field_validator("image_repository")
+    @classmethod
+    def repository_without_mutable_reference(cls, value: str) -> str:
+        if "://" in value or "@" in value or any(character.isspace() for character in value):
+            raise ValueError("image_repository must be an OCI repository without scheme or digest")
+        if ":" in value.rsplit("/", 1)[-1]:
+            raise ValueError("image_repository must not contain a mutable image tag")
+        return value
+
+
+class AutomationPackageDraftCreate(AutomationPackageCreate):
+    supersedes_id: UUID | None = None
+
+
+class AutomationPackageValidationRunCreate(ApiModel):
+    environment_id: UUID
+    baseline_id: UUID
+
+
+class AutomationPackageActivateRequest(ApiModel):
+    validation_run_id: UUID
+
+
+class AutomationPackageStatusChangeRequest(ApiModel):
+    reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
 
 class AutomationPackageResponse(ApiModel):
@@ -578,8 +789,16 @@ class AutomationPackageResponse(ApiModel):
     name: str
     version: str
     digest: Digest
+    runner_type: str
+    image_repository: str
     status: str
+    supersedes_id: UUID | None
+    validated_run_id: UUID | None
+    activated_by: UUID | None
+    activated_at: datetime | None
+    status_reason: str | None
     created_at: datetime
+    updated_at: datetime
 
 
 class RunCreate(ApiModel):

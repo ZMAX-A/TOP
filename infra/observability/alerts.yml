@@ -54,6 +54,15 @@ groups:
           summary: TestOps reliability metrics are unavailable
           description: The API has failed to query Run and scheduler reliability state for five minutes.
 
+      - alert: TestOpsQualityOperationsSnapshotUnavailable
+        expr: testops_quality_operations_snapshot_success{job="testops-api"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps quality operations metrics are unavailable
+          description: The API has failed to query quality evaluator and Webhook state for five minutes.
+
       - alert: TestOpsDispatchBacklogOldest
         expr: |
           testops_dispatch_waiting_runs{job="testops-api"} > 0
@@ -86,3 +95,27 @@ groups:
         annotations:
           summary: TestOps has stale Runner slot leases
           description: An active Run is bound to a Runner whose heartbeat has expired.
+
+      - alert: TestOpsQualityAlertEvaluatorLag
+        expr: |
+          testops_quality_alert_evaluation_due_configs{job="testops-api"} > 0
+          and
+          testops_quality_alert_evaluation_lag_seconds{job="testops-api"} > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps quality alert evaluation is delayed
+          description: At least one enabled quality alert configuration has remained due for over ten minutes.
+
+      - alert: TestOpsQualityWebhookPendingBacklog
+        expr: |
+          testops_quality_webhook_deliveries{job="testops-api",status="PENDING"} > 0
+          and
+          testops_quality_webhook_oldest_pending_age_seconds{job="testops-api"} > 600
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps quality Webhook backlog is aging
+          description: At least one quality Webhook delivery has remained pending for over ten minutes.

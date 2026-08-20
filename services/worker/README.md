@@ -3,6 +3,18 @@
 Worker 通过事务 Outbox 将控制面的 `run.queued`、`run.cancel_requested` 事件发布到
 Celery。任务只接收不可变 Run Snapshot，站点操作仍封装在对应 Runner Adapter 中。
 
+质量告警 Webhook 使用独立的 `quality_webhook_deliveries` 队列和
+`scripts/dispatch_quality_webhooks.py`，不与 Run/Celery Outbox 混用；dispatcher 只保存 HTTP 状态码和脱敏
+错误，可选签名密钥从 `TESTOPS_SECRET_<配置名称>` 环境变量读取。
+
+`scripts/evaluate_quality_alerts.py` 是独立的项目质量评估循环。它按配置中的持久化到期时间计算相邻 UTC
+窗口，把触发、升级、降级和恢复事件事务性写入上述队列；通知序号、信号指纹和冷却期防止重复或抖动投递。
+限时静默只抑制自动投递，不停止计算或推进已通知状态；静默到期会提前调度评估，以便补发仍成立的状态变化。
+FAILED 投递的人工重放会创建新的 PENDING 记录并保留原失败记录和原事件 ID；dispatcher 无需特殊分支，仍按
+普通持久化记录处理。新记录使用当前已启用配置，因此应先用测试事件验证目标和签名密钥，再由管理员重放。
+控制面的低基数指标会统计 PENDING/FAILED、最老 PENDING 年龄和重放记录；dispatcher 不直接推送指标，也不在
+标签中写入项目、目标或投递 ID。
+
 当前闭环包括：
 
 - `run:<run_id>` 确定性任务 ID；

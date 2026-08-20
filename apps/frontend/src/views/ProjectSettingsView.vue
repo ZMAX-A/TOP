@@ -144,7 +144,11 @@ const scheduleTarget = computed(() =>
 const scheduleEnvironments = computed(
   () => environmentsByTarget.value[scheduleForm.target_id] || [],
 )
-const schedulePackages = computed(() => packagesByTarget.value[scheduleForm.target_id] || [])
+const schedulePackages = computed(() =>
+  (packagesByTarget.value[scheduleForm.target_id] || []).filter(
+    (item) => item.status === 'ACTIVE' || item.id === scheduleForm.automation_package_id,
+  ),
+)
 const firingVisible = ref(false)
 const firingLoading = ref(false)
 const firingSchedule = ref<RegressionSchedule>()
@@ -477,7 +481,9 @@ function openSchedule(schedule?: RegressionSchedule): void {
       [...baselines.value].reverse().find((item) => item.status === 'RELEASED')?.baseline_id ||
       '',
     automation_package_id:
-      schedule?.automation_package_id || packagesByTarget.value[targetId]?.[0]?.id || '',
+      schedule?.automation_package_id ||
+      packagesByTarget.value[targetId]?.find((item) => item.status === 'ACTIVE')?.id ||
+      '',
     case_codes: schedule?.case_codes.join(', ') || '',
     cron_expression: schedule?.cron_expression || '0 2 * * *',
     timezone: schedule?.timezone || 'Asia/Shanghai',
@@ -1108,8 +1114,9 @@ onMounted(load)
               <el-option
                 v-for="item in schedulePackages"
                 :key="item.id"
-                :label="`${item.name}@${item.version}`"
+                :label="`${item.name}@${item.version}${item.status === 'ACTIVE' ? '' : ` · ${item.status}`}`"
                 :value="item.id"
+                :disabled="item.status !== 'ACTIVE'"
               />
             </el-select>
           </el-form-item>
