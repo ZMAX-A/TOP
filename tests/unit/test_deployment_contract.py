@@ -1,10 +1,14 @@
 from pathlib import Path
 
+import pytest
 from scripts.smoke_compose import (
     FAIL_CASE_CODE,
     PASS_CASE_CODE,
+    ApiClient,
+    SmokeError,
     build_smoke_baseline,
     runner_source_digest,
+    validate_run,
 )
 
 from testops.contracts import CaseBaseline, canonical_sha256
@@ -84,6 +88,10 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "scripts/schedule_regressions.py" in compose
     assert "scripts/reap_run_reliability.py" in compose
 
+    workflow = (ROOT / ".github/workflows/ci.yml").read_text("utf-8")
+    assert "stat -c '%g' /var/run/docker.sock" in workflow
+    assert 'echo "DOCKER_SOCKET_GID=${docker_socket_gid}" >> "${GITHUB_ENV}"' in workflow
+
     for path in (
         "infra/docker/api.Dockerfile",
         "infra/docker/worker.Dockerfile",
@@ -148,6 +156,43 @@ def test_compose_smoke_requires_container_isolation_evidence() -> None:
     assert '"resource_limits_enforced": True' in smoke
     assert 'runtime_image_id = isolation.get("runtime_image_id")' in smoke
     assert 'os.getenv("TESTOPS_DOCKER_EXECUTABLE"' in smoke
+
+
+def test_compose_smoke_reports_bounded_terminal_diagnostics_without_leaking_secrets() -> None:
+    detail = {
+        "id": "00000000-0000-0000-0000-000000000001",
+        "status": "INFRA_ERROR",
+        "result": {
+            "case_results": [
+                {
+                    "case_code": "TC-SMOKE-PASS",
+                    "failure_category": "EXECUTOR_ISOLATION",
+                    "error_message": "Docker daemon is unavailable to the container executor",
+                }
+            ]
+        },
+    }
+    with pytest.raises(SmokeError) as captured:
+        validate_run(
+            ApiClient("http://127.0.0.1:1"),
+            {},
+            detail,
+            expected_status="PASSED",
+            secret_value="smoke-password",
+        )
+    message = str(captured.value)
+    assert "EXECUTOR_ISOLATION" in message
+    assert "Docker daemon is unavailable" in message
+
+    detail["result"]["case_results"][0]["error_message"] = "smoke-password"
+    with pytest.raises(SmokeError, match="response leaked a bound secret value"):
+        validate_run(
+            ApiClient("http://127.0.0.1:1"),
+            {},
+            detail,
+            expected_status="PASSED",
+            secret_value="smoke-password",
+        )
 
 
 def test_kubernetes_runner_template_scopes_controller_and_run_identities() -> None:

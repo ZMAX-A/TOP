@@ -131,6 +131,12 @@ jobs:
           cache: pip
           cache-dependency-path: pyproject.toml
       - run: python -m pip install -e ".[platform]"
+      - name: Detect the Docker socket group
+        run: |
+          test -S /var/run/docker.sock
+          docker_socket_gid="$(stat -c '%g' /var/run/docker.sock)"
+          test -n "${docker_socket_gid}"
+          echo "DOCKER_SOCKET_GID=${docker_socket_gid}" >> "${GITHUB_ENV}"
       - name: Build and start the full stack
         run: docker compose --profile smoke up --detach --build
       - name: Run deterministic smoke

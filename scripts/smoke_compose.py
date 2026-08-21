@@ -536,13 +536,29 @@ def validate_run(
     secret_value: str,
 ) -> dict[str, Any]:
     run_id = str(detail["id"])
-    if detail.get("status") != expected_status:
-        raise SmokeError(
-            f"run {run_id} ended as {detail.get('status')}, expected {expected_status}"
-        )
     serialized = json.dumps(detail, ensure_ascii=False)
     if secret_value and secret_value in serialized:
         raise SmokeError(f"run {run_id} response leaked a bound secret value")
+    if detail.get("status") != expected_status:
+        result = detail.get("result")
+        raw_cases = result.get("case_results") if isinstance(result, dict) else None
+        diagnostics = []
+        if isinstance(raw_cases, list):
+            for case in raw_cases[:3]:
+                if not isinstance(case, dict):
+                    continue
+                diagnostics.append(
+                    {
+                        "case_code": str(case.get("case_code", ""))[:100],
+                        "failure_category": str(case.get("failure_category", ""))[:100],
+                        "error_message": str(case.get("error_message", ""))[:500],
+                    }
+                )
+        diagnostic_text = json.dumps(diagnostics, ensure_ascii=False, separators=(",", ":"))
+        raise SmokeError(
+            f"run {run_id} ended as {detail.get('status')}, expected {expected_status}; "
+            f"diagnostics={diagnostic_text}"
+        )
     result = _object(detail.get("result"), f"run {run_id} result")
     isolation = _object(
         result.get("execution_isolation"),
