@@ -40,6 +40,10 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "RUNNER_EXECUTION_MODE: ${RUNNER_EXECUTION_MODE:-CONTAINER}" in compose
     assert "RUNNER_EXECUTOR_TIMEOUT_SECONDS:" in compose
     assert (
+        "RUNNER_CONTAINER_IMAGE: "
+        "${RUNNER_CONTAINER_IMAGE:-testops-worker:${TESTOPS_IMAGE_TAG:-0.30.0}}" in compose
+    )
+    assert (
         "RUNNER_CONTAINER_NETWORK_POLICY: ${RUNNER_CONTAINER_NETWORK_POLICY:-ALLOWLIST}" in compose
     )
     assert "RUNNER_CONTAINER_MEMORY_MIB:" in compose
