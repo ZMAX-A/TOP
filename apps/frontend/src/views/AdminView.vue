@@ -571,6 +571,33 @@ onMounted(loadActiveTab)
               <template #default="scope">
                 <span>{{ scope.row.capabilities.target_types.join(', ') }}</span>
                 <div class="muted">浏览器：{{ scope.row.capabilities.browsers.join(', ') || '不适用' }}</div>
+                <div class="muted">
+                  不可变包：{{ scope.row.capabilities.automation_packages.length }}
+                </div>
+                <div class="muted">
+                  执行隔离：{{ scope.row.capabilities.execution_isolation?.mode || '未声明' }}
+                  · {{ scope.row.capabilities.execution_isolation?.credential_scope || '未知凭据范围' }}
+                </div>
+                <div v-if="scope.row.capabilities.execution_isolation" class="muted">
+                  网络：{{ scope.row.capabilities.execution_isolation.network_policy }}
+                  · 只读根：{{ scope.row.capabilities.execution_isolation.read_only_root_filesystem ? '是' : '否' }}
+                  · 资源限制：{{ scope.row.capabilities.execution_isolation.resource_limits_enforced ? '是' : '否' }}
+                </div>
+                <div
+                  v-if="scope.row.capabilities.execution_isolation?.orchestrator_namespace"
+                  class="muted"
+                >
+                  Namespace：{{ scope.row.capabilities.execution_isolation.orchestrator_namespace }}
+                  · ServiceAccount：{{ scope.row.capabilities.execution_isolation.service_account_name }}
+                  · Token 自动挂载：{{ scope.row.capabilities.execution_isolation.service_account_token_automounted ? '是' : '否' }}
+                </div>
+                <div
+                  v-for="runtime in scope.row.capabilities.automation_packages"
+                  :key="`${runtime.runner_type}:${runtime.image_repository}@${runtime.digest}`"
+                  class="muted mono"
+                >
+                  {{ runtime.image_repository }}@{{ runtime.digest.slice(0, 18) }}…
+                </div>
               </template>
             </el-table-column>
             <el-table-column prop="max_slots" label="槽位" width="80" />

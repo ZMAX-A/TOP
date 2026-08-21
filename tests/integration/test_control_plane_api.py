@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import json
 import tempfile
 import unittest
@@ -8,11 +9,13 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from uuid import UUID, uuid4
 
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from fastapi.testclient import TestClient
 from sqlalchemy import func, select
 
 from testops.api.artifact_store import ArtifactAccess
-from testops.api.config import Settings
+from testops.api.config import Settings, SupplyChainVerifierPublicKey
 from testops.api.main import create_app
 from testops.api.persistence import (
     ArtifactRecord,
@@ -33,6 +36,11 @@ from testops.api.persistence import TestRunRecord as RunRecord
 from testops.api.quality_alert_services import evaluate_quality_alert_batch
 from testops.api.reliability_services import process_run_reliability
 from testops.api.schedule_services import process_due_schedules
+from testops.api.supply_chain_auth import (
+    base64url_encode,
+    supply_chain_detached_jws_signing_input,
+    supply_chain_jws_protected_header,
+)
 from testops.contracts import CaseBaseline, canonical_sha256
 from testops.worker.outbox import dispatch_outbox_batch
 from testops.worker.quality_webhooks import dispatch_quality_webhook_batch
@@ -42,6 +50,85 @@ RUNNER_HEADERS = {"X-Runner-Token": "integration-runner-token"}
 BOOTSTRAP_TOKEN = "integration-bootstrap-token"
 ADMIN_PASSWORD = "integration-admin-password"
 PACKAGE_DIGEST = "sha256:" + "c" * 64
+PACKAGE_RUNTIME_CAPABILITY = {
+    "runner_type": "WEB_PLAYWRIGHT",
+    "image_repository": "testops-worker",
+    "digest": PACKAGE_DIGEST,
+}
+RUNNER_ISOLATION_CAPABILITY = {
+    "mode": "SUBPROCESS",
+    "dedicated_process": True,
+    "credential_scope": "RUN_SECRETS_ONLY",
+    "read_only_root_filesystem": False,
+    "network_policy": "WORKER_DEFAULT",
+    "resource_limits_enforced": False,
+}
+CONTAINER_ISOLATION_CAPABILITY = {
+    "mode": "CONTAINER",
+    "dedicated_process": True,
+    "credential_scope": "RUN_SECRETS_ONLY",
+    "read_only_root_filesystem": True,
+    "network_policy": "ALLOWLIST",
+    "resource_limits_enforced": True,
+    "memory_limit_bytes": 1024 * 1024 * 1024,
+    "cpu_limit_millis": 1000,
+    "pids_limit": 256,
+}
+KUBERNETES_ISOLATION_CAPABILITY = {
+    "mode": "KUBERNETES",
+    "dedicated_process": True,
+    "credential_scope": "RUN_SECRETS_ONLY",
+    "read_only_root_filesystem": True,
+    "network_policy": "DENY_ALL",
+    "resource_limits_enforced": True,
+    "memory_limit_bytes": 1024 * 1024 * 1024,
+    "cpu_limit_millis": 1000,
+    "ephemeral_storage_limit_bytes": 2 * 1024 * 1024 * 1024,
+    "orchestrator_namespace": "testops-runs",
+    "service_account_name": "testops-runner",
+    "service_account_token_automounted": False,
+}
+VERIFIER_CREDENTIAL_ID = "ci-cosign-slsa-verifier/2026-08-ed25519"
+VERIFIER_WORKLOAD_IDENTITY = "https://github.com/example/testops/.github/workflows/release.yml"
+VERIFIER_PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(1, 33)))
+INVALID_VERIFIER_PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(33, 65)))
+ROTATED_VERIFIER_CREDENTIAL_ID = "ci-cosign-slsa-verifier/2026-09-ed25519"
+ROTATED_VERIFIER_PRIVATE_KEY = Ed25519PrivateKey.from_private_bytes(bytes(range(65, 97)))
+VERIFIER_PUBLIC_KEY = VERIFIER_PRIVATE_KEY.public_key().public_bytes(
+    encoding=serialization.Encoding.Raw,
+    format=serialization.PublicFormat.Raw,
+)
+ROTATED_VERIFIER_PUBLIC_KEY = ROTATED_VERIFIER_PRIVATE_KEY.public_key().public_bytes(
+    encoding=serialization.Encoding.Raw,
+    format=serialization.PublicFormat.Raw,
+)
+
+
+def supply_chain_report(
+    image_digest: str,
+    *,
+    outcome: str = "VERIFIED",
+) -> dict[str, object]:
+    verified = outcome == "VERIFIED"
+    return {
+        "outcome": outcome,
+        "policy_version": "testops-supply-chain-v1",
+        "verifier": "ci-cosign-slsa-verifier",
+        "image_digest": image_digest,
+        "signature_bundle_digest": "sha256:" + "d" * 64,
+        "provenance_digest": "sha256:" + "e" * 64,
+        "sbom_digest": "sha256:" + "f" * 64,
+        "signature_verified": verified,
+        "transparency_log_verified": verified,
+        "provenance_verified": verified,
+        "sbom_verified": verified,
+        "certificate_issuer": "https://token.actions.githubusercontent.com",
+        "certificate_identity": "https://github.com/example/testops/.github/workflows/release.yml",
+        "builder_id": "https://github.com/actions/runner",
+        "source_repository": "https://github.com/example/testops",
+        "source_revision": "a" * 40,
+        "reason": None if verified else "signature identity is not allowed by policy",
+    }
 
 
 class RecordingPublisher:
@@ -103,6 +190,29 @@ class ControlPlaneApiTests(unittest.TestCase):
             auto_create_schema=True,
             runner_callback_token=RUNNER_HEADERS["X-Runner-Token"],
             bootstrap_admin_token=BOOTSTRAP_TOKEN,
+            supply_chain_allowed_verifiers=("ci-cosign-slsa-verifier",),
+            supply_chain_allowed_certificate_issuers=(
+                "https://token.actions.githubusercontent.com",
+            ),
+            supply_chain_allowed_certificate_identities=(
+                "https://github.com/example/testops/.github/workflows/release.yml",
+            ),
+            supply_chain_allowed_builder_ids=("https://github.com/actions/runner",),
+            supply_chain_allowed_source_repositories=("https://github.com/example/testops",),
+            supply_chain_verifier_public_keys=(
+                SupplyChainVerifierPublicKey(
+                    credential_id=VERIFIER_CREDENTIAL_ID,
+                    verifier="ci-cosign-slsa-verifier",
+                    workload_identity=VERIFIER_WORKLOAD_IDENTITY,
+                    public_key=VERIFIER_PUBLIC_KEY,
+                ),
+                SupplyChainVerifierPublicKey(
+                    credential_id=ROTATED_VERIFIER_CREDENTIAL_ID,
+                    verifier="ci-cosign-slsa-verifier",
+                    workload_identity=VERIFIER_WORKLOAD_IDENTITY,
+                    public_key=ROTATED_VERIFIER_PUBLIC_KEY,
+                ),
+            ),
         )
         self.app = create_app(settings)
         self.client_context = TestClient(self.app)
@@ -127,6 +237,44 @@ class ControlPlaneApiTests(unittest.TestCase):
     def tearDown(self) -> None:
         self.client_context.__exit__(None, None, None)
         self.temporary_directory.cleanup()
+
+    def _signed_supply_chain_post(
+        self,
+        url: str,
+        payload: dict[str, object],
+        *,
+        credential_id: str = VERIFIER_CREDENTIAL_ID,
+        private_key: Ed25519PrivateKey = VERIFIER_PRIVATE_KEY,
+        workload_identity: str = VERIFIER_WORKLOAD_IDENTITY,
+        nonce: str | None = None,
+        created: int | None = None,
+    ):
+        body = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+        created_value = str(created if created is not None else int(datetime.now(UTC).timestamp()))
+        nonce_value = nonce or str(uuid4())
+        request_digest = "sha256:" + hashlib.sha256(body).hexdigest()
+        signing_input = supply_chain_detached_jws_signing_input(
+            method="POST",
+            path=url,
+            created=created_value,
+            nonce=nonce_value,
+            request_digest=request_digest,
+            credential_id=credential_id,
+            workload_identity=workload_identity,
+        )
+        protected = base64url_encode(supply_chain_jws_protected_header(credential_id))
+        signature = base64url_encode(private_key.sign(signing_input))
+        return self.client.post(
+            url,
+            content=body,
+            headers={
+                "Content-Type": "application/json",
+                "X-TestOps-Verifier-Key-Id": credential_id,
+                "X-TestOps-Envelope-Created": created_value,
+                "X-TestOps-Envelope-Nonce": nonce_value,
+                "X-TestOps-Envelope-Signature": f"{protected}..{signature}",
+            },
+        )
 
     def _bootstrap(self) -> dict[str, str]:
         project_response = self.client.post(
@@ -248,6 +396,8 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertEqual(drafted.status_code, 201, drafted.text)
         draft = drafted.json()
         self.assertEqual(draft["status"], "DRAFT")
+        self.assertEqual(draft["supply_chain_status"], "PENDING")
+        self.assertIsNone(draft["supply_chain_verification_id"])
         self.assertEqual(draft["runner_type"], "WEB_PLAYWRIGHT")
         self.assertEqual(draft["supersedes_id"], resources["package_id"])
         self.assertIsNone(draft["validated_run_id"])
@@ -274,6 +424,157 @@ class ControlPlaneApiTests(unittest.TestCase):
             "environment_id": resources["environment_id"],
             "baseline_id": resources["baseline_id"],
         }
+        pending_validation = self.client.post(
+            validation_url,
+            headers={**self.headers, "Idempotency-Key": "package-validation-pending"},
+            json=validation_payload,
+        )
+        self.assertEqual(pending_validation.status_code, 409, pending_validation.text)
+
+        supply_chain_url = f"{packages_url}/{draft['id']}/supply-chain-verifications"
+        unsigned_admin_report = self.client.post(
+            supply_chain_url,
+            headers=self.headers,
+            json=supply_chain_report("sha256:" + "1" * 64),
+        )
+        self.assertEqual(unsigned_admin_report.status_code, 401, unsigned_admin_report.text)
+        unknown_credential = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            credential_id="ci-cosign-slsa-verifier/unknown",
+        )
+        self.assertEqual(unknown_credential.status_code, 401, unknown_credential.text)
+        invalid_signature = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            private_key=INVALID_VERIFIER_PRIVATE_KEY,
+        )
+        self.assertEqual(invalid_signature.status_code, 401, invalid_signature.text)
+        wrong_workload_identity = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            workload_identity="spiffe://attacker.example.invalid/untrusted",
+        )
+        self.assertEqual(
+            wrong_workload_identity.status_code,
+            401,
+            wrong_workload_identity.text,
+        )
+        expired_envelope = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            created=int(datetime.now(UTC).timestamp()) - 600,
+        )
+        self.assertEqual(expired_envelope.status_code, 401, expired_envelope.text)
+        future_envelope = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            created=int(datetime.now(UTC).timestamp()) + 120,
+        )
+        self.assertEqual(future_envelope.status_code, 401, future_envelope.text)
+        mismatched_report = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report("sha256:" + "1" * 64),
+        )
+        self.assertEqual(mismatched_report.status_code, 422, mismatched_report.text)
+        untrusted_identity_payload = supply_chain_report(draft["digest"])
+        untrusted_identity_payload["certificate_identity"] = (
+            "https://github.com/attacker/untrusted/.github/workflows/release.yml"
+        )
+        untrusted_identity = self._signed_supply_chain_post(
+            supply_chain_url,
+            untrusted_identity_payload,
+        )
+        self.assertEqual(untrusted_identity.status_code, 422, untrusted_identity.text)
+        wrong_verifier_payload = supply_chain_report(draft["digest"])
+        wrong_verifier_payload["verifier"] = "untrusted-verifier"
+        wrong_verifier = self._signed_supply_chain_post(
+            supply_chain_url,
+            wrong_verifier_payload,
+        )
+        self.assertEqual(wrong_verifier.status_code, 422, wrong_verifier.text)
+        rejected_report = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"], outcome="REJECTED"),
+        )
+        self.assertEqual(rejected_report.status_code, 201, rejected_report.text)
+        self.assertEqual(rejected_report.json()["outcome"], "REJECTED")
+        rejected_validation = self.client.post(
+            validation_url,
+            headers={**self.headers, "Idempotency-Key": "package-validation-rejected"},
+            json=validation_payload,
+        )
+        self.assertEqual(rejected_validation.status_code, 409, rejected_validation.text)
+        verified_nonce = str(uuid4())
+        verified_report = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            nonce=verified_nonce,
+        )
+        self.assertEqual(verified_report.status_code, 201, verified_report.text)
+        verification = verified_report.json()
+        self.assertEqual(verification["outcome"], "VERIFIED")
+        self.assertEqual(verification["image_digest"], draft["digest"])
+        self.assertTrue(verification["report_digest"].startswith("sha256:"))
+        replayed_envelope = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            nonce=verified_nonce,
+        )
+        self.assertEqual(replayed_envelope.status_code, 409, replayed_envelope.text)
+        replayed_report = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+        )
+        self.assertEqual(replayed_report.status_code, 200, replayed_report.text)
+        self.assertEqual(replayed_report.json()["id"], verification["id"])
+        rotated_key_report = self._signed_supply_chain_post(
+            supply_chain_url,
+            supply_chain_report(draft["digest"]),
+            credential_id=ROTATED_VERIFIER_CREDENTIAL_ID,
+            private_key=ROTATED_VERIFIER_PRIVATE_KEY,
+        )
+        self.assertEqual(rotated_key_report.status_code, 200, rotated_key_report.text)
+        self.assertEqual(rotated_key_report.json()["id"], verification["id"])
+        verification_history = self.client.get(supply_chain_url, headers=self.headers)
+        self.assertEqual(verification_history.status_code, 200, verification_history.text)
+        self.assertEqual(
+            [item["outcome"] for item in verification_history.json()],
+            ["VERIFIED", "REJECTED"],
+        )
+        envelope_history = self.client.get(
+            supply_chain_url.replace("verifications", "envelopes"),
+            headers=self.headers,
+        )
+        self.assertEqual(envelope_history.status_code, 200, envelope_history.text)
+        self.assertEqual(len(envelope_history.json()), 4)
+        self.assertEqual(
+            {item["credential_id"] for item in envelope_history.json()},
+            {VERIFIER_CREDENTIAL_ID, ROTATED_VERIFIER_CREDENTIAL_ID},
+        )
+        self.assertTrue(
+            all(item["signature_algorithm"] == "ED25519" for item in envelope_history.json())
+        )
+        self.assertTrue(
+            all(
+                item["workload_identity"] == VERIFIER_WORKLOAD_IDENTITY
+                for item in envelope_history.json()
+            )
+        )
+        self.assertTrue(
+            all(item["key_fingerprint"].startswith("sha256:") for item in envelope_history.json())
+        )
+        admitted_package = self.client.get(
+            f"{packages_url}/{draft['id']}",
+            headers=self.headers,
+        )
+        self.assertEqual(admitted_package.status_code, 200, admitted_package.text)
+        self.assertEqual(admitted_package.json()["supply_chain_status"], "VERIFIED")
+        self.assertEqual(
+            admitted_package.json()["supply_chain_verification_id"],
+            verification["id"],
+        )
+
         validation = self.client.post(
             validation_url,
             headers={**self.headers, "Idempotency-Key": "package-validation-0001"},
@@ -283,6 +584,16 @@ class ControlPlaneApiTests(unittest.TestCase):
         validation_run = validation.json()
         self.assertEqual(validation_run["automation_package_id"], draft["id"])
         self.assertEqual(validation_run["case_count"], 89)
+        validation_detail = self.client.get(
+            f"/api/v1/runs/{validation_run['id']}",
+            headers=self.headers,
+        )
+        self.assertEqual(validation_detail.status_code, 200, validation_detail.text)
+        supply_chain_snapshot = validation_detail.json()["snapshot"]["automation_package"][
+            "supply_chain"
+        ]
+        self.assertEqual(supply_chain_snapshot["verification_id"], verification["id"])
+        self.assertEqual(supply_chain_snapshot["report_digest"], verification["report_digest"])
         replayed_validation = self.client.post(
             validation_url,
             headers={**self.headers, "Idempotency-Key": "package-validation-0001"},
@@ -290,6 +601,18 @@ class ControlPlaneApiTests(unittest.TestCase):
         )
         self.assertEqual(replayed_validation.status_code, 200, replayed_validation.text)
         self.assertEqual(replayed_validation.json()["id"], validation_run["id"])
+        package_runs = self.client.get(
+            f"/api/v1/projects/{resources['project_id']}/runs",
+            headers=self.headers,
+            params={"automation_package_id": draft["id"]},
+        )
+        self.assertEqual(package_runs.status_code, 200, package_runs.text)
+        self.assertEqual(package_runs.json()["total"], 1)
+        self.assertEqual(package_runs.json()["items"][0]["id"], validation_run["id"])
+        self.assertEqual(
+            package_runs.json()["items"][0]["automation_package_id"],
+            draft["id"],
+        )
 
         activation_url = f"{packages_url}/{draft['id']}/activate"
         premature_activation = self.client.post(
@@ -356,6 +679,37 @@ class ControlPlaneApiTests(unittest.TestCase):
             },
         )
         self.assertEqual(schedule.status_code, 201, schedule.text)
+        security_rejection_payload = supply_chain_report(
+            draft["digest"],
+            outcome="REJECTED",
+        )
+        security_rejection_payload["reason"] = "critical vulnerability exceeds policy threshold"
+        security_rejection = self._signed_supply_chain_post(
+            supply_chain_url,
+            security_rejection_payload,
+        )
+        self.assertEqual(security_rejection.status_code, 201, security_rejection.text)
+        rejected_active_run = self.client.post(
+            "/api/v1/runs",
+            headers={**self.headers, "Idempotency-Key": "rejected-active-package-run"},
+            json=draft_run_payload,
+        )
+        self.assertEqual(rejected_active_run.status_code, 422, rejected_active_run.text)
+        rejected_rerun = self.client.post(
+            f"/api/v1/runs/{ordinary_active_run.json()['id']}/rerun",
+            headers={**self.headers, "Idempotency-Key": "rejected-package-rerun"},
+            json={"mode": "FULL"},
+        )
+        self.assertEqual(rejected_rerun.status_code, 409, rejected_rerun.text)
+        rejected_schedule_trigger = self.client.post(
+            f"{schedule_url}/{schedule.json()['id']}/trigger",
+            headers={**self.headers, "Idempotency-Key": "rejected-package-schedule"},
+        )
+        self.assertEqual(
+            rejected_schedule_trigger.status_code,
+            409,
+            rejected_schedule_trigger.text,
+        )
         deprecate_url = f"{packages_url}/{draft['id']}/deprecate"
         in_use_deprecation = self.client.post(
             deprecate_url,
@@ -406,6 +760,9 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertTrue(
             {
                 "automation_package.draft_created",
+                "automation_package.supply_chain_rejected",
+                "automation_package.supply_chain_verified",
+                "automation_package.supply_chain_report_idempotent",
                 "automation_package.validation_run_created",
                 "automation_package.activated",
                 "automation_package.deprecated",
@@ -459,6 +816,16 @@ class ControlPlaneApiTests(unittest.TestCase):
         )
         self.assertEqual(delegated_draft.status_code, 201, delegated_draft.text)
         self.assertEqual(delegated_draft.json()["status"], "DRAFT")
+        denied_supply_chain_admission = self.client.post(
+            f"{packages_url}/{delegated_draft.json()['id']}/supply-chain-verifications",
+            headers=project_admin_headers,
+            json=supply_chain_report(delegated_draft.json()["digest"]),
+        )
+        self.assertEqual(
+            denied_supply_chain_admission.status_code,
+            401,
+            denied_supply_chain_admission.text,
+        )
 
     def test_project_creation_persists_creator_membership_and_audit(self) -> None:
         first = self.client.post(
@@ -738,6 +1105,7 @@ class ControlPlaneApiTests(unittest.TestCase):
                     "target_types": ["WEB"],
                     "browsers": ["firefox"],
                     "labels": {"os": "linux"},
+                    "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
                 },
             },
         )
@@ -748,6 +1116,122 @@ class ControlPlaneApiTests(unittest.TestCase):
         self.assertEqual(
             waiting.json()["dispatch_wait_reason"],
             "RUNNER_CAPABILITY_MISMATCH",
+        )
+
+        isolation_missing = self.client.put(
+            heartbeat_url,
+            headers=RUNNER_HEADERS,
+            json={
+                "pool_key": "web-chromium",
+                "display_name": "Web Worker 01",
+                "runner_version": "0.10.0",
+                "max_slots": 1,
+                "capabilities": {
+                    "target_types": ["WEB"],
+                    "browsers": ["chromium"],
+                    "labels": {"os": "linux"},
+                    "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
+                },
+            },
+        )
+        self.assertEqual(isolation_missing.status_code, 200, isolation_missing.text)
+        isolation_wait = asyncio.run(dispatch(base_time + timedelta(seconds=2)))
+        self.assertEqual(isolation_wait.waiting, 1)
+        waiting = self.client.get(f"/api/v1/runs/{first.json()['id']}", headers=self.headers)
+        self.assertEqual(
+            waiting.json()["dispatch_wait_reason"],
+            "RUNNER_ISOLATION_UNAVAILABLE",
+        )
+
+        incomplete_container = self.client.put(
+            heartbeat_url,
+            headers=RUNNER_HEADERS,
+            json={
+                "pool_key": "web-chromium",
+                "display_name": "Web Worker 01",
+                "runner_version": "0.28.0",
+                "max_slots": 1,
+                "capabilities": {
+                    "target_types": ["WEB"],
+                    "browsers": ["chromium"],
+                    "labels": {"os": "linux"},
+                    "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
+                    "execution_isolation": {
+                        **CONTAINER_ISOLATION_CAPABILITY,
+                        "resource_limits_enforced": False,
+                    },
+                },
+            },
+        )
+        self.assertEqual(incomplete_container.status_code, 422, incomplete_container.text)
+
+        incomplete_kubernetes = self.client.put(
+            heartbeat_url,
+            headers=RUNNER_HEADERS,
+            json={
+                "pool_key": "web-chromium",
+                "display_name": "Web Worker 01",
+                "runner_version": "0.30.0",
+                "max_slots": 1,
+                "capabilities": {
+                    "target_types": ["WEB"],
+                    "browsers": ["chromium"],
+                    "labels": {"os": "linux"},
+                    "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
+                    "execution_isolation": {
+                        **KUBERNETES_ISOLATION_CAPABILITY,
+                        "service_account_token_automounted": True,
+                    },
+                },
+            },
+        )
+        self.assertEqual(incomplete_kubernetes.status_code, 422, incomplete_kubernetes.text)
+
+        complete_kubernetes = self.client.put(
+            heartbeat_url,
+            headers=RUNNER_HEADERS,
+            json={
+                "pool_key": "web-chromium",
+                "display_name": "Web Worker 01",
+                "runner_version": "0.30.0",
+                "max_slots": 1,
+                "capabilities": {
+                    "target_types": ["WEB"],
+                    "browsers": ["chromium"],
+                    "labels": {"os": "linux"},
+                    "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
+                    "execution_isolation": KUBERNETES_ISOLATION_CAPABILITY,
+                },
+            },
+        )
+        self.assertEqual(complete_kubernetes.status_code, 200, complete_kubernetes.text)
+
+        package_mismatched = self.client.put(
+            heartbeat_url,
+            headers=RUNNER_HEADERS,
+            json={
+                "pool_key": "web-chromium",
+                "display_name": "Web Worker 01",
+                "runner_version": "0.10.0",
+                "max_slots": 1,
+                "capabilities": {
+                    "target_types": ["WEB"],
+                    "browsers": ["chromium"],
+                    "labels": {"os": "linux"},
+                    "automation_packages": [
+                        {**PACKAGE_RUNTIME_CAPABILITY, "digest": "sha256:" + "d" * 64}
+                    ],
+                    "execution_isolation": CONTAINER_ISOLATION_CAPABILITY,
+                },
+            },
+        )
+        self.assertEqual(package_mismatched.status_code, 200, package_mismatched.text)
+        package_wait = asyncio.run(dispatch(base_time + timedelta(seconds=3)))
+        self.assertEqual(package_wait.waiting, 1)
+        waiting = self.client.get(f"/api/v1/runs/{first.json()['id']}", headers=self.headers)
+        self.assertEqual(
+            waiting.json()["dispatch_wait_reason"],
+            "AUTOMATION_PACKAGE_UNAVAILABLE",
         )
 
         matched = self.client.put(
@@ -762,11 +1246,13 @@ class ControlPlaneApiTests(unittest.TestCase):
                     "target_types": ["WEB"],
                     "browsers": ["chromium"],
                     "labels": {"os": "linux"},
+                    "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
+                    "execution_isolation": CONTAINER_ISOLATION_CAPABILITY,
                 },
             },
         )
         self.assertEqual(matched.status_code, 200, matched.text)
-        published = asyncio.run(dispatch(base_time + timedelta(seconds=2)))
+        published = asyncio.run(dispatch(base_time + timedelta(seconds=4)))
         self.assertEqual(
             (published.selected, published.published, published.waiting),
             (1, 1, 0),
@@ -782,7 +1268,7 @@ class ControlPlaneApiTests(unittest.TestCase):
             json=self._run_payload(resources, "TC-LOGIN-007"),
         )
         self.assertEqual(second.status_code, 201, second.text)
-        exhausted = asyncio.run(dispatch(base_time + timedelta(seconds=3)))
+        exhausted = asyncio.run(dispatch(base_time + timedelta(seconds=5)))
         self.assertEqual(exhausted.waiting, 1)
         second_waiting = self.client.get(
             f"/api/v1/runs/{second.json()['id']}", headers=self.headers
@@ -797,7 +1283,7 @@ class ControlPlaneApiTests(unittest.TestCase):
             headers=self.headers,
         )
         self.assertEqual(canceled.status_code, 200, canceled.text)
-        resumed = asyncio.run(dispatch(base_time + timedelta(seconds=4), limit=1))
+        resumed = asyncio.run(dispatch(base_time + timedelta(seconds=6), limit=1))
         self.assertEqual((resumed.published, resumed.waiting), (1, 0))
         self.assertEqual(publisher.queues[-1], "testops.pool.web-chromium")
 
@@ -809,6 +1295,10 @@ class ControlPlaneApiTests(unittest.TestCase):
         workers = self.client.get("/api/v1/admin/runner-workers", headers=self.headers)
         self.assertEqual(workers.status_code, 200, workers.text)
         self.assertEqual(workers.json()[0]["health"], "ONLINE")
+        self.assertEqual(
+            workers.json()[0]["capabilities"]["automation_packages"],
+            [PACKAGE_RUNTIME_CAPABILITY],
+        )
         catalog = self.client.get("/api/v1/runner-pools/catalog", headers=self.headers)
         self.assertEqual(catalog.status_code, 200, catalog.text)
         self.assertEqual(catalog.json()[0]["key"], "web-chromium")
@@ -849,6 +1339,8 @@ class ControlPlaneApiTests(unittest.TestCase):
                 "target_types": ["WEB"],
                 "browsers": ["chromium"],
                 "labels": {"purpose": "reliability-test"},
+                "automation_packages": [PACKAGE_RUNTIME_CAPABILITY],
+                "execution_isolation": RUNNER_ISOLATION_CAPABILITY,
             },
         }
         heartbeat = self.client.put(

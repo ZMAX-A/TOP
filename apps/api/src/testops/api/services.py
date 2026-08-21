@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime, time, timedelta
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 from sqlalchemy import func, select
@@ -11,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from testops.contracts import (
     AutomationPackageRef,
+    AutomationPackageSupplyChainRef,
     CaseBaseline,
     CaseBaselineRef,
     CaseResultStatus,
@@ -28,6 +30,8 @@ from .persistence import (
     ArtifactRecord,
     AuditLogRecord,
     AutomationPackageRecord,
+    AutomationPackageSupplyChainEnvelopeRecord,
+    AutomationPackageSupplyChainVerificationRecord,
     CaseBaselineRecord,
     ChangeRequestRecord,
     DispatchOutboxRecord,
@@ -49,6 +53,7 @@ from .schemas import (
     AutomationPackageCreate,
     AutomationPackageDraftCreate,
     AutomationPackageStatusChangeRequest,
+    AutomationPackageSupplyChainVerificationCreate,
     AutomationPackageValidationRunCreate,
     BaselinePublishRequest,
     EnvironmentCreate,
@@ -67,6 +72,9 @@ from .schemas import (
 )
 from .state_machine import InvalidRunTransition, require_run_transition
 
+if TYPE_CHECKING:
+    from .supply_chain_auth import SupplyChainVerifierPrincipal
+
 RUNNER_ACTOR_ID = UUID("00000000-0000-0000-0000-000000000001")
 TERMINAL_RUN_STATUSES = frozenset(
     {
@@ -84,6 +92,7 @@ IN_FLIGHT_RUN_STATUSES = frozenset(
         RunStatus.RUNNING,
     }
 )
+SUPPLY_CHAIN_EXECUTABLE_STATUSES = frozenset({"LEGACY", "VERIFIED"})
 
 
 class ServiceError(RuntimeError):
@@ -1106,6 +1115,7 @@ async def create_automation_package(
         image_repository=payload.image_repository,
         status=status,
         supersedes_id=supersedes_id,
+        supply_chain_status="PENDING" if status == "DRAFT" else "LEGACY",
     )
     session.add(record)
     session.add(
@@ -1126,6 +1136,7 @@ async def create_automation_package(
                 "runner_type": record.runner_type,
                 "image_repository": record.image_repository,
                 "status": record.status,
+                "supply_chain_status": record.supply_chain_status,
                 "supersedes_id": str(supersedes_id) if supersedes_id else None,
             },
         )
@@ -1173,6 +1184,290 @@ async def get_automation_package(
     return record
 
 
+async def list_automation_package_supply_chain_verifications(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+) -> tuple[AutomationPackageSupplyChainVerificationRecord, ...]:
+    await get_automation_package(session, project_id, target_id, package_id)
+    records = await session.scalars(
+        select(AutomationPackageSupplyChainVerificationRecord)
+        .where(
+            AutomationPackageSupplyChainVerificationRecord.project_id == project_id,
+            AutomationPackageSupplyChainVerificationRecord.target_id == target_id,
+            AutomationPackageSupplyChainVerificationRecord.automation_package_id == package_id,
+        )
+        .order_by(AutomationPackageSupplyChainVerificationRecord.created_at.desc())
+    )
+    return tuple(records)
+
+
+async def list_automation_package_supply_chain_envelopes(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+) -> tuple[AutomationPackageSupplyChainEnvelopeRecord, ...]:
+    await get_automation_package(session, project_id, target_id, package_id)
+    records = await session.scalars(
+        select(AutomationPackageSupplyChainEnvelopeRecord)
+        .where(
+            AutomationPackageSupplyChainEnvelopeRecord.project_id == project_id,
+            AutomationPackageSupplyChainEnvelopeRecord.target_id == target_id,
+            AutomationPackageSupplyChainEnvelopeRecord.automation_package_id == package_id,
+        )
+        .order_by(AutomationPackageSupplyChainEnvelopeRecord.received_at.desc())
+    )
+    return tuple(records)
+
+
+async def record_automation_package_supply_chain_verification(
+    session: AsyncSession,
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageSupplyChainVerificationCreate,
+    verifier_principal: SupplyChainVerifierPrincipal,
+    *,
+    policy_version: str,
+    allowed_verifiers: tuple[str, ...],
+    allowed_certificate_issuers: tuple[str, ...],
+    allowed_certificate_identities: tuple[str, ...],
+    allowed_builder_ids: tuple[str, ...],
+    allowed_source_repositories: tuple[str, ...],
+) -> tuple[AutomationPackageSupplyChainVerificationRecord, bool]:
+    package = await get_automation_package(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        lock=True,
+    )
+    if payload.verifier != verifier_principal.verifier:
+        raise InvalidRequest(
+            "supply-chain report verifier does not match the authenticated service identity"
+        )
+    used_envelope = await session.scalar(
+        select(AutomationPackageSupplyChainEnvelopeRecord.id).where(
+            AutomationPackageSupplyChainEnvelopeRecord.credential_id
+            == verifier_principal.credential_id,
+            AutomationPackageSupplyChainEnvelopeRecord.nonce == verifier_principal.nonce,
+        )
+    )
+    if used_envelope is not None:
+        raise ResourceConflict("supply-chain verifier envelope nonce was already used")
+    if payload.image_digest != package.digest:
+        raise InvalidRequest("supply-chain report image_digest does not match the package")
+    if payload.policy_version != policy_version:
+        raise InvalidRequest("supply-chain report policy_version is not current")
+    if payload.outcome == "VERIFIED":
+        policy_values = (
+            ("verifier", payload.verifier, allowed_verifiers),
+            (
+                "certificate_issuer",
+                payload.certificate_issuer,
+                allowed_certificate_issuers,
+            ),
+            (
+                "certificate_identity",
+                payload.certificate_identity,
+                allowed_certificate_identities,
+            ),
+            ("builder_id", payload.builder_id, allowed_builder_ids),
+            (
+                "source_repository",
+                payload.source_repository,
+                allowed_source_repositories,
+            ),
+        )
+        missing_policy = [name for name, _, allowed in policy_values if not allowed]
+        if missing_policy:
+            raise ResourceConflict(
+                "supply-chain admission policy is not configured for " + ", ".join(missing_policy)
+            )
+        rejected_values = [name for name, value, allowed in policy_values if value not in allowed]
+        if rejected_values:
+            raise InvalidRequest(
+                "supply-chain report is not allowed by policy for " + ", ".join(rejected_values)
+            )
+    report_digest = canonical_sha256(
+        {
+            "automation_package_id": str(package.id),
+            "report": payload.model_dump(mode="json", exclude_none=True),
+        }
+    )
+    existing = await session.scalar(
+        select(AutomationPackageSupplyChainVerificationRecord).where(
+            AutomationPackageSupplyChainVerificationRecord.automation_package_id == package.id,
+            AutomationPackageSupplyChainVerificationRecord.report_digest == report_digest,
+        )
+    )
+    moment = utc_now()
+    if existing is not None:
+        session.add(
+            AutomationPackageSupplyChainEnvelopeRecord(
+                id=uuid4(),
+                project_id=project_id,
+                target_id=target_id,
+                automation_package_id=package.id,
+                verification_id=existing.id,
+                verifier=verifier_principal.verifier,
+                credential_id=verifier_principal.credential_id,
+                envelope_profile=verifier_principal.envelope_profile,
+                signature_algorithm=verifier_principal.signature_algorithm,
+                workload_identity=verifier_principal.workload_identity,
+                key_fingerprint=verifier_principal.key_fingerprint,
+                nonce=verifier_principal.nonce,
+                issued_at=verifier_principal.issued_at,
+                received_at=moment,
+                request_digest=verifier_principal.request_digest,
+                signature_digest=verifier_principal.signature_digest,
+            )
+        )
+        session.add(
+            _audit(
+                actor_id=verifier_principal.actor_id,
+                action="automation_package.supply_chain_report_idempotent",
+                resource_type="automation_package",
+                resource_id=package.id,
+                project_id=project_id,
+                details={
+                    "verification_id": str(existing.id),
+                    "report_digest": report_digest,
+                    "verifier": verifier_principal.verifier,
+                    "credential_id": verifier_principal.credential_id,
+                    "envelope_profile": verifier_principal.envelope_profile,
+                    "signature_algorithm": verifier_principal.signature_algorithm,
+                    "workload_identity": verifier_principal.workload_identity,
+                    "key_fingerprint": verifier_principal.key_fingerprint,
+                    "envelope_nonce": verifier_principal.nonce,
+                    "request_digest": verifier_principal.request_digest,
+                    "signature_digest": verifier_principal.signature_digest,
+                },
+            )
+        )
+        await _commit_unique(session, "supply-chain verifier envelope was already used")
+        return existing, False
+
+    record = AutomationPackageSupplyChainVerificationRecord(
+        id=uuid4(),
+        project_id=project_id,
+        target_id=target_id,
+        automation_package_id=package.id,
+        report_digest=report_digest,
+        verified_by=None,
+        verified_at=moment,
+        created_at=moment,
+        **payload.model_dump(),
+    )
+    session.add(record)
+    session.add(
+        AutomationPackageSupplyChainEnvelopeRecord(
+            id=uuid4(),
+            project_id=project_id,
+            target_id=target_id,
+            automation_package_id=package.id,
+            verification_id=record.id,
+            verifier=verifier_principal.verifier,
+            credential_id=verifier_principal.credential_id,
+            envelope_profile=verifier_principal.envelope_profile,
+            signature_algorithm=verifier_principal.signature_algorithm,
+            workload_identity=verifier_principal.workload_identity,
+            key_fingerprint=verifier_principal.key_fingerprint,
+            nonce=verifier_principal.nonce,
+            issued_at=verifier_principal.issued_at,
+            received_at=moment,
+            request_digest=verifier_principal.request_digest,
+            signature_digest=verifier_principal.signature_digest,
+        )
+    )
+    package.supply_chain_status = payload.outcome
+    package.supply_chain_verification_id = record.id
+    package.supply_chain_verified_at = moment
+    session.add(
+        _audit(
+            actor_id=verifier_principal.actor_id,
+            action=(
+                "automation_package.supply_chain_verified"
+                if payload.outcome == "VERIFIED"
+                else "automation_package.supply_chain_rejected"
+            ),
+            resource_type="automation_package",
+            resource_id=package.id,
+            project_id=project_id,
+            details={
+                "verification_id": str(record.id),
+                "report_digest": report_digest,
+                "policy_version": payload.policy_version,
+                "verifier": payload.verifier,
+                "image_digest": payload.image_digest,
+                "signature_bundle_digest": payload.signature_bundle_digest,
+                "provenance_digest": payload.provenance_digest,
+                "sbom_digest": payload.sbom_digest,
+                "certificate_issuer": payload.certificate_issuer,
+                "certificate_identity": payload.certificate_identity,
+                "builder_id": payload.builder_id,
+                "source_repository": payload.source_repository,
+                "source_revision": payload.source_revision,
+                "outcome": payload.outcome,
+                "reason": payload.reason,
+                "credential_id": verifier_principal.credential_id,
+                "envelope_profile": verifier_principal.envelope_profile,
+                "signature_algorithm": verifier_principal.signature_algorithm,
+                "workload_identity": verifier_principal.workload_identity,
+                "key_fingerprint": verifier_principal.key_fingerprint,
+                "envelope_nonce": verifier_principal.nonce,
+                "request_digest": verifier_principal.request_digest,
+                "signature_digest": verifier_principal.signature_digest,
+            },
+        )
+    )
+    await _commit_unique(session, "supply-chain verifier envelope was already used")
+    await session.refresh(record)
+    return record, True
+
+
+async def _automation_package_supply_chain_ref(
+    session: AsyncSession,
+    package: AutomationPackageRecord,
+) -> AutomationPackageSupplyChainRef | None:
+    if package.supply_chain_status == "LEGACY":
+        return None
+    if package.supply_chain_status != "VERIFIED":
+        raise InvalidRequest(
+            "automation package supply-chain status "
+            f"{package.supply_chain_status} cannot be scheduled"
+        )
+    if package.supply_chain_verification_id is None:
+        raise ResourceConflict("verified automation package has no supply-chain evidence")
+    record = await session.get(
+        AutomationPackageSupplyChainVerificationRecord,
+        package.supply_chain_verification_id,
+    )
+    if (
+        record is None
+        or record.automation_package_id != package.id
+        or record.outcome != "VERIFIED"
+        or record.image_digest != package.digest
+    ):
+        raise ResourceConflict("automation package supply-chain evidence is inconsistent")
+    return AutomationPackageSupplyChainRef(
+        verification_id=record.id,
+        report_digest=record.report_digest,
+        policy_version=record.policy_version,
+        verifier=record.verifier,
+        signature_bundle_digest=record.signature_bundle_digest,
+        provenance_digest=record.provenance_digest,
+        sbom_digest=record.sbom_digest,
+        certificate_issuer=record.certificate_issuer,
+        certificate_identity=record.certificate_identity,
+        builder_id=record.builder_id,
+        source_repository=record.source_repository,
+        source_revision=record.source_revision,
+    )
+
+
 async def activate_automation_package(
     session: AsyncSession,
     project_id: UUID,
@@ -1192,6 +1487,10 @@ async def activate_automation_package(
         return package
     if package.status != "DRAFT":
         raise ResourceConflict("only a DRAFT automation package can be activated")
+    if package.supply_chain_status != "VERIFIED":
+        raise ResourceConflict(
+            "automation package must pass supply-chain verification before activation"
+        )
     validation_run = await session.get(TestRunRecord, payload.validation_run_id)
     if (
         validation_run is None
@@ -1548,6 +1847,11 @@ async def create_run(
         raise InvalidRequest(
             f"automation package status {package.status} cannot be scheduled through this endpoint"
         )
+    if package.supply_chain_status not in SUPPLY_CHAIN_EXECUTABLE_STATUSES:
+        raise InvalidRequest(
+            "automation package supply-chain status "
+            f"{package.supply_chain_status} cannot be scheduled through this endpoint"
+        )
     if target.target_type != TargetType.WEB.value:
         raise InvalidRequest("M2 Runner dispatch currently supports WEB targets only")
 
@@ -1560,6 +1864,7 @@ async def create_run(
         raise InvalidRequest("WEB environment has no web_config")
     await _enforce_execution_policy(session, project)
     runner_pool_id = environment.runner_pool_id or target.runner_pool_id
+    supply_chain = await _automation_package_supply_chain_ref(session, package)
 
     run_id = uuid4()
     created_at = utc_now()
@@ -1581,6 +1886,7 @@ async def create_run(
             digest=package.digest,
             runner_type=package.runner_type,
             image_repository=package.image_repository,
+            supply_chain=supply_chain,
         ),
         cases=cases,
         browser=target.browser,
@@ -1628,6 +1934,10 @@ async def create_automation_package_validation_run(
     )
     if package.status != "DRAFT":
         raise ResourceConflict("only a DRAFT automation package can start validation")
+    if package.supply_chain_status != "VERIFIED":
+        raise ResourceConflict(
+            "automation package must pass supply-chain verification before validation"
+        )
     run, created = await create_run(
         session,
         RunCreate(
@@ -1701,6 +2011,10 @@ async def create_rerun(
         raise ResourceNotFound("source Run scheduling resources no longer exist")
     if package.status == "REVOKED":
         raise ResourceConflict("a Run using a revoked automation package cannot be rerun")
+    if package.supply_chain_status not in SUPPLY_CHAIN_EXECUTABLE_STATUSES:
+        raise ResourceConflict(
+            "a Run using a supply-chain rejected automation package cannot be rerun"
+        )
     runner_pool_id = environment.runner_pool_id or target.runner_pool_id
     cases = source_snapshot.cases
     if mode == "FAILED_ONLY":
@@ -2149,6 +2463,7 @@ async def list_runs(
     statuses: tuple[RunStatus, ...] = (),
     target_id: UUID | None = None,
     environment_id: UUID | None = None,
+    automation_package_id: UUID | None = None,
     created_by: UUID | None = None,
     source_run_id: UUID | None = None,
     case_code: str | None = None,
@@ -2165,6 +2480,8 @@ async def list_runs(
         conditions.append(TestRunRecord.target_id == target_id)
     if environment_id is not None:
         conditions.append(TestRunRecord.environment_id == environment_id)
+    if automation_package_id is not None:
+        conditions.append(TestRunRecord.automation_package_id == automation_package_id)
     if created_by is not None:
         conditions.append(TestRunRecord.created_by == created_by)
     if source_run_id is not None:

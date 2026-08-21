@@ -2,7 +2,7 @@
 
 ## 适用范围
 
-本手册覆盖 `0.21.x` 控制面、Run Outbox、质量告警 Evaluator、Webhook Dispatcher、Scheduler、Reaper、Celery Worker、
+本手册覆盖 `0.30.x` 控制面、Run Outbox、质量告警 Evaluator、Webhook Dispatcher、Scheduler、Reaper、Celery Worker、
 PostgreSQL、Redis 和 MinIO 的发布、备份、恢复与基础故障处置。Compose 是单机验收基座，不替代生产 TLS、Ingress、托管
 数据库、对象存储权限和集中日志方案。
 
@@ -13,11 +13,118 @@ PostgreSQL、Redis 和 MinIO 的发布、备份、恢复与基础故障处置。
 2. 将所有 `change-me-*` 值替换为独立随机密钥；`BOOTSTRAP_ADMIN_TOKEN` 只在首次创建
    管理员时短暂启用，完成后从运行环境移除；
 3. 固定应用与基础镜像到经过验证的不可变摘要，并保存镜像清单；
-4. 运行一次完整备份和离线校验，记录备份位置、摘要、RPO/RTO 与恢复负责人；
-5. 确认 PostgreSQL、MinIO、队列和 Runner 工作区容量，以及告警接收链路；
-6. 确认前端代理对 SSE 关闭缓冲，但不公开代理 API `/metrics`；入口保持 1 MiB 请求体上限并隐藏 Nginx 版本；
-7. 对最终应用镜像和全部基础镜像运行漏洞扫描并保存报告。扫描器未运行、数据库过期或下载失败都必须按门禁未完成
+4. 配置非空且精确的供应链验证器、证书 issuer/identity、builder 和源码仓库允许清单，并只向 API 服务注入验证器
+   Ed25519 公钥、credential id 与批准的 HTTPS/SPIFFE 工作负载身份；私钥只保留在验证器工作负载中。用最终摘要完成
+   Cosign、provenance 与 SBOM 策略验证，在 CI 制品库保留原始证据；
+5. 核对每个 Runner Pool 的 `RUNNER_PACKAGE_CATALOG` 与已批准自动化包的 OCI Manifest Digest 一致，并确保
+   发布窗口内旧、新摘要都有健康 Worker 容量；
+6. 确认注册 Worker 使用 `RUNNER_EXECUTION_MODE=KUBERNETES` 或受控单节点 `CONTAINER`，心跳显示
+   `RUN_SECRETS_ONLY`、只读根、非默认网络和精确资源限制；抽检 Run Result 的实际镜像 ID、资源限制与部署配置一致，
+   并确认 Run Pod/容器不获得 Kubernetes Token、Docker Socket 或 hostPath；
+7. 运行一次完整备份和离线校验，记录备份位置、摘要、RPO/RTO 与恢复负责人；
+8. 确认 PostgreSQL、MinIO、队列和 Runner 工作区容量，以及告警接收链路；
+9. 确认前端代理对 SSE 关闭缓冲，但不公开代理 API `/metrics`；入口保持 1 MiB 请求体上限并隐藏 Nginx 版本；
+10. 对最终应用镜像和全部基础镜像运行漏洞扫描并保存报告。扫描器未运行、数据库过期或下载失败都必须按门禁未完成
    处理，不能以摘要固定或本地构建成功替代扫描结论。
+
+## 自动化包供应链准入
+
+新自动化包的顺序必须是：创建 DRAFT → CI 对精确 OCI 摘要验证签名/透明日志、SLSA provenance 和 SBOM →
+专用验证器服务提交签名 Envelope → 工作台显示 VERIFIED → 部署对应 Worker → 创建全量验证 Run → 激活。控制面不执行
+Cosign、不拉取 Registry 内容，也不保存原始证明；原始 Sigstore bundle、provenance、SBOM 和扫描报告必须在 CI
+制品库按报告摘要不可变保留。
+
+`SUPPLY_CHAIN_ALLOWED_VERIFIERS`、`SUPPLY_CHAIN_ALLOWED_CERTIFICATE_ISSUERS`、
+`SUPPLY_CHAIN_ALLOWED_CERTIFICATE_IDENTITIES`、`SUPPLY_CHAIN_ALLOWED_BUILDER_IDS` 和
+`SUPPLY_CHAIN_ALLOWED_SOURCE_REPOSITORIES` 任一为空时 VERIFIED 失败关闭。生产值必须精确到批准的工作流身份，不能
+使用通配符、个人分支身份或示例值。新报告为 REJECTED 时，新执行、计划触发和重跑立即停止；在途 Run 不会被
+改写，值班人员还必须根据事件完成包吊销和影响评估。
+
+`SUPPLY_CHAIN_VERIFIER_ED25519_KEYS` 是 JSON 数组，每项只包含 `credential_id`、`workload_identity` 和 32 字节原始
+Ed25519 公钥的无填充 base64url。身份只接受 HTTPS 或 SPIFFE URI。Envelope 必须携带
+`X-TestOps-Verifier-Key-Id`、Unix 秒级 `X-TestOps-Envelope-Created`、小写 UUID `X-TestOps-Envelope-Nonce` 和 compact
+detached JWS。受保护 Header 固定为 `alg=EdDSA`、匹配请求 Header 的 `kid` 和 TestOps profile type；签名输入覆盖 v2
+profile、HTTP 方法、路径、created、nonce、原始 JSON SHA-256、credential id 和绑定的工作负载身份。默认仅接受 300 秒
+内且未来偏差不超过 30 秒的请求。成功消费的 credential/nonce 在数据库唯一保存，同一 nonce 再次提交返回 409；相同
+报告使用新 nonce 重试返回原判定并追加 Envelope 审计。
+
+轮换时先同时配置旧、新公钥，重启 API 后让验证器切换到新私钥和 key-id，确认工作台显示新 key 指纹但保持同一工作
+负载身份，再移除旧公钥并重启。`SUPPLY_CHAIN_ALLOW_LEGACY_HMAC=false` 是默认值；只有迁移窗口才可显式设为 `true` 并
+临时配置 `SUPPLY_CHAIN_VERIFIER_HMAC_KEYS`，切换完成后必须再次关闭并移除共享秘密。禁止把私钥或 HMAC secret 写入
+报告、数据库、日志、前端变量或 Compose 公共环境锚点；生产仍必须使用 TLS，签名不提供传输机密性。
+
+### 可信 CI 提交客户端
+
+`scripts/submit_supply_chain_verification.py` 是验证器工作负载的最小提交入口。它不会执行 Cosign、provenance、SBOM 或
+漏洞检查；这些工具必须先生成符合 API 契约的 JSON 报告。客户端会再次验证报告字段，使用确定性紧凑 JSON 作为原始
+请求体，从受限文件加载未加密 PKCS8 PEM 或 32 字节原始 base64url Ed25519 私钥，生成唯一 nonce 后签名并提交。默认只
+接受无路径前缀的 HTTPS origin、使用系统 CA、拒绝 HTTP 跳转，并限制报告、私钥和响应大小。
+
+私钥内容不能放入命令参数、普通环境变量、仓库、构建日志或制品。CI Secret 应先写入权限仅限当前工作负载的临时文件，
+再通过 `TESTOPS_SUPPLY_CHAIN_PRIVATE_KEY_FILE` 传入；Windows 执行器必须用 ACL 达到同等边界。`--allow-http` 只允许本机
+隔离开发环境使用。`--dry-run` 会校验报告和密钥并输出请求摘要、公钥指纹、created 与 nonce，但不会发送请求，也不会
+打印签名 Header。
+
+```bash
+export TESTOPS_BASE_URL="https://testops.example.com"
+export TESTOPS_SUPPLY_CHAIN_CREDENTIAL_ID="ci-cosign-slsa-verifier/2026-08-ed25519"
+export TESTOPS_SUPPLY_CHAIN_WORKLOAD_IDENTITY="https://github.com/example/testops/.github/workflows/release.yml"
+export TESTOPS_SUPPLY_CHAIN_PRIVATE_KEY_FILE="${RUNNER_TEMP}/testops-verifier-key.pem"
+
+python scripts/submit_supply_chain_verification.py \
+  --project-id "<project-uuid>" \
+  --target-id "<target-uuid>" \
+  --package-id "<automation-package-uuid>" \
+  --report-file "${RUNNER_TEMP}/supply-chain-report.json"
+```
+
+GitHub Actions 中可从加密 Secret 创建临时文件；步骤结束时即使请求失败也必须删除。不要开启 shell trace。
+
+```yaml
+- name: Submit TestOps supply-chain verification
+  shell: bash
+  env:
+    TESTOPS_BASE_URL: https://testops.example.com
+    TESTOPS_SUPPLY_CHAIN_CREDENTIAL_ID: ci-cosign-slsa-verifier/2026-08-ed25519
+    TESTOPS_SUPPLY_CHAIN_WORKLOAD_IDENTITY: https://github.com/example/testops/.github/workflows/release.yml
+    TESTOPS_SUPPLY_CHAIN_PRIVATE_KEY_PEM: ${{ secrets.TESTOPS_SUPPLY_CHAIN_PRIVATE_KEY_PEM }}
+    TESTOPS_PROJECT_ID: ${{ vars.TESTOPS_PROJECT_ID }}
+    TESTOPS_TARGET_ID: ${{ vars.TESTOPS_TARGET_ID }}
+    TESTOPS_PACKAGE_ID: ${{ vars.TESTOPS_PACKAGE_ID }}
+  run: |
+    set -euo pipefail
+    umask 077
+    key_file="${RUNNER_TEMP}/testops-verifier-key.pem"
+    trap 'rm -f -- "${key_file}"' EXIT
+    printf '%s' "${TESTOPS_SUPPLY_CHAIN_PRIVATE_KEY_PEM}" > "${key_file}"
+    export TESTOPS_SUPPLY_CHAIN_PRIVATE_KEY_FILE="${key_file}"
+    python scripts/submit_supply_chain_verification.py \
+      --project-id "${TESTOPS_PROJECT_ID}" \
+      --target-id "${TESTOPS_TARGET_ID}" \
+      --package-id "${TESTOPS_PACKAGE_ID}" \
+      --report-file "${RUNNER_TEMP}/supply-chain-report.json"
+```
+
+成功输出中的 `credential_id`、`workload_identity`、`key_fingerprint`、`request_digest`、`created`、`nonce` 和 API 判定应与
+原始 Cosign/SLSA/SBOM 制品一起保存。HTTP 401 表示签名、身份、时间窗或 key-id 不匹配；409 表示 nonce 已消费；422
+表示报告契约错误；503 表示 API 未配置任何可用验证器公钥。禁止通过放宽 TLS、复用 nonce 或重新启用旧 HMAC 绕过失败。
+
+## Kubernetes Job 执行器
+
+生产模板见 `infra/kubernetes/m9.5.3-runner.yaml`。执行 Namespace 必须启用 Restricted Pod Security Admission，并由实际
+CNI 执行 NetworkPolicy；只有完成 CNI 验证后才能设置 `RUNNER_KUBERNETES_NETWORK_POLICY_ENFORCED=true`。控制器使用
+专用 ServiceAccount 和 Namespace Role，不能授予 ClusterRole、节点、Deployment 或其他 Namespace 权限。Run Pod 使用
+另一个非默认 ServiceAccount，`automountServiceAccountToken=false`，不能挂载控制器投影 Token、hostPath 或 Docker
+Socket。
+
+默认 `DENY_ALL` 不允许目标流量。改为 `ALLOWLIST` 前，把批准目标解析为最小 CIDR 集合，完成 DNS 重绑定、私网/元数据
+地址和 IPv4/IPv6 审查，再写入 `RUNNER_KUBERNETES_ALLOW_CIDRS`；当前实现是 Worker 级静态策略，不能把它描述为动态
+项目级域名策略。每次发布至少验证正常、预期失败、取消、超时、控制器重启和孤儿资源回收，并确认目标 Namespace 没有
+残留 `io.testops.managed=true` 的 Job、Pod、ConfigMap、Secret 或 NetworkPolicy。
+
+控制器通过短期投影 Token 访问 Kubernetes API，Run 完成后经 `pods/exec` 导出有界结果归档；因此 `pods/exec` 权限只授予
+控制器 Role。控制器仍是高信任边界，必须使用专用节点池、集中审计和最小控制面 Secret。真实 Registry 镜像必须固定 OCI
+Manifest Digest；示例 `registry.example.invalid` 不能直接用于生产。
 
 ## 升级流程
 
@@ -132,6 +239,11 @@ Dispatcher 使用的 Python/certifi 信任库并完成真实签名投递，不�
 | --- | --- | --- |
 | `/readyz` 返回 503 | PostgreSQL 连接、证书、容量、迁移版本 | 保持 API 摘流，恢复数据库连通后再放量 |
 | Run 长时间停留 QUEUED | Outbox 日志、Redis、Celery ping、派发积压指标 | 恢复发布器/Worker；确认 Reaper 在线，不要直接改 Run 状态 |
+| Run 显示 `AUTOMATION_PACKAGE_UNAVAILABLE` | Snapshot 的仓库/摘要、Worker 心跳目录、对应 Pool 健康容量 | 部署或恢复精确承载该摘要的 Worker；禁止改 Snapshot、改摘要或用可变标签替代 |
+| Run 显示 `RUNNER_ISOLATION_UNAVAILABLE` | Worker 的执行模式、心跳隔离能力、版本和对应 Pool | 优先恢复完整 `KUBERNETES` 能力，或在受控单节点使用 `CONTAINER`；滚动升级期间可保留较低级 Worker，但不要伪造心跳能力 |
+| Run 显示 `EXECUTOR_ISOLATION` | 镜像摘要、Docker/Kubernetes API、ServiceAccount、NetworkPolicy、只读挂载、资源限制与受管残留 | 暂停新 Run，修复执行器或精确回收同 Run 的受管资源；禁止关闭只读根、授予默认 SA、挂载宿主目录或向 Run 暴露 Docker Socket |
+| 包长期为 `PENDING` 或报告提交失败 | 五类允许清单、当前策略版本、Cosign issuer/identity、builder、源码仓库和证据摘要 | 修复 CI 验证或精确允许清单；禁止由项目管理员手工标记通过 |
+| ACTIVE 包变为供应链 `REJECTED` | 最新报告原因、签名/provenance/SBOM 原始证据、受影响 Run 和计划 | 保持新执行关闭，暂停计划并吊销包；保存证据，不修改历史 Snapshot |
 | Run 自动变为 TIMED_OUT | Run 冻结的 `timeout_seconds`、事件时间线、Runner 日志 | 判断是否合理调高项目策略，再从不可变 Snapshot 重跑 |
 | 失联 Worker 租约告警 | Worker 心跳、Reaper 日志、Pool 活动租约 | 隔离异常 Worker，确认租约自动回收后再恢复容量 |
 | 定时计划延迟告警 | Scheduler 日志、到期计划量、数据库锁与配额 | 恢复 Scheduler，核对补跑/跳过记录，禁止手工改 `next_fire_at` |

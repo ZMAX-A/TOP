@@ -6,6 +6,7 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -35,9 +36,20 @@ PROJECT_KEY = "platform-smoke"
 TARGET_KEY = "web"
 ENVIRONMENT_KEY = "compose"
 PACKAGE_NAME = "compose-smoke-runner"
-PACKAGE_VERSION = "0.22.0"
+PACKAGE_VERSION = "0.30.0"
 PASS_CASE_CODE = "TC-SMOKE-PASS"
 FAIL_CASE_CODE = "TC-SMOKE-FAIL"
+
+
+def runner_source_digest() -> str:
+    source_root = ROOT / "runners/web_playwright/src"
+    digest = hashlib.sha256()
+    for path in sorted(source_root.rglob("*.py")):
+        digest.update(path.relative_to(source_root).as_posix().encode("utf-8"))
+        digest.update(b"\0")
+        digest.update(path.read_bytes())
+        digest.update(b"\0")
+    return f"sha256:{digest.hexdigest()}"
 
 
 class SmokeError(RuntimeError):
@@ -215,9 +227,9 @@ def build_smoke_baseline() -> CaseBaseline:
     )
     source_digest = "sha256:" + hashlib.sha256(b"testops-compose-smoke-v1").hexdigest()
     return CaseBaseline(
-        baseline_id=uuid5(NAMESPACE_URL, "testops-platform/compose-smoke/baseline-v0.22.0"),
+        baseline_id=uuid5(NAMESPACE_URL, "testops-platform/compose-smoke/baseline-v0.30.0"),
         project_key=PROJECT_KEY,
-        version="case-v0.22.0",
+        version="case-v0.30.0",
         source=CaseBaselineSource(
             file_name="compose-smoke.json",
             file_digest=source_digest,
@@ -431,9 +443,7 @@ def ensure_resources(
     baseline_id = str(baseline_response["baseline_id"])
 
     packages_path = f"/api/v1/projects/{project_id}/targets/{target_id}/automation-packages"
-    package_digest = canonical_sha256(
-        {"name": PACKAGE_NAME, "version": PACKAGE_VERSION, "runner": "web-playwright"}
-    )
+    package_digest = runner_source_digest()
     _, payload = client.request("GET", packages_path, headers=headers)
     packages = _objects(payload, f"GET {packages_path}")
     package = next(
@@ -533,6 +543,36 @@ def validate_run(
     serialized = json.dumps(detail, ensure_ascii=False)
     if secret_value and secret_value in serialized:
         raise SmokeError(f"run {run_id} response leaked a bound secret value")
+    result = _object(detail.get("result"), f"run {run_id} result")
+    isolation = _object(
+        result.get("execution_isolation"),
+        f"run {run_id} execution isolation evidence",
+    )
+    expected_isolation = {
+        "mode": "CONTAINER",
+        "executor_version": PACKAGE_VERSION,
+        "dedicated_process": True,
+        "credential_scope": "RUN_SECRETS_ONLY",
+        "workspace_scope": "RUN_DIRECTORY",
+        "read_only_root_filesystem": True,
+        "network_policy": os.getenv("RUNNER_CONTAINER_NETWORK_POLICY", "ALLOWLIST"),
+        "resource_limits_enforced": True,
+        "memory_limit_bytes": int(os.getenv("RUNNER_CONTAINER_MEMORY_MIB", "1024")) * 1024 * 1024,
+        "cpu_limit_millis": int(os.getenv("RUNNER_CONTAINER_CPU_MILLIS", "1000")),
+        "pids_limit": int(os.getenv("RUNNER_CONTAINER_PIDS_LIMIT", "256")),
+    }
+    mismatches = {
+        field: {"expected": expected, "actual": isolation.get(field)}
+        for field, expected in expected_isolation.items()
+        if isolation.get(field) != expected
+    }
+    if mismatches:
+        raise SmokeError(f"run {run_id} isolation evidence mismatch: {mismatches}")
+    runtime_image_id = isolation.get("runtime_image_id")
+    if not isinstance(runtime_image_id, str) or not re.fullmatch(
+        r"sha256:[0-9a-f]{64}", runtime_image_id
+    ):
+        raise SmokeError(f"run {run_id} has no immutable runtime image ID")
 
     _, payload = client.request(
         "GET",
@@ -590,11 +630,13 @@ def validate_run(
         "events": len(events),
         "artifacts": len(artifacts),
         "verified_downloads": verified_downloads,
+        "execution_isolation": isolation,
     }
 
 
 def _docker_compose(*arguments: str) -> None:
-    docker = shutil.which("docker")
+    configured_docker = os.getenv("TESTOPS_DOCKER_EXECUTABLE", "").strip()
+    docker = configured_docker or shutil.which("docker")
     if docker is None:
         raise SmokeError("docker is required for --exercise-recovery")
     subprocess.run(

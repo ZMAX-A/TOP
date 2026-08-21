@@ -212,12 +212,10 @@ class WebRunConfig(FrozenModel):
     capture_trace: bool = True
 
 
-class AutomationPackageRef(FrozenModel):
-    name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9._-]*$")]
-    version: NonEmptyStr
-    digest: Sha256Digest
+class AutomationPackageRuntimeRef(FrozenModel):
     runner_type: Literal["WEB_PLAYWRIGHT"] = "WEB_PLAYWRIGHT"
     image_repository: NonEmptyStr = "testops-worker"
+    digest: Sha256Digest
 
     @field_validator("image_repository")
     @classmethod
@@ -227,6 +225,27 @@ class AutomationPackageRef(FrozenModel):
         if ":" in value.rsplit("/", 1)[-1]:
             raise ValueError("image_repository must not contain a mutable image tag")
         return value
+
+
+class AutomationPackageSupplyChainRef(FrozenModel):
+    verification_id: UUID
+    report_digest: Sha256Digest
+    policy_version: NonEmptyStr
+    verifier: NonEmptyStr
+    signature_bundle_digest: Sha256Digest
+    provenance_digest: Sha256Digest
+    sbom_digest: Sha256Digest
+    certificate_issuer: NonEmptyStr
+    certificate_identity: NonEmptyStr
+    builder_id: NonEmptyStr
+    source_repository: NonEmptyStr
+    source_revision: NonEmptyStr
+
+
+class AutomationPackageRef(AutomationPackageRuntimeRef):
+    name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9._-]*$")]
+    version: NonEmptyStr
+    supply_chain: AutomationPackageSupplyChainRef | None = None
 
 
 class RunSnapshot(FrozenModel):
@@ -311,6 +330,64 @@ class CaseResult(FrozenModel):
         return self
 
 
+class RunExecutionIsolationEvidence(FrozenModel):
+    mode: Literal["IN_PROCESS", "SUBPROCESS", "CONTAINER", "KUBERNETES"]
+    executor_version: NonEmptyStr
+    dedicated_process: bool
+    credential_scope: Literal["WORKER", "RUN_SECRETS_ONLY"]
+    workspace_scope: Literal["RUN_DIRECTORY"] = "RUN_DIRECTORY"
+    read_only_root_filesystem: bool
+    network_policy: Literal["WORKER_DEFAULT", "DENY_ALL", "ALLOWLIST"]
+    resource_limits_enforced: bool
+    runtime_image_id: Sha256Digest | None = None
+    memory_limit_bytes: Annotated[int, Field(ge=128 * 1024 * 1024)] | None = None
+    cpu_limit_millis: Annotated[int, Field(ge=100, le=32_000)] | None = None
+    pids_limit: Annotated[int, Field(ge=16, le=4096)] | None = None
+    ephemeral_storage_limit_bytes: Annotated[int, Field(ge=64 * 1024 * 1024)] | None = None
+    orchestrator_namespace: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"),
+        ]
+        | None
+    ) = None
+    service_account_name: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"),
+        ]
+        | None
+    ) = None
+    service_account_token_automounted: bool | None = None
+
+    @model_validator(mode="after")
+    def hard_isolation_evidence_is_complete(self) -> RunExecutionIsolationEvidence:
+        if self.mode not in {"CONTAINER", "KUBERNETES"}:
+            return self
+        if not self.dedicated_process or self.credential_scope != "RUN_SECRETS_ONLY":
+            raise ValueError("hard isolation requires a dedicated process and Run credentials")
+        if not self.read_only_root_filesystem or self.network_policy == "WORKER_DEFAULT":
+            raise ValueError("hard isolation requires filesystem and network enforcement")
+        if not self.resource_limits_enforced:
+            raise ValueError("hard isolation requires resource enforcement")
+        if None in (self.runtime_image_id, self.memory_limit_bytes, self.cpu_limit_millis):
+            raise ValueError("hard isolation requires an immutable image and exact limits")
+        if self.mode == "CONTAINER" and self.pids_limit is None:
+            raise ValueError("container isolation requires immutable image and exact limits")
+        if self.mode == "KUBERNETES":
+            if self.ephemeral_storage_limit_bytes is None:
+                raise ValueError("Kubernetes isolation requires an ephemeral storage limit")
+            if not self.orchestrator_namespace or not self.service_account_name:
+                raise ValueError(
+                    "Kubernetes isolation requires namespace and ServiceAccount evidence"
+                )
+            if self.service_account_name == "default":
+                raise ValueError("Kubernetes isolation cannot use the default ServiceAccount")
+            if self.service_account_token_automounted is not False:
+                raise ValueError("Kubernetes isolation must disable ServiceAccount token automount")
+        return self
+
+
 class RunResult(FrozenModel):
     schema_version: Literal["1.0"] = "1.0"
     run_id: UUID
@@ -320,6 +397,7 @@ class RunResult(FrozenModel):
     runner_version: NonEmptyStr
     case_results: tuple[CaseResult, ...]
     artifacts: tuple[Artifact, ...] = ()
+    execution_isolation: RunExecutionIsolationEvidence | None = None
 
     @field_validator("started_at", "finished_at")
     @classmethod

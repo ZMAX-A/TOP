@@ -10,6 +10,7 @@ from uuid import UUID
 from testops.contracts import (
     CaseResult,
     CaseResultStatus,
+    RunExecutionIsolationEvidence,
     RunResult,
     RunSnapshot,
     RunStatus,
@@ -19,7 +20,17 @@ from testops.runners.web import EnvironmentSecretProvider, PlaywrightWebAdapter
 from .artifact_store import ArtifactUploader
 from .celery_app import celery_app
 from .config import WorkerSettings
+from .container_execution import ContainerRunExecutor
 from .control_plane import ControlPlaneClient
+from .execution_isolation import (
+    IsolatedExecutionCanceled,
+    IsolatedExecutionError,
+    IsolatedExecutionTimedOut,
+    SubprocessRunExecutor,
+)
+from .isolated_executor import persist_run_result, subprocess_isolation_evidence
+from .kubernetes_execution import KubernetesRunExecutor
+from .package_runtime import PackageRuntimeUnavailable
 
 TERMINAL_RUN_STATUSES = frozenset(
     {
@@ -32,15 +43,28 @@ TERMINAL_RUN_STATUSES = frozenset(
 )
 
 
-def _recovery_result(job: RunSnapshot, error: Exception) -> RunResult:
+def _recovery_result(
+    job: RunSnapshot,
+    error: Exception,
+    *,
+    runner_version: str,
+    execution_isolation: RunExecutionIsolationEvidence | None = None,
+) -> RunResult:
     moment = datetime.now(UTC)
     safe_error = str(error)[:2000]
+    failure_category = (
+        "AUTOMATION_PACKAGE_UNAVAILABLE"
+        if isinstance(error, PackageRuntimeUnavailable)
+        else "EXECUTOR_ISOLATION"
+        if isinstance(error, IsolatedExecutionError)
+        else "WORKER_INFRASTRUCTURE"
+    )
     return RunResult(
         run_id=job.run_id,
         status=RunStatus.INFRA_ERROR,
         started_at=moment,
         finished_at=moment,
-        runner_version="0.1.0",
+        runner_version=runner_version,
         case_results=tuple(
             CaseResult(
                 case_id=case.case_id,
@@ -49,22 +73,28 @@ def _recovery_result(job: RunSnapshot, error: Exception) -> RunResult:
                 started_at=moment,
                 finished_at=moment,
                 duration_ms=0,
-                failure_category=("WORKER_INFRASTRUCTURE" if case.enabled else "case disabled"),
+                failure_category=(failure_category if case.enabled else "case disabled"),
                 error_message=safe_error if case.enabled else None,
             )
             for case in job.cases
         ),
+        execution_isolation=execution_isolation,
     )
 
 
-def _canceled_result(job: RunSnapshot) -> RunResult:
+def _canceled_result(
+    job: RunSnapshot,
+    *,
+    runner_version: str,
+    execution_isolation: RunExecutionIsolationEvidence | None = None,
+) -> RunResult:
     moment = datetime.now(UTC)
     return RunResult(
         run_id=job.run_id,
         status=RunStatus.CANCELED,
         started_at=moment,
         finished_at=moment,
-        runner_version="0.1.0",
+        runner_version=runner_version,
         case_results=tuple(
             CaseResult(
                 case_id=case.case_id,
@@ -77,7 +107,62 @@ def _canceled_result(job: RunSnapshot) -> RunResult:
             )
             for case in job.cases
         ),
+        execution_isolation=execution_isolation,
     )
+
+
+def _timed_out_result(
+    job: RunSnapshot,
+    *,
+    runner_version: str,
+    execution_isolation: RunExecutionIsolationEvidence,
+) -> RunResult:
+    moment = datetime.now(UTC)
+    return RunResult(
+        run_id=job.run_id,
+        status=RunStatus.TIMED_OUT,
+        started_at=moment,
+        finished_at=moment,
+        runner_version=runner_version,
+        case_results=tuple(
+            CaseResult(
+                case_id=case.case_id,
+                case_code=case.case_code,
+                status=(CaseResultStatus.INFRA_ERROR if case.enabled else CaseResultStatus.SKIPPED),
+                started_at=moment,
+                finished_at=moment,
+                duration_ms=0,
+                failure_category="EXECUTOR_TIMEOUT" if case.enabled else "case disabled",
+                error_message=("isolated Run exceeded executor timeout" if case.enabled else None),
+            )
+            for case in job.cases
+        ),
+        execution_isolation=execution_isolation,
+    )
+
+
+def _in_process_isolation_evidence(runner_version: str) -> RunExecutionIsolationEvidence:
+    return RunExecutionIsolationEvidence(
+        mode="IN_PROCESS",
+        executor_version=runner_version,
+        dedicated_process=False,
+        credential_scope="WORKER",
+        read_only_root_filesystem=False,
+        network_policy="WORKER_DEFAULT",
+        resource_limits_enforced=False,
+    )
+
+
+def _failed_isolation_evidence(
+    settings: WorkerSettings,
+    error: IsolatedExecutionError,
+) -> RunExecutionIsolationEvidence | None:
+    evidence = getattr(error, "execution_isolation", None)
+    if isinstance(evidence, RunExecutionIsolationEvidence):
+        return evidence
+    if settings.runner_execution_mode == "SUBPROCESS":
+        return subprocess_isolation_evidence(settings.runner_version)
+    return None
 
 
 def _existing_result(workspace_root: str, run_id: UUID) -> RunResult | None:
@@ -146,7 +231,7 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
         return {"run_id": str(job.run_id), "status": existing.status.value, "recovered": True}
 
     if initial_state["cancel_requested"]:
-        result = _canceled_result(job)
+        result = _canceled_result(job, runner_version=settings.runner_version)
         control_plane.report_result(result)
         return {
             "run_id": str(job.run_id),
@@ -154,36 +239,85 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
             "recovered": False,
         }
 
-    adapter = PlaywrightWebAdapter(
-        workspace_root=settings.workspace_root,
-        secret_provider=EnvironmentSecretProvider(),
-    )
     try:
         control_plane.report_status(
             job.run_id,
             RunStatus.PREPARING,
             worker_key=settings.runner_worker_key,
         )
-        adapter.prepare(job)
+        runtime = settings.runner_package_catalog.require(job.automation_package)
+        if runtime.runner_type != "WEB_PLAYWRIGHT":
+            raise PackageRuntimeUnavailable(
+                f"worker has no adapter for automation package runner type {runtime.runner_type}"
+            )
         control_plane.report_status(
             job.run_id,
             RunStatus.RUNNING,
             worker_key=settings.runner_worker_key,
         )
+        if settings.runner_execution_mode == "KUBERNETES":
+            result = KubernetesRunExecutor(settings, control_plane).execute(job)
+        elif settings.runner_execution_mode == "CONTAINER":
+            result = ContainerRunExecutor(settings, control_plane).execute(job)
+        elif settings.runner_execution_mode == "SUBPROCESS":
+            result = SubprocessRunExecutor(settings, control_plane).execute(job)
+        else:
+            adapter = PlaywrightWebAdapter(
+                workspace_root=settings.workspace_root,
+                secret_provider=EnvironmentSecretProvider(),
+            )
+            adapter.prepare(job)
 
-        def reporter(event: dict[str, object]) -> None:
-            try:
-                control_plane.report_event(job.run_id, event)
-            except Exception:
-                # The local JSONL event is replayed before the immutable result
-                # callback and again by a retried task if transport stays down.
-                pass
-            if event.get("event") == "case_started" and control_plane.cancel_requested(job.run_id):
-                adapter.cancel(str(job.run_id))
+            def reporter(event: dict[str, object]) -> None:
+                try:
+                    control_plane.report_event(job.run_id, event)
+                except Exception:
+                    # The local JSONL event is replayed before the immutable result
+                    # callback and again by a retried task if transport stays down.
+                    pass
+                if event.get("event") == "case_started" and control_plane.cancel_requested(
+                    job.run_id
+                ):
+                    adapter.cancel(str(job.run_id))
 
-        result = adapter.execute(job, reporter)
+            result = adapter.execute(job, reporter).model_copy(
+                update={
+                    "execution_isolation": _in_process_isolation_evidence(settings.runner_version)
+                }
+            )
+    except IsolatedExecutionCanceled as exc:
+        result = _canceled_result(
+            job,
+            runner_version=settings.runner_version,
+            execution_isolation=_failed_isolation_evidence(settings, exc),
+        )
+    except IsolatedExecutionTimedOut as exc:
+        evidence = _failed_isolation_evidence(settings, exc)
+        if evidence is None:
+            result = _recovery_result(
+                job,
+                exc,
+                runner_version=settings.runner_version,
+            )
+        else:
+            result = _timed_out_result(
+                job,
+                runner_version=settings.runner_version,
+                execution_isolation=evidence,
+            )
     except Exception as exc:
-        result = _recovery_result(job, exc)
+        isolation = (
+            _failed_isolation_evidence(settings, exc)
+            if isinstance(exc, IsolatedExecutionError)
+            else None
+        )
+        result = _recovery_result(
+            job,
+            exc,
+            runner_version=settings.runner_version,
+            execution_isolation=isolation,
+        )
+    persist_run_result(settings.workspace_root, result)
     _reconcile_events(settings.workspace_root, job.run_id, control_plane)
     uploaded = _upload_artifacts(result, settings)
     control_plane.report_result(uploaded)

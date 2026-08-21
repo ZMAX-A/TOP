@@ -32,6 +32,8 @@ const DISPATCH_WAIT_LABELS: Record<string, string> = {
   RUNNER_POOL_DISABLED: 'Runner Pool 已禁用',
   NO_HEALTHY_RUNNER: '正在等待健康 Runner 心跳',
   RUNNER_CAPABILITY_MISMATCH: '当前健康 Runner 的能力与此 Run 不匹配',
+  RUNNER_ISOLATION_UNAVAILABLE: '当前健康 Runner 未启用凭据最小化的子进程隔离',
+  AUTOMATION_PACKAGE_UNAVAILABLE: '当前健康 Runner 未承载该不可变自动化包',
   RUNNER_POOL_CAPACITY_EXHAUSTED: 'Runner Pool 槽位已满，正在等待释放',
   BROKER_PUBLISH_FAILED: '消息队列投递失败，系统正在自动重试',
 }
@@ -476,12 +478,85 @@ onBeforeUnmount(() => {
           <dl>
             <div><dt>基线</dt><dd>{{ run.snapshot.case_baseline.version }}</dd></div>
             <div><dt>自动化包</dt><dd>{{ run.snapshot.automation_package.name }}@{{ run.snapshot.automation_package.version }}</dd></div>
+            <div>
+              <dt>供应链</dt>
+              <dd>
+                <el-tag
+                  :type="run.snapshot.automation_package.supply_chain ? 'success' : 'info'"
+                  size="small"
+                  effect="plain"
+                >{{ run.snapshot.automation_package.supply_chain ? 'VERIFIED' : 'LEGACY' }}</el-tag>
+              </dd>
+            </div>
+            <div v-if="run.snapshot.automation_package.supply_chain">
+              <dt>准入策略</dt>
+              <dd>{{ run.snapshot.automation_package.supply_chain.policy_version }}</dd>
+            </div>
+            <div v-if="run.snapshot.automation_package.supply_chain">
+              <dt>证明报告</dt>
+              <dd class="mono">{{ shortDigest(run.snapshot.automation_package.supply_chain.report_digest) }}</dd>
+            </div>
+            <div v-if="run.snapshot.automation_package.supply_chain">
+              <dt>源码修订</dt>
+              <dd class="mono">{{ run.snapshot.automation_package.supply_chain.source_revision.slice(0, 12) }}</dd>
+            </div>
             <div><dt>浏览器</dt><dd>{{ run.snapshot.browser || '—' }}</dd></div>
             <div><dt>快照摘要</dt><dd class="mono">{{ shortDigest(run.snapshot_digest) }}</dd></div>
             <div><dt>配置摘要</dt><dd class="mono">{{ shortDigest(run.snapshot.config_hash) }}</dd></div>
             <div><dt>创建时间</dt><dd>{{ formatDate(run.created_at) }}</dd></div>
             <div><dt>结束时间</dt><dd>{{ formatDate(run.finished_at) }}</dd></div>
           </dl>
+        </section>
+
+        <section v-if="run.result?.execution_isolation" class="surface snapshot-card">
+          <h2>执行隔离证据</h2>
+          <dl>
+            <div>
+              <dt>执行模式</dt>
+              <dd><el-tag type="success" size="small">{{ run.result.execution_isolation.mode }}</el-tag></dd>
+            </div>
+            <div><dt>执行器版本</dt><dd>{{ run.result.execution_isolation.executor_version }}</dd></div>
+            <div><dt>独立进程</dt><dd>{{ run.result.execution_isolation.dedicated_process ? '已启用' : '未启用' }}</dd></div>
+            <div><dt>凭据范围</dt><dd>{{ run.result.execution_isolation.credential_scope }}</dd></div>
+            <div><dt>工作区范围</dt><dd>{{ run.result.execution_isolation.workspace_scope }}</dd></div>
+            <div><dt>只读根文件系统</dt><dd>{{ run.result.execution_isolation.read_only_root_filesystem ? '已强制' : '未强制' }}</dd></div>
+            <div><dt>网络策略</dt><dd>{{ run.result.execution_isolation.network_policy }}</dd></div>
+            <div><dt>资源限制</dt><dd>{{ run.result.execution_isolation.resource_limits_enforced ? '已强制' : '未强制' }}</dd></div>
+            <div v-if="run.result.execution_isolation.runtime_image_id">
+              <dt>不可变容器镜像</dt>
+              <dd class="mono">{{ shortDigest(run.result.execution_isolation.runtime_image_id) }}</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.memory_limit_bytes">
+              <dt>内存上限</dt>
+              <dd>{{ Math.round(run.result.execution_isolation.memory_limit_bytes / 1024 / 1024) }} MiB</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.cpu_limit_millis">
+              <dt>CPU 上限</dt><dd>{{ run.result.execution_isolation.cpu_limit_millis }} millicores</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.pids_limit">
+              <dt>PID 上限</dt><dd>{{ run.result.execution_isolation.pids_limit }}</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.ephemeral_storage_limit_bytes">
+              <dt>临时存储上限</dt>
+              <dd>{{ Math.round(run.result.execution_isolation.ephemeral_storage_limit_bytes / 1024 / 1024) }} MiB</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.orchestrator_namespace">
+              <dt>Namespace</dt><dd>{{ run.result.execution_isolation.orchestrator_namespace }}</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.service_account_name">
+              <dt>ServiceAccount</dt><dd>{{ run.result.execution_isolation.service_account_name }}</dd>
+            </div>
+            <div v-if="run.result.execution_isolation.service_account_token_automounted !== null && run.result.execution_isolation.service_account_token_automounted !== undefined">
+              <dt>SA Token 自动挂载</dt><dd>{{ run.result.execution_isolation.service_account_token_automounted ? '是' : '已禁用' }}</dd>
+            </div>
+          </dl>
+          <el-alert
+            v-if="!run.result.execution_isolation.read_only_root_filesystem || !run.result.execution_isolation.resource_limits_enforced"
+            title="当前执行结果未完整强制文件系统或资源硬隔离，请检查 Worker 执行模式与沙箱配置。"
+            type="warning"
+            :closable="false"
+            show-icon
+          />
         </section>
 
         <section class="surface timeline-card">

@@ -1,5 +1,7 @@
 import type {
   AutomationPackage,
+  AutomationPackageSupplyChainEnvelope,
+  AutomationPackageSupplyChainVerification,
   ArtifactAccess,
   AuditLog,
   Baseline,
@@ -306,6 +308,22 @@ export const api = {
     request<AutomationPackage>(
       `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}`,
     ),
+  packageSupplyChainVerifications: (
+    projectId: string,
+    targetId: string,
+    packageId: string,
+  ) =>
+    request<AutomationPackageSupplyChainVerification[]>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}/supply-chain-verifications`,
+    ),
+  packageSupplyChainEnvelopes: (
+    projectId: string,
+    targetId: string,
+    packageId: string,
+  ) =>
+    request<AutomationPackageSupplyChainEnvelope[]>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/${packageId}/supply-chain-envelopes`,
+    ),
   createPackageDraft: (projectId: string, targetId: string, payload: unknown) =>
     request<AutomationPackage>(
       `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/drafts`,
@@ -406,6 +424,7 @@ export const api = {
       status?: string[]
       target_id?: string
       environment_id?: string
+      automation_package_id?: string
       created_by?: string
       source_run_id?: string
       case_code?: string

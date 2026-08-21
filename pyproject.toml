@@ -1,11 +1,12 @@
 [project]
 name = "testops-platform"
-version = "0.22.0"
+version = "0.30.0"
 description = "Multi-project TestOps governance and execution platform"
 requires-python = ">=3.12"
 dependencies = [
   "asyncpg>=0.30,<1",
   "boto3>=1.35,<2",
+  "cryptography>=46,<51",
   "fastapi>=0.115,<1",
   "prometheus-client>=0.25,<1",
   "pydantic>=2.10,<3",
@@ -24,8 +25,12 @@ runner = [
 platform = [
   "alembic>=1.14,<2",
   "celery>=5.4,<6",
+  "docker>=7.1,<8",
   "httpx>=0.28,<1",
   "redis>=5.2,<7",
+]
+kubernetes-executor = [
+  "kubernetes>=33,<35",
 ]
 dev = [
   "aiosqlite>=0.21,<1",

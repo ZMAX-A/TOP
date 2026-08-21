@@ -141,6 +141,177 @@
       "title": "CaseResultStatus",
       "type": "string"
     },
+    "RunExecutionIsolationEvidence": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "enum": [
+            "IN_PROCESS",
+            "SUBPROCESS",
+            "CONTAINER",
+            "KUBERNETES"
+          ],
+          "title": "Mode",
+          "type": "string"
+        },
+        "executor_version": {
+          "minLength": 1,
+          "title": "Executor Version",
+          "type": "string"
+        },
+        "dedicated_process": {
+          "title": "Dedicated Process",
+          "type": "boolean"
+        },
+        "credential_scope": {
+          "enum": [
+            "WORKER",
+            "RUN_SECRETS_ONLY"
+          ],
+          "title": "Credential Scope",
+          "type": "string"
+        },
+        "workspace_scope": {
+          "const": "RUN_DIRECTORY",
+          "default": "RUN_DIRECTORY",
+          "title": "Workspace Scope",
+          "type": "string"
+        },
+        "read_only_root_filesystem": {
+          "title": "Read Only Root Filesystem",
+          "type": "boolean"
+        },
+        "network_policy": {
+          "enum": [
+            "WORKER_DEFAULT",
+            "DENY_ALL",
+            "ALLOWLIST"
+          ],
+          "title": "Network Policy",
+          "type": "string"
+        },
+        "resource_limits_enforced": {
+          "title": "Resource Limits Enforced",
+          "type": "boolean"
+        },
+        "runtime_image_id": {
+          "anyOf": [
+            {
+              "pattern": "^sha256:[0-9a-fA-F]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runtime Image Id"
+        },
+        "memory_limit_bytes": {
+          "anyOf": [
+            {
+              "minimum": 134217728,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Memory Limit Bytes"
+        },
+        "cpu_limit_millis": {
+          "anyOf": [
+            {
+              "maximum": 32000,
+              "minimum": 100,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Cpu Limit Millis"
+        },
+        "pids_limit": {
+          "anyOf": [
+            {
+              "maximum": 4096,
+              "minimum": 16,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Pids Limit"
+        },
+        "ephemeral_storage_limit_bytes": {
+          "anyOf": [
+            {
+              "minimum": 67108864,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Ephemeral Storage Limit Bytes"
+        },
+        "orchestrator_namespace": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Orchestrator Namespace"
+        },
+        "service_account_name": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Service Account Name"
+        },
+        "service_account_token_automounted": {
+          "anyOf": [
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Service Account Token Automounted"
+        }
+      },
+      "required": [
+        "mode",
+        "executor_version",
+        "dedicated_process",
+        "credential_scope",
+        "read_only_root_filesystem",
+        "network_policy",
+        "resource_limits_enforced"
+      ],
+      "title": "RunExecutionIsolationEvidence",
+      "type": "object"
+    },
     "RunStatus": {
       "enum": [
         "QUEUED",
@@ -201,6 +372,17 @@
       },
       "title": "Artifacts",
       "type": "array"
+    },
+    "execution_isolation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RunExecutionIsolationEvidence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     }
   },
   "required": [

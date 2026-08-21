@@ -46,6 +46,7 @@ const DISPATCH_WAIT_LABELS: Record<string, string> = {
   RUNNER_POOL_DISABLED: '资源池已禁用',
   NO_HEALTHY_RUNNER: '等待健康 Runner',
   RUNNER_CAPABILITY_MISMATCH: '等待匹配能力',
+  AUTOMATION_PACKAGE_UNAVAILABLE: '等待精确自动化包',
   RUNNER_POOL_CAPACITY_EXHAUSTED: '等待空闲槽位',
   BROKER_PUBLISH_FAILED: '队列投递重试中',
 }

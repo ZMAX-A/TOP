@@ -77,21 +77,6 @@
     "AutomationPackageRef": {
       "additionalProperties": false,
       "properties": {
-        "name": {
-          "pattern": "^[a-z0-9][a-z0-9._-]*$",
-          "title": "Name",
-          "type": "string"
-        },
-        "version": {
-          "minLength": 1,
-          "title": "Version",
-          "type": "string"
-        },
-        "digest": {
-          "pattern": "^sha256:[0-9a-fA-F]{64}$",
-          "title": "Digest",
-          "type": "string"
-        },
         "runner_type": {
           "const": "WEB_PLAYWRIGHT",
           "default": "WEB_PLAYWRIGHT",
@@ -103,14 +88,121 @@
           "minLength": 1,
           "title": "Image Repository",
           "type": "string"
+        },
+        "digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Digest",
+          "type": "string"
+        },
+        "name": {
+          "pattern": "^[a-z0-9][a-z0-9._-]*$",
+          "title": "Name",
+          "type": "string"
+        },
+        "version": {
+          "minLength": 1,
+          "title": "Version",
+          "type": "string"
+        },
+        "supply_chain": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/AutomationPackageSupplyChainRef"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         }
       },
       "required": [
+        "digest",
         "name",
-        "version",
-        "digest"
+        "version"
       ],
       "title": "AutomationPackageRef",
+      "type": "object"
+    },
+    "AutomationPackageSupplyChainRef": {
+      "additionalProperties": false,
+      "properties": {
+        "verification_id": {
+          "format": "uuid",
+          "title": "Verification Id",
+          "type": "string"
+        },
+        "report_digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Report Digest",
+          "type": "string"
+        },
+        "policy_version": {
+          "minLength": 1,
+          "title": "Policy Version",
+          "type": "string"
+        },
+        "verifier": {
+          "minLength": 1,
+          "title": "Verifier",
+          "type": "string"
+        },
+        "signature_bundle_digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Signature Bundle Digest",
+          "type": "string"
+        },
+        "provenance_digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Provenance Digest",
+          "type": "string"
+        },
+        "sbom_digest": {
+          "pattern": "^sha256:[0-9a-fA-F]{64}$",
+          "title": "Sbom Digest",
+          "type": "string"
+        },
+        "certificate_issuer": {
+          "minLength": 1,
+          "title": "Certificate Issuer",
+          "type": "string"
+        },
+        "certificate_identity": {
+          "minLength": 1,
+          "title": "Certificate Identity",
+          "type": "string"
+        },
+        "builder_id": {
+          "minLength": 1,
+          "title": "Builder Id",
+          "type": "string"
+        },
+        "source_repository": {
+          "minLength": 1,
+          "title": "Source Repository",
+          "type": "string"
+        },
+        "source_revision": {
+          "minLength": 1,
+          "title": "Source Revision",
+          "type": "string"
+        }
+      },
+      "required": [
+        "verification_id",
+        "report_digest",
+        "policy_version",
+        "verifier",
+        "signature_bundle_digest",
+        "provenance_digest",
+        "sbom_digest",
+        "certificate_issuer",
+        "certificate_identity",
+        "builder_id",
+        "source_repository",
+        "source_revision"
+      ],
+      "title": "AutomationPackageSupplyChainRef",
       "type": "object"
     },
     "CaseBaselineRef": {

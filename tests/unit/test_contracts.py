@@ -14,7 +14,12 @@ from testops.contracts import (
     CaseBaselineSource,
     CaseDefinition,
     CasePriority,
+    CaseResult,
+    CaseResultStatus,
+    RunExecutionIsolationEvidence,
+    RunResult,
     RunSnapshot,
+    RunStatus,
     RuntimeVariable,
     SecretBinding,
     StepDefinition,
@@ -162,6 +167,94 @@ class ContractTests(unittest.TestCase):
     def test_secret_like_runtime_variable_requires_secret_binding(self) -> None:
         with self.assertRaisesRegex(ValidationError, "must use a secret binding"):
             RuntimeVariable(name="TEST_PASSWORD", value="not-allowed")
+
+    def test_run_result_isolation_evidence_is_explicit_and_backward_compatible(self) -> None:
+        snapshot = run_snapshot()
+        moment = datetime.now(UTC)
+        result = RunResult(
+            run_id=snapshot.run_id,
+            status=RunStatus.PASSED,
+            started_at=moment,
+            finished_at=moment,
+            runner_version="0.27.0",
+            case_results=(
+                CaseResult(
+                    case_id=snapshot.cases[0].case_id,
+                    case_code=snapshot.cases[0].case_code,
+                    status=CaseResultStatus.PASSED,
+                    started_at=moment,
+                    finished_at=moment,
+                    duration_ms=0,
+                ),
+            ),
+        )
+        self.assertIsNone(result.execution_isolation)
+
+        evidence = RunExecutionIsolationEvidence(
+            mode="SUBPROCESS",
+            executor_version="0.27.0",
+            dedicated_process=True,
+            credential_scope="RUN_SECRETS_ONLY",
+            read_only_root_filesystem=False,
+            network_policy="WORKER_DEFAULT",
+            resource_limits_enforced=False,
+        )
+        enriched = result.model_copy(update={"execution_isolation": evidence})
+        self.assertEqual(enriched.execution_isolation.workspace_scope, "RUN_DIRECTORY")
+        self.assertFalse(enriched.execution_isolation.resource_limits_enforced)
+
+        container_evidence = RunExecutionIsolationEvidence(
+            mode="CONTAINER",
+            executor_version="0.28.0",
+            dedicated_process=True,
+            credential_scope="RUN_SECRETS_ONLY",
+            read_only_root_filesystem=True,
+            network_policy="ALLOWLIST",
+            resource_limits_enforced=True,
+            runtime_image_id="sha256:" + "a" * 64,
+            memory_limit_bytes=1024 * 1024 * 1024,
+            cpu_limit_millis=1000,
+            pids_limit=256,
+        )
+        self.assertEqual(container_evidence.mode, "CONTAINER")
+
+        kubernetes_evidence = RunExecutionIsolationEvidence(
+            mode="KUBERNETES",
+            executor_version="0.30.0",
+            dedicated_process=True,
+            credential_scope="RUN_SECRETS_ONLY",
+            read_only_root_filesystem=True,
+            network_policy="DENY_ALL",
+            resource_limits_enforced=True,
+            runtime_image_id="sha256:" + "b" * 64,
+            memory_limit_bytes=1024 * 1024 * 1024,
+            cpu_limit_millis=1000,
+            ephemeral_storage_limit_bytes=2 * 1024 * 1024 * 1024,
+            orchestrator_namespace="testops-runs",
+            service_account_name="testops-runner",
+            service_account_token_automounted=False,
+        )
+        self.assertEqual(kubernetes_evidence.mode, "KUBERNETES")
+
+        with self.assertRaisesRegex(ValueError, "default ServiceAccount"):
+            RunExecutionIsolationEvidence.model_validate(
+                {
+                    **kubernetes_evidence.model_dump(mode="python"),
+                    "service_account_name": "default",
+                }
+            )
+        self.assertEqual(container_evidence.pids_limit, 256)
+
+        with self.assertRaisesRegex(ValueError, "immutable image and exact limits"):
+            RunExecutionIsolationEvidence(
+                mode="CONTAINER",
+                executor_version="0.28.0",
+                dedicated_process=True,
+                credential_scope="RUN_SECRETS_ONLY",
+                read_only_root_filesystem=True,
+                network_policy="DENY_ALL",
+                resource_limits_enforced=True,
+            )
 
 
 if __name__ == "__main__":

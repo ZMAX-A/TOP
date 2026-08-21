@@ -357,6 +357,10 @@ class AutomationPackageRecord(TimestampMixin, Base):
             "status IN ('DRAFT', 'ACTIVE', 'DEPRECATED', 'REVOKED')",
             name="status_allowed",
         ),
+        CheckConstraint(
+            "supply_chain_status IN ('LEGACY', 'PENDING', 'VERIFIED', 'REJECTED')",
+            name="supply_chain_status_allowed",
+        ),
     )
 
     id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
@@ -397,6 +401,138 @@ class AutomationPackageRecord(TimestampMixin, Base):
     activated_by: Mapped[UUID | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
     activated_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     status_reason: Mapped[str | None] = mapped_column(String(500))
+    supply_chain_status: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="LEGACY",
+        server_default="LEGACY",
+    )
+    supply_chain_verification_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("automation_package_supply_chain_verifications.id", ondelete="SET NULL"),
+        index=True,
+    )
+    supply_chain_verified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class AutomationPackageSupplyChainVerificationRecord(Base):
+    __tablename__ = "automation_package_supply_chain_verifications"
+    __table_args__ = (
+        UniqueConstraint("automation_package_id", "report_digest"),
+        CheckConstraint(
+            "outcome IN ('VERIFIED', 'REJECTED')",
+            name="outcome_allowed",
+        ),
+        Index(
+            "ix_package_supply_chain_verifications_package_created",
+            "automation_package_id",
+            "created_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_id: Mapped[UUID] = mapped_column(
+        ForeignKey("test_targets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    automation_package_id: Mapped[UUID] = mapped_column(
+        ForeignKey("automation_packages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    outcome: Mapped[str] = mapped_column(String(32), nullable=False)
+    policy_version: Mapped[str] = mapped_column(String(128), nullable=False)
+    verifier: Mapped[str] = mapped_column(String(200), nullable=False)
+    image_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    signature_bundle_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    provenance_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    sbom_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    signature_verified: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    transparency_log_verified: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    provenance_verified: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    sbom_verified: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    certificate_issuer: Mapped[str] = mapped_column(String(500), nullable=False)
+    certificate_identity: Mapped[str] = mapped_column(String(500), nullable=False)
+    builder_id: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_repository: Mapped[str] = mapped_column(String(500), nullable=False)
+    source_revision: Mapped[str] = mapped_column(String(128), nullable=False)
+    report_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    reason: Mapped[str | None] = mapped_column(String(500))
+    verified_by: Mapped[UUID | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"),
+        index=True,
+    )
+    verified_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+
+
+class AutomationPackageSupplyChainEnvelopeRecord(Base):
+    __tablename__ = "automation_package_supply_chain_envelopes"
+    __table_args__ = (
+        UniqueConstraint("credential_id", "nonce"),
+        CheckConstraint(
+            "(signature_algorithm = 'HMAC-SHA256' "
+            "AND envelope_profile = 'testops-supply-chain-envelope-v1' "
+            "AND workload_identity IS NULL AND key_fingerprint IS NULL) "
+            "OR (signature_algorithm = 'ED25519' "
+            "AND envelope_profile = 'testops-supply-chain-envelope-v2' "
+            "AND workload_identity IS NOT NULL AND key_fingerprint IS NOT NULL)",
+            name="ck_supply_chain_envelope_signature_identity",
+        ),
+        Index(
+            "ix_package_supply_chain_envelopes_package_received",
+            "automation_package_id",
+            "received_at",
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    target_id: Mapped[UUID] = mapped_column(
+        ForeignKey("test_targets.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    automation_package_id: Mapped[UUID] = mapped_column(
+        ForeignKey("automation_packages.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    verification_id: Mapped[UUID] = mapped_column(
+        ForeignKey("automation_package_supply_chain_verifications.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    verifier: Mapped[str] = mapped_column(String(200), nullable=False)
+    credential_id: Mapped[str] = mapped_column(String(129), nullable=False)
+    envelope_profile: Mapped[str] = mapped_column(String(64), nullable=False)
+    signature_algorithm: Mapped[str] = mapped_column(String(20), nullable=False)
+    workload_identity: Mapped[str | None] = mapped_column(String(512))
+    key_fingerprint: Mapped[str | None] = mapped_column(String(71))
+    nonce: Mapped[str] = mapped_column(String(36), nullable=False)
+    issued_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    received_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
+    request_digest: Mapped[str] = mapped_column(String(71), nullable=False)
+    signature_digest: Mapped[str] = mapped_column(String(71), nullable=False)
 
 
 class RunnerPoolRecord(TimestampMixin, Base):

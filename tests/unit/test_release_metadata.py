@@ -35,7 +35,7 @@ def test_release_version_is_coherent_across_runtime_and_packaging() -> None:
 def test_release_has_one_migration_head_and_required_operations_evidence() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "infra/alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["20260820_0016"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["20260821_0019"]
 
     required = (
         ROOT / ".github/workflows/ci.yml",
@@ -57,5 +57,16 @@ def test_release_has_one_migration_head_and_required_operations_evidence() -> No
         ROOT / "docs/milestones/M8.4-quality-alert-operations.md",
         ROOT / "docs/milestones/M8.5-quality-webhook-replay.md",
         ROOT / "docs/milestones/M8.6-quality-operations-observability.md",
+        ROOT / "docs/milestones/M9.1-automation-package-lifecycle.md",
+        ROOT / "docs/milestones/M9.2-immutable-package-runtime-admission.md",
+        ROOT / "docs/milestones/M9.3-automation-package-workbench.md",
+        ROOT / "docs/milestones/M9.4.1-supply-chain-admission.md",
+        ROOT / "docs/milestones/M9.4.2-signed-verifier-envelopes.md",
+        ROOT / "docs/milestones/M9.5.1-subprocess-execution-isolation.md",
+        ROOT / "docs/milestones/M9.5.2-container-execution-isolation.md",
+        ROOT / "docs/milestones/M9.5.3-kubernetes-job-isolation.md",
+        ROOT / "docs/milestones/M9.6.1-asymmetric-verifier-identity.md",
+        ROOT / "infra/kubernetes/m9.5.3-runner.yaml",
+        ROOT / "scripts/submit_supply_chain_verification.py",
     )
     assert all(path.is_file() and path.stat().st_size > 0 for path in required)

@@ -1,6 +1,6 @@
 # TestOps Platform
 
-多项目自动化测试治理与执行平台，当前开发版本为 `0.22.0`。当前仓库是平台新代码的唯一开发目录；同级
+多项目自动化测试治理与执行平台，当前开发版本为 `0.30.0`。当前仓库是平台新代码的唯一开发目录；同级
 `../web` 是现有颜佳 AI Web 自动化项目，只作为首个 Web Runner 的迁移来源。
 
 ## 当前里程碑
@@ -14,7 +14,12 @@ M7.3（定时回归计划）、M7.4（运行可靠性与队列可观测性）、
 M7.6（目标、环境与基线质量维度）、M7.7（Flaky Case 识别）、M8.1（相邻窗口质量波动告警）和
 M8.2（质量告警 Webhook 可靠投递基础）、M8.3（质量告警自动评估状态机）和
 M8.4（质量告警人工确认与限时静默）、M8.5（失败投递人工重放）和
-M8.6（质量运营可观测性）已实现，M8 质量告警闭环开发完成。M9.1（自动化包生命周期控制面）已实现。
+M8.6（质量运营可观测性）已实现，M8 质量告警闭环开发完成。M9.1（自动化包生命周期控制面）和
+M9.2（不可变自动化包运行时准入）、M9.3（自动化包生命周期工作台）和
+M9.4.1（签名、来源证明与 SBOM 准入）、M9.4.2（验证器服务身份与签名 Envelope）和
+M9.5.1（每 Run 子进程与最小凭据隔离）、M9.5.2（每 Run 容器硬隔离）和
+M9.5.3（Kubernetes Job 执行隔离）和 M9.6.1（工作负载身份绑定与 Ed25519 验证器 Envelope）已实现；M9.5.3
+真实集群预验收与生产验证器密钥轮换演练仍是发布门禁。
 
 - 统一动作和断言能力注册表；
 - 平台用例、Runner Job、Runner Result 契约；
@@ -27,8 +32,24 @@ M8.6（质量运营可观测性）已实现，M8 质量告警闭环开发完成�
 - PostgreSQL/SQLAlchemy 控制面模型和首个 Alembic 迁移；
 - 项目、目标、环境、不可变基线、自动化包生命周期和 Run REST API；
 - 自动化包支持草稿、全量验证、激活、弃用和吊销，Runner 类型、OCI 仓库与不可变摘要进入 Run Snapshot；
+- 项目自动化包工作台支持按目标查看版本、创建草稿、发起全量验证、选择 PASSED Run 激活，以及带原因的弃用和
+  吊销；关联 Run 可按自动化包精确筛选并跳转到执行详情；
+- Runner Worker 心跳声明预装的不可变包目录；Outbox 按目标、浏览器和精确 `repository@sha256` 派发，
+  Worker 在进入 Adapter 前再次校验，未承载该包时失败关闭；
+- 新草稿必须由配置了可轮换专用凭据的可信 CI 验证器提交供应链验证报告；全局精确允许清单校验验证器、证书颁发者/身份、
+  构建器和源码仓库，签名、透明日志、provenance 与 SBOM 四项全部通过后才允许验证、激活和执行；
+- 供应链报告默认使用绑定 HTTPS/SPIFFE 工作负载身份和 credential id 的 Ed25519 detached JWS，覆盖方法、路径、
+  时间戳、UUID nonce 和原始请求体摘要；控制面只保存公钥、身份与指纹，校验短时时间窗并以数据库唯一约束拒绝
+  nonce 重放。旧 HMAC v1 默认关闭，仅供显式迁移窗口使用；
+- 可信 CI 使用 `scripts/submit_supply_chain_verification.py` 校验报告契约、从受限文件加载 Ed25519 私钥、生成 v2
+  Envelope 并提交判定；客户端默认只接受 HTTPS、拒绝重定向且不会在输出中打印私钥或签名 Header；
+- 供应链判定采用追加式记录，最新 VERIFIED/REJECTED 状态控制新执行、计划和重跑；VERIFIED 证明 ID、策略、
+  报告与证据摘要、构建来源冻结进 Run Snapshot，旧包以显式 `LEGACY` 状态兼容；
 - 幂等 Run 创建、不可变 Run Snapshot、显式状态机和事务 Outbox；
 - Redis/Celery Worker 投递、取消轮询、Runner 状态/结果回调和制品元数据入库；
+- Compose Worker 默认将每个 Run 放入独立 Docker 容器；Kubernetes Worker 为每个 Run 创建独立 Job、最小 Secret、
+  只读 Snapshot 和 Egress NetworkPolicy。两种硬隔离执行器都只注入 Snapshot 声明的 `TESTOPS_SECRET_*`，并在回读
+  实际镜像、文件系统、网络和资源参数后记录 Result 隔离证据；
 - 本地身份提供者使用 scrypt 密码哈希和只保存 SHA-256 摘要的不透明会话令牌；
 - System Admin、Project Admin、Tester、Reviewer、Viewer 五类角色和项目级权限；
 - 用例草稿、字段级 Diff、受影响用例验证、异人审批、候选全回归和确认发布；
@@ -270,6 +291,16 @@ python scripts/smoke_playwright.py
     或仍有写入流量时执行覆盖恢复。
 13. 普通 Run 和定时回归只能使用已激活自动化包；候选包必须通过 Released 基线全量验证后才能激活。
 14. 弃用包保留历史重跑能力；吊销包禁止新的普通执行、计划引用和历史重跑。
+15. Runner 只能执行其心跳已声明且本地目录再次确认的精确不可变包，不能按名称、版本或可变标签猜测替代。
+16. 新包验证前必须完成供应链准入；允许清单未配置、身份不匹配或任一签名/provenance/SBOM 检查失败时均关闭准入。
+17. 供应链准入报告只接受短时、完整覆盖并使用唯一 nonce 的验证器签名 Envelope；Ed25519 credential 必须绑定批准的
+    HTTPS/SPIFFE 工作负载身份，用户会话、重复 nonce、身份替换、过期签名或已移除的轮换公钥都不能写入判定。
+18. 注册 Worker 至少使用每 Run 独立子进程并仅注入 Snapshot 声明的测试密钥；生产容器 Worker 还必须强制只读根、
+    非默认网络和 CPU/内存/PID 限制，并从 Docker Engine 回读实际参数后才写入隔离证据。
+19. 父 Worker 的 Docker Engine 权限属于高信任执行控制面；Run 容器不得挂载 Docker Socket，只能使用一次性 Snapshot
+    只读卷、工作区卷和显式 allowlist/deny-all 网络，任何镜像标签或运行参数不一致都失败关闭。
+20. Kubernetes 控制器只能在专用 Namespace 使用最小 Role 管理受管 Run 资源；Run Pod 必须使用非默认
+    ServiceAccount、禁用 Token 自动挂载、无 hostPath/宿主命名空间，并以实际 Pod 与 NetworkPolicy 回读结果作为证据。
 
 阶段设计与验证证据见 [`docs/milestones`](docs/milestones)，M5 与 M6 详见
 [`M5.1-full-stack-runtime.md`](docs/milestones/M5.1-full-stack-runtime.md)、
@@ -289,5 +320,13 @@ python scripts/smoke_playwright.py
 [`M8.4-quality-alert-operations.md`](docs/milestones/M8.4-quality-alert-operations.md) 和
 [`M8.5-quality-webhook-replay.md`](docs/milestones/M8.5-quality-webhook-replay.md) 和
 [`M8.6-quality-operations-observability.md`](docs/milestones/M8.6-quality-operations-observability.md)，以及
-[`M9.1-automation-package-lifecycle.md`](docs/milestones/M9.1-automation-package-lifecycle.md)。发布前还必须完成
+[`M9.1-automation-package-lifecycle.md`](docs/milestones/M9.1-automation-package-lifecycle.md) 和
+[`M9.2-immutable-package-runtime-admission.md`](docs/milestones/M9.2-immutable-package-runtime-admission.md) 和
+[`M9.3-automation-package-workbench.md`](docs/milestones/M9.3-automation-package-workbench.md) 和
+[`M9.4.1-supply-chain-admission.md`](docs/milestones/M9.4.1-supply-chain-admission.md) 和
+[`M9.4.2-signed-verifier-envelopes.md`](docs/milestones/M9.4.2-signed-verifier-envelopes.md) 和
+[`M9.5.1-subprocess-execution-isolation.md`](docs/milestones/M9.5.1-subprocess-execution-isolation.md) 和
+[`M9.5.2-container-execution-isolation.md`](docs/milestones/M9.5.2-container-execution-isolation.md) 和
+[`M9.5.3-kubernetes-job-isolation.md`](docs/milestones/M9.5.3-kubernetes-job-isolation.md) 和
+[`M9.6.1-asymmetric-verifier-identity.md`](docs/milestones/M9.6.1-asymmetric-verifier-identity.md)。发布前还必须完成
 [`生产验收清单`](docs/operations/release-checklist.md)。

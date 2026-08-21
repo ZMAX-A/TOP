@@ -26,6 +26,7 @@ from .persistence import (
 )
 from .schemas import RegressionScheduleCreate, RegressionScheduleUpdate, RunCreate
 from .services import (
+    SUPPLY_CHAIN_EXECUTABLE_STATUSES,
     InvalidRequest,
     ResourceConflict,
     ResourceNotFound,
@@ -99,6 +100,10 @@ async def _validate_resources(
         raise ResourceNotFound("automation package not found for target")
     if package.status != "ACTIVE":
         raise ResourceConflict("regression schedules require an ACTIVE automation package")
+    if package.supply_chain_status not in SUPPLY_CHAIN_EXECUTABLE_STATUSES:
+        raise ResourceConflict(
+            "regression schedules require a supply-chain admitted automation package"
+        )
     baseline = CaseBaseline.model_validate(baseline_record.document)
     if not _select_cases(baseline, case_codes):
         raise InvalidRequest("regression schedule must contain at least one enabled case")

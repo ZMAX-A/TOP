@@ -1,0 +1,193 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: testops-runs
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: testops-controller
+  namespace: testops-runs
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: testops-runner
+  namespace: testops-runs
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: testops-controller
+  namespace: testops-runs
+rules:
+  - apiGroups: ["batch"]
+    resources: ["jobs"]
+    verbs: ["create", "get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "delete"]
+  - apiGroups: [""]
+    resources: ["pods/exec"]
+    verbs: ["create"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["create", "get", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["create", "get", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: testops-controller
+  namespace: testops-runs
+subjects:
+  - kind: ServiceAccount
+    name: testops-controller
+    namespace: testops-runs
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: testops-controller
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: testops-controller
+  namespace: testops-runs
+data:
+  RUNNER_WORKER_KEY: kubernetes-web-1
+  RUNNER_POOL_KEY: default-web
+  RUNNER_DISPLAY_NAME: Kubernetes Web Worker 1
+  RUNNER_VERSION: 0.30.0
+  RUNNER_MAX_SLOTS: "1"
+  RUNNER_CAPABILITIES: '{"target_types":["WEB"],"browsers":["chromium"],"labels":{"runtime":"kubernetes","os":"linux"}}'
+  RUNNER_PACKAGE_CATALOG: '[{"runner_type":"WEB_PLAYWRIGHT","image_repository":"registry.example.invalid/testops/yanjia-web","digest":"sha256:e040482d91882b9be417b94cd0c404c072b7988bd61a04bb6d82da1f0b68f5e7"}]'
+  RUNNER_EXECUTION_MODE: KUBERNETES
+  RUNNER_EXECUTOR_POLL_SECONDS: "2"
+  RUNNER_EXECUTOR_TIMEOUT_SECONDS: "3600"
+  RUNNER_KUBERNETES_NAMESPACE: testops-runs
+  RUNNER_KUBERNETES_SERVICE_ACCOUNT: testops-runner
+  RUNNER_KUBERNETES_NETWORK_POLICY: DENY_ALL
+  RUNNER_KUBERNETES_NETWORK_POLICY_ENFORCED: "true"
+  RUNNER_KUBERNETES_ALLOW_CIDRS: ""
+  RUNNER_KUBERNETES_MEMORY_MIB: "1024"
+  RUNNER_KUBERNETES_CPU_MILLIS: "1000"
+  RUNNER_KUBERNETES_EPHEMERAL_STORAGE_MIB: "2048"
+  RUNNER_KUBERNETES_CLEANUP_TTL_SECONDS: "300"
+  RUNNER_KUBERNETES_IN_CLUSTER: "true"
+  RUNNER_WORKSPACE_ROOT: /var/lib/testops/controller-runs
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: testops-controller
+  namespace: testops-runs
+  labels:
+    app.kubernetes.io/name: testops-controller
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: testops-controller
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: testops-controller
+    spec:
+      automountServiceAccountToken: false
+      serviceAccountName: testops-controller
+      enableServiceLinks: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        runAsGroup: 1001
+        fsGroup: 1001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: controller
+          image: registry.example.invalid/testops/controller@sha256:e040482d91882b9be417b94cd0c404c072b7988bd61a04bb6d82da1f0b68f5e7
+          imagePullPolicy: IfNotPresent
+          command:
+            - python
+            - -m
+            - celery
+            - -A
+            - testops.worker.celery_app:celery_app
+            - worker
+            - --loglevel=INFO
+            - --pool=solo
+            - --hostname=testops-kubernetes@%h
+            - --queues=celery,testops.pool.default-web
+          envFrom:
+            - configMapRef:
+                name: testops-controller
+            - secretRef:
+                name: testops-worker-control-plane
+          resources:
+            requests:
+              cpu: 250m
+              memory: 512Mi
+              ephemeral-storage: 512Mi
+            limits:
+              cpu: "1"
+              memory: 1Gi
+              ephemeral-storage: 2Gi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            capabilities:
+              drop: ["ALL"]
+            seccompProfile:
+              type: RuntimeDefault
+          volumeMounts:
+            - name: api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+            - name: workspace
+              mountPath: /var/lib/testops/controller-runs
+            - name: tmp
+              mountPath: /tmp
+            - name: home
+              mountPath: /home/pwuser
+      volumes:
+        - name: api-access
+          projected:
+            defaultMode: 420
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+                  audience: https://kubernetes.default.svc
+              - configMap:
+                  name: kube-root-ca.crt
+                  items:
+                    - key: ca.crt
+                      path: ca.crt
+              - downwardAPI:
+                  items:
+                    - path: namespace
+                      fieldRef:
+                        apiVersion: v1
+                        fieldPath: metadata.namespace
+        - name: workspace
+          emptyDir:
+            sizeLimit: 2Gi
+        - name: tmp
+          emptyDir:
+            medium: Memory
+            sizeLimit: 256Mi
+        - name: home
+          emptyDir:
+            medium: Memory
+            sizeLimit: 64Mi

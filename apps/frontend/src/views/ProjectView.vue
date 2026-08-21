@@ -3,6 +3,7 @@ import { computed, onMounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft,
+  Box,
   DataAnalysis,
   DocumentAdd,
   Lock,
@@ -178,6 +179,10 @@ onMounted(load)
       </div>
       <div class="heading-actions">
         <el-button :icon="Refresh" @click="load">刷新</el-button>
+        <el-button
+          :icon="Box"
+          @click="router.push({ name: 'project-automation-packages', params: { projectId } })"
+        >自动化包</el-button>
         <el-button
           :icon="DataAnalysis"
           @click="router.push({ name: 'project-quality', params: { projectId } })"

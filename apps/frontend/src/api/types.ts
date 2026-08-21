@@ -305,6 +305,26 @@ export interface RunnerCapabilities {
   target_types: Array<'WEB' | 'APP' | 'API'>
   browsers: string[]
   labels: Record<string, string>
+  automation_packages: Array<{
+    runner_type: 'WEB_PLAYWRIGHT'
+    image_repository: string
+    digest: string
+  }>
+  execution_isolation?: {
+    mode: 'IN_PROCESS' | 'SUBPROCESS' | 'CONTAINER' | 'KUBERNETES'
+    dedicated_process: boolean
+    credential_scope: 'WORKER' | 'RUN_SECRETS_ONLY'
+    read_only_root_filesystem: boolean
+    network_policy: 'WORKER_DEFAULT' | 'DENY_ALL' | 'ALLOWLIST'
+    resource_limits_enforced: boolean
+    memory_limit_bytes?: number | null
+    cpu_limit_millis?: number | null
+    pids_limit?: number | null
+    ephemeral_storage_limit_bytes?: number | null
+    orchestrator_namespace?: string | null
+    service_account_name?: string | null
+    service_account_token_automounted?: boolean | null
+  }
 }
 
 export interface RunnerWorker {
@@ -425,8 +445,60 @@ export interface AutomationPackage {
   activated_by: string | null
   activated_at: string | null
   status_reason: string | null
+  supply_chain_status: 'LEGACY' | 'PENDING' | 'VERIFIED' | 'REJECTED'
+  supply_chain_verification_id: string | null
+  supply_chain_verified_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface AutomationPackageSupplyChainVerification {
+  id: string
+  project_id: string
+  target_id: string
+  automation_package_id: string
+  outcome: 'VERIFIED' | 'REJECTED'
+  policy_version: string
+  verifier: string
+  image_digest: string
+  signature_bundle_digest: string
+  provenance_digest: string
+  sbom_digest: string
+  signature_verified: boolean
+  transparency_log_verified: boolean
+  provenance_verified: boolean
+  sbom_verified: boolean
+  certificate_issuer: string
+  certificate_identity: string
+  builder_id: string
+  source_repository: string
+  source_revision: string
+  report_digest: string
+  reason: string | null
+  verified_by: string | null
+  verified_at: string
+  created_at: string
+}
+
+export interface AutomationPackageSupplyChainEnvelope {
+  id: string
+  project_id: string
+  target_id: string
+  automation_package_id: string
+  verification_id: string
+  verifier: string
+  credential_id: string
+  envelope_profile:
+    | 'testops-supply-chain-envelope-v1'
+    | 'testops-supply-chain-envelope-v2'
+  signature_algorithm: 'HMAC-SHA256' | 'ED25519'
+  workload_identity: string | null
+  key_fingerprint: string | null
+  nonce: string
+  issued_at: string
+  received_at: string
+  request_digest: string
+  signature_digest: string
 }
 
 export interface Baseline {
@@ -599,6 +671,24 @@ export interface RunResult {
   runner_version: string
   case_results: CaseResult[]
   artifacts: Artifact[]
+  execution_isolation?: {
+    mode: 'IN_PROCESS' | 'SUBPROCESS' | 'CONTAINER' | 'KUBERNETES'
+    executor_version: string
+    dedicated_process: boolean
+    credential_scope: 'WORKER' | 'RUN_SECRETS_ONLY'
+    workspace_scope: 'RUN_DIRECTORY'
+    read_only_root_filesystem: boolean
+    network_policy: 'WORKER_DEFAULT' | 'DENY_ALL' | 'ALLOWLIST'
+    resource_limits_enforced: boolean
+    runtime_image_id?: string | null
+    memory_limit_bytes?: number | null
+    cpu_limit_millis?: number | null
+    pids_limit?: number | null
+    ephemeral_storage_limit_bytes?: number | null
+    orchestrator_namespace?: string | null
+    service_account_name?: string | null
+    service_account_token_automounted?: boolean | null
+  } | null
 }
 
 export interface RunSnapshot {
@@ -618,6 +708,22 @@ export interface RunSnapshot {
     name: string
     version: string
     digest: string
+    runner_type: 'WEB_PLAYWRIGHT'
+    image_repository: string
+    supply_chain: {
+      verification_id: string
+      report_digest: string
+      policy_version: string
+      verifier: string
+      signature_bundle_digest: string
+      provenance_digest: string
+      sbom_digest: string
+      certificate_issuer: string
+      certificate_identity: string
+      builder_id: string
+      source_repository: string
+      source_revision: string
+    } | null
   }
   [key: string]: unknown
 }

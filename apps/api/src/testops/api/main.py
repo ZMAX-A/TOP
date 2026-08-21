@@ -25,7 +25,7 @@ from .reliability_services import collect_reliability_snapshot
 from .routes import router
 from .services import ServiceError
 
-API_VERSION = "0.22.0"
+API_VERSION = "0.30.0"
 LOGGER = logging.getLogger(__name__)
 
 

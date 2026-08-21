@@ -95,6 +95,66 @@ def _worker_matches(
     return True
 
 
+def _worker_hosts_package(
+    worker: RunnerWorkerRecord,
+    *,
+    runner_type: str,
+    image_repository: str,
+    digest: str,
+) -> bool:
+    advertised = worker.capabilities.get("automation_packages", [])
+    if not isinstance(advertised, list):
+        return False
+    requested_digest = digest.lower()
+    return any(
+        isinstance(package, dict)
+        and package.get("runner_type") == runner_type
+        and package.get("image_repository") == image_repository
+        and str(package.get("digest", "")).lower() == requested_digest
+        for package in advertised
+    )
+
+
+def _worker_supports_execution_isolation(worker: RunnerWorkerRecord) -> bool:
+    isolation = worker.capabilities.get("execution_isolation")
+    if not isinstance(isolation, dict):
+        return False
+    if isolation.get("mode") == "SUBPROCESS":
+        return (
+            isolation.get("dedicated_process") is True
+            and isolation.get("credential_scope") == "RUN_SECRETS_ONLY"
+        )
+    mode = isolation.get("mode")
+    if mode not in {"CONTAINER", "KUBERNETES"}:
+        return False
+    hard_isolation = (
+        isolation.get("dedicated_process") is True
+        and isolation.get("credential_scope") == "RUN_SECRETS_ONLY"
+        and isolation.get("read_only_root_filesystem") is True
+        and isolation.get("network_policy") in {"DENY_ALL", "ALLOWLIST"}
+        and isolation.get("resource_limits_enforced") is True
+        and isinstance(isolation.get("memory_limit_bytes"), int)
+        and isinstance(isolation.get("cpu_limit_millis"), int)
+    )
+    if not hard_isolation:
+        return False
+    if mode == "CONTAINER":
+        return isinstance(isolation.get("pids_limit"), int)
+    return (
+        isinstance(isolation.get("ephemeral_storage_limit_bytes"), int)
+        and isinstance(isolation.get("orchestrator_namespace"), str)
+        and isolation.get("service_account_name") not in {None, "", "default"}
+        and isolation.get("service_account_token_automounted") is False
+    )
+
+
+def _worker_isolation_rank(worker: RunnerWorkerRecord) -> int:
+    isolation = worker.capabilities.get("execution_isolation")
+    if not isinstance(isolation, dict):
+        return 0
+    return {"SUBPROCESS": 1, "CONTAINER": 2, "KUBERNETES": 3}.get(str(isolation.get("mode")), 0)
+
+
 async def _prepare_run_dispatch(
     session: AsyncSession,
     record: DispatchOutboxRecord,
@@ -143,13 +203,42 @@ async def _prepare_run_dispatch(
     target_type = str(snapshot["target_type"])
     raw_browser = snapshot.get("browser")
     browser = str(raw_browser) if raw_browser is not None else None
-    eligible_workers = tuple(
+    capable_workers = tuple(
         worker
         for worker in healthy_workers
         if _worker_matches(worker, target_type=target_type, browser=browser)
     )
-    if not eligible_workers:
+    if not capable_workers:
         raise CapacityWait("RUNNER_CAPABILITY_MISMATCH")
+    isolated_workers = tuple(
+        worker for worker in capable_workers if _worker_supports_execution_isolation(worker)
+    )
+    if not isolated_workers:
+        raise CapacityWait("RUNNER_ISOLATION_UNAVAILABLE")
+    automation_package = snapshot.get("automation_package")
+    if not isinstance(automation_package, dict):
+        raise ValueError("Outbox Run Snapshot has no automation package runtime")
+    runner_type = str(automation_package.get("runner_type", ""))
+    image_repository = str(automation_package.get("image_repository", ""))
+    package_digest = str(automation_package.get("digest", ""))
+    package_workers = tuple(
+        worker
+        for worker in isolated_workers
+        if _worker_hosts_package(
+            worker,
+            runner_type=runner_type,
+            image_repository=image_repository,
+            digest=package_digest,
+        )
+    )
+    if not package_workers:
+        raise CapacityWait("AUTOMATION_PACKAGE_UNAVAILABLE")
+    strongest_isolation = max(_worker_isolation_rank(worker) for worker in package_workers)
+    eligible_workers = tuple(
+        worker
+        for worker in package_workers
+        if _worker_isolation_rank(worker) == strongest_isolation
+    )
 
     existing_lease = await session.scalar(
         select(RunnerSlotLeaseRecord).where(

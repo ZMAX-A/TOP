@@ -18,6 +18,7 @@ from pydantic import (
 )
 
 from testops.contracts import (
+    AutomationPackageRuntimeRef,
     CaseBaseline,
     CaseResultStatus,
     RunResult,
@@ -548,6 +549,59 @@ class RegressionScheduleFiringResponse(ApiModel):
         return _as_utc(value)
 
 
+class RunnerExecutionIsolationCapabilities(ApiModel):
+    mode: Literal["IN_PROCESS", "SUBPROCESS", "CONTAINER", "KUBERNETES"]
+    dedicated_process: bool
+    credential_scope: Literal["WORKER", "RUN_SECRETS_ONLY"]
+    read_only_root_filesystem: bool
+    network_policy: Literal["WORKER_DEFAULT", "DENY_ALL", "ALLOWLIST"]
+    resource_limits_enforced: bool
+    memory_limit_bytes: Annotated[int, Field(ge=128 * 1024 * 1024)] | None = None
+    cpu_limit_millis: Annotated[int, Field(ge=100, le=32_000)] | None = None
+    pids_limit: Annotated[int, Field(ge=16, le=4096)] | None = None
+    ephemeral_storage_limit_bytes: Annotated[int, Field(ge=64 * 1024 * 1024)] | None = None
+    orchestrator_namespace: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"),
+        ]
+        | None
+    ) = None
+    service_account_name: (
+        Annotated[
+            str,
+            StringConstraints(pattern=r"^[a-z0-9](?:[-a-z0-9]{0,61}[a-z0-9])?$"),
+        ]
+        | None
+    ) = None
+    service_account_token_automounted: bool | None = None
+
+    @model_validator(mode="after")
+    def hard_isolation_capabilities_are_complete(self) -> RunnerExecutionIsolationCapabilities:
+        if self.mode not in {"CONTAINER", "KUBERNETES"}:
+            return self
+        if not self.dedicated_process or self.credential_scope != "RUN_SECRETS_ONLY":
+            raise ValueError("hard isolation requires a dedicated process and Run credentials")
+        if not self.read_only_root_filesystem or self.network_policy == "WORKER_DEFAULT":
+            raise ValueError("hard isolation requires filesystem and network enforcement")
+        if not self.resource_limits_enforced:
+            raise ValueError("hard isolation requires resource enforcement")
+        if None in (self.memory_limit_bytes, self.cpu_limit_millis):
+            raise ValueError("hard isolation requires exact resource limits")
+        if self.mode == "CONTAINER" and self.pids_limit is None:
+            raise ValueError("container isolation requires exact resource limits")
+        if self.mode == "KUBERNETES":
+            if self.ephemeral_storage_limit_bytes is None:
+                raise ValueError("Kubernetes isolation requires an ephemeral storage limit")
+            if not self.orchestrator_namespace or not self.service_account_name:
+                raise ValueError("Kubernetes isolation requires namespace and ServiceAccount")
+            if self.service_account_name == "default":
+                raise ValueError("Kubernetes isolation cannot use the default ServiceAccount")
+            if self.service_account_token_automounted is not False:
+                raise ValueError("Kubernetes isolation must disable ServiceAccount token automount")
+        return self
+
+
 class RunnerCapabilities(ApiModel):
     target_types: Annotated[tuple[TargetType, ...], Field(min_length=1, max_length=8)]
     browsers: Annotated[
@@ -558,6 +612,11 @@ class RunnerCapabilities(ApiModel):
         Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9_.-]*$")],
         Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)],
     ] = Field(default_factory=dict)
+    automation_packages: Annotated[
+        tuple[AutomationPackageRuntimeRef, ...],
+        Field(max_length=50),
+    ] = ()
+    execution_isolation: RunnerExecutionIsolationCapabilities | None = None
 
     @model_validator(mode="after")
     def unique_capabilities(self) -> RunnerCapabilities:
@@ -565,6 +624,12 @@ class RunnerCapabilities(ApiModel):
             raise ValueError("target_types contains duplicates")
         if len(self.browsers) != len(set(self.browsers)):
             raise ValueError("browsers contains duplicates")
+        package_keys = [
+            (package.runner_type, package.image_repository, package.digest)
+            for package in self.automation_packages
+        ]
+        if len(package_keys) != len(set(package_keys)):
+            raise ValueError("automation_packages contains duplicates")
         return self
 
 
@@ -782,6 +847,98 @@ class AutomationPackageStatusChangeRequest(ApiModel):
     reason: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=500)]
 
 
+EvidenceText = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+]
+
+
+class AutomationPackageSupplyChainVerificationCreate(ApiModel):
+    outcome: Literal["VERIFIED", "REJECTED"]
+    policy_version: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=128),
+    ]
+    verifier: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+    ]
+    image_digest: Digest
+    signature_bundle_digest: Digest
+    provenance_digest: Digest
+    sbom_digest: Digest
+    signature_verified: bool
+    transparency_log_verified: bool
+    provenance_verified: bool
+    sbom_verified: bool
+    certificate_issuer: EvidenceText
+    certificate_identity: EvidenceText
+    builder_id: EvidenceText
+    source_repository: EvidenceText
+    source_revision: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=128),
+    ]
+    reason: (
+        Annotated[
+            str,
+            StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+        ]
+        | None
+    ) = None
+
+    @model_validator(mode="after")
+    def verified_outcome_requires_all_checks(
+        self,
+    ) -> AutomationPackageSupplyChainVerificationCreate:
+        checks = (
+            self.signature_verified,
+            self.transparency_log_verified,
+            self.provenance_verified,
+            self.sbom_verified,
+        )
+        if self.outcome == "VERIFIED" and not all(checks):
+            raise ValueError("VERIFIED supply-chain outcome requires every check to pass")
+        if self.outcome == "REJECTED" and self.reason is None:
+            raise ValueError("REJECTED supply-chain outcome requires a reason")
+        return self
+
+
+class AutomationPackageSupplyChainVerificationResponse(
+    AutomationPackageSupplyChainVerificationCreate
+):
+    id: UUID
+    project_id: UUID
+    target_id: UUID
+    automation_package_id: UUID
+    report_digest: Digest
+    verified_by: UUID | None
+    verified_at: datetime
+    created_at: datetime
+
+
+class AutomationPackageSupplyChainEnvelopeResponse(ApiModel):
+    id: UUID
+    project_id: UUID
+    target_id: UUID
+    automation_package_id: UUID
+    verification_id: UUID
+    verifier: str
+    credential_id: str
+    envelope_profile: Literal[
+        "testops-supply-chain-envelope-v1",
+        "testops-supply-chain-envelope-v2",
+    ]
+    signature_algorithm: Literal["HMAC-SHA256", "ED25519"]
+    workload_identity: str | None
+    key_fingerprint: Digest | None
+    nonce: str
+    issued_at: datetime
+    received_at: datetime
+    request_digest: Digest
+    signature_digest: Digest
+
+
 class AutomationPackageResponse(ApiModel):
     id: UUID
     project_id: UUID
@@ -797,6 +954,9 @@ class AutomationPackageResponse(ApiModel):
     activated_by: UUID | None
     activated_at: datetime | None
     status_reason: str | None
+    supply_chain_status: Literal["LEGACY", "PENDING", "VERIFIED", "REJECTED"]
+    supply_chain_verification_id: UUID | None
+    supply_chain_verified_at: datetime | None
     created_at: datetime
     updated_at: datetime
 

@@ -44,6 +44,7 @@ jobs:
         run: |
           python scripts/export_schemas.py --check
           python scripts/verify_artifacts.py
+          python scripts/submit_supply_chain_verification.py --help
       - name: Verify the migration graph and offline SQL
         run: |
           python -c "from alembic.config import Config; from alembic.script import ScriptDirectory; heads=ScriptDirectory.from_config(Config('alembic.ini')).get_heads(); assert len(heads) == 1, heads"

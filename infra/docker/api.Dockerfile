@@ -3,6 +3,8 @@ FROM python:3.12-slim@sha256:dd29372629eeba2dd003fd9e9d35a5b8236c44727875a036425
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_DEFAULT_TIMEOUT=60 \
+    PIP_RETRIES=8 \
     PYTHONPATH=/app/packages/contracts/src:/app/apps/api/src:/app/runners/web_playwright/src:/app/services/worker/src
 
 WORKDIR /app

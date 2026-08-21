@@ -41,6 +41,8 @@ from .identity import CurrentPrincipal, authorize_project, require_system_admin
 from .persistence import (
     ArtifactRecord,
     AutomationPackageRecord,
+    AutomationPackageSupplyChainEnvelopeRecord,
+    AutomationPackageSupplyChainVerificationRecord,
     CaseBaselineRecord,
     EnvironmentRecord,
     RegressionScheduleFiringRecord,
@@ -84,6 +86,9 @@ from .schemas import (
     AutomationPackageDraftCreate,
     AutomationPackageResponse,
     AutomationPackageStatusChangeRequest,
+    AutomationPackageSupplyChainEnvelopeResponse,
+    AutomationPackageSupplyChainVerificationCreate,
+    AutomationPackageSupplyChainVerificationResponse,
     AutomationPackageValidationRunCreate,
     BaselinePublishRequest,
     BaselineResponse,
@@ -155,6 +160,8 @@ from .services import (
     get_run,
     get_run_artifact,
     heartbeat_runner_worker,
+    list_automation_package_supply_chain_envelopes,
+    list_automation_package_supply_chain_verifications,
     list_automation_packages,
     list_baselines,
     list_environments,
@@ -167,6 +174,7 @@ from .services import (
     list_runs,
     list_targets,
     publish_baseline,
+    record_automation_package_supply_chain_verification,
     record_run_event,
     record_run_result,
     revoke_automation_package,
@@ -178,6 +186,7 @@ from .services import (
     update_runner_worker,
     update_target,
 )
+from .supply_chain_auth import SupplyChainVerifierAuth
 
 router = APIRouter(prefix="/api/v1")
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -256,6 +265,18 @@ def _baseline_response(record: CaseBaselineRecord) -> BaselineResponse:
 
 def _package_response(record: AutomationPackageRecord) -> AutomationPackageResponse:
     return AutomationPackageResponse.model_validate(record)
+
+
+def _package_supply_chain_verification_response(
+    record: AutomationPackageSupplyChainVerificationRecord,
+) -> AutomationPackageSupplyChainVerificationResponse:
+    return AutomationPackageSupplyChainVerificationResponse.model_validate(record)
+
+
+def _package_supply_chain_envelope_response(
+    record: AutomationPackageSupplyChainEnvelopeRecord,
+) -> AutomationPackageSupplyChainEnvelopeResponse:
+    return AutomationPackageSupplyChainEnvelopeResponse.model_validate(record)
 
 
 def _regression_schedule_response(
@@ -1104,6 +1125,91 @@ async def get_automation_package_detail(
     return _package_response(record)
 
 
+@router.get(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/supply-chain-verifications",
+    response_model=tuple[AutomationPackageSupplyChainVerificationResponse, ...],
+    tags=["automation-packages"],
+)
+async def get_automation_package_supply_chain_verifications(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> tuple[AutomationPackageSupplyChainVerificationResponse, ...]:
+    await authorize_project(session, principal, project_id, "project:read")
+    records = await list_automation_package_supply_chain_verifications(
+        session,
+        project_id,
+        target_id,
+        package_id,
+    )
+    return tuple(_package_supply_chain_verification_response(record) for record in records)
+
+
+@router.get(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/supply-chain-envelopes",
+    response_model=tuple[AutomationPackageSupplyChainEnvelopeResponse, ...],
+    tags=["automation-packages"],
+)
+async def get_automation_package_supply_chain_envelopes(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> tuple[AutomationPackageSupplyChainEnvelopeResponse, ...]:
+    await authorize_project(session, principal, project_id, "project:read")
+    records = await list_automation_package_supply_chain_envelopes(
+        session,
+        project_id,
+        target_id,
+        package_id,
+    )
+    return tuple(_package_supply_chain_envelope_response(record) for record in records)
+
+
+@router.post(
+    "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/supply-chain-verifications",
+    response_model=AutomationPackageSupplyChainVerificationResponse,
+    status_code=status.HTTP_201_CREATED,
+    tags=["automation-packages"],
+)
+async def post_automation_package_supply_chain_verification(
+    project_id: UUID,
+    target_id: UUID,
+    package_id: UUID,
+    payload: AutomationPackageSupplyChainVerificationCreate,
+    verifier_principal: SupplyChainVerifierAuth,
+    request: Request,
+    session: Session,
+    response: Response,
+) -> AutomationPackageSupplyChainVerificationResponse:
+    record, created = await record_automation_package_supply_chain_verification(
+        session,
+        project_id,
+        target_id,
+        package_id,
+        payload,
+        verifier_principal,
+        policy_version=request.app.state.settings.supply_chain_policy_version,
+        allowed_verifiers=request.app.state.settings.supply_chain_allowed_verifiers,
+        allowed_certificate_issuers=(
+            request.app.state.settings.supply_chain_allowed_certificate_issuers
+        ),
+        allowed_certificate_identities=(
+            request.app.state.settings.supply_chain_allowed_certificate_identities
+        ),
+        allowed_builder_ids=request.app.state.settings.supply_chain_allowed_builder_ids,
+        allowed_source_repositories=(
+            request.app.state.settings.supply_chain_allowed_source_repositories
+        ),
+    )
+    if not created:
+        response.status_code = status.HTTP_200_OK
+    return _package_supply_chain_verification_response(record)
+
+
 @router.post(
     "/projects/{project_id}/targets/{target_id}/automation-packages/{package_id}/validation-runs",
     response_model=RunResponse,
@@ -1385,6 +1491,7 @@ async def get_project_runs(
     run_statuses: Annotated[list[RunStatus] | None, Query(alias="status")] = None,
     target_id: UUID | None = None,
     environment_id: UUID | None = None,
+    automation_package_id: UUID | None = None,
     created_by: UUID | None = None,
     source_run_id: UUID | None = None,
     case_code: Annotated[str | None, Query(pattern=r"^TC-[A-Z0-9-]+$")] = None,
@@ -1400,6 +1507,7 @@ async def get_project_runs(
         statuses=tuple(run_statuses or ()),
         target_id=target_id,
         environment_id=environment_id,
+        automation_package_id=automation_package_id,
         created_by=created_by,
         source_run_id=source_run_id,
         case_code=case_code,

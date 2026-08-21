@@ -48,6 +48,11 @@ const router = createRouter({
       component: () => import('@/views/ProjectSettingsView.vue'),
     },
     {
+      path: '/projects/:projectId/automation-packages',
+      name: 'project-automation-packages',
+      component: () => import('@/views/AutomationPackagesView.vue'),
+    },
+    {
       path: '/projects/:projectId/runs',
       name: 'project-runs',
       component: () => import('@/views/RunOperationsView.vue'),
