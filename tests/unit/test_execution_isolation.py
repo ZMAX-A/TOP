@@ -6,11 +6,13 @@ import tempfile
 import unittest
 from datetime import UTC, datetime
 from pathlib import Path
+from types import SimpleNamespace
 from unittest.mock import Mock, patch
 
 from testops.contracts import CaseResult, CaseResultStatus, RunResult, RunSnapshot, RunStatus
 from testops.worker.execution_isolation import forward_new_events, isolated_child_environment
 from testops.worker.isolated_executor import (
+    disable_process_crash_dumps,
     execute_isolated_snapshot,
     subprocess_isolation_evidence,
 )
@@ -73,6 +75,72 @@ class ExecutionIsolationTests(unittest.TestCase):
         self.assertFalse(evidence.read_only_root_filesystem)
         self.assertEqual(evidence.network_policy, "WORKER_DEFAULT")
         self.assertFalse(evidence.resource_limits_enforced)
+
+    def test_crash_dump_guard_is_noop_outside_linux(self) -> None:
+        with (
+            patch("testops.worker.isolated_executor.sys.platform", "win32"),
+            patch("testops.worker.isolated_executor.ctypes.CDLL") as cdll,
+        ):
+            disable_process_crash_dumps()
+
+        cdll.assert_not_called()
+
+    def test_crash_dump_guard_disables_linux_collection(self) -> None:
+        fake_resource = SimpleNamespace(RLIMIT_CORE=4, setrlimit=Mock())
+        safe_core_pattern = SimpleNamespace(read_text=Mock(return_value="core\n"))
+        libc = Mock()
+        libc.prctl.side_effect = (0, 0)
+        with (
+            patch("testops.worker.isolated_executor.sys.platform", "linux"),
+            patch(
+                "testops.worker.isolated_executor.CORE_PATTERN_PATH",
+                safe_core_pattern,
+            ),
+            patch.dict("sys.modules", {"resource": fake_resource}),
+            patch("testops.worker.isolated_executor.ctypes.CDLL", return_value=libc),
+        ):
+            disable_process_crash_dumps()
+
+        safe_core_pattern.read_text.assert_called_once_with(encoding="utf-8")
+        fake_resource.setrlimit.assert_called_once_with(fake_resource.RLIMIT_CORE, (0, 0))
+        self.assertEqual(
+            [call.args for call in libc.prctl.call_args_list],
+            [(4, 0, 0, 0, 0), (3, 0, 0, 0, 0)],
+        )
+
+    def test_crash_dump_guard_rejects_wsl_piped_collector(self) -> None:
+        unsafe_core_pattern = SimpleNamespace(
+            read_text=Mock(return_value="|/wsl-capture-crash %t %E %p %s\n")
+        )
+        with (
+            patch("testops.worker.isolated_executor.sys.platform", "linux"),
+            patch(
+                "testops.worker.isolated_executor.CORE_PATTERN_PATH",
+                unsafe_core_pattern,
+            ),
+            patch("testops.worker.isolated_executor.ctypes.CDLL") as cdll,
+            self.assertRaisesRegex(RuntimeError, "WSL crash collector is enabled"),
+        ):
+            disable_process_crash_dumps()
+
+        cdll.assert_not_called()
+
+    def test_crash_dump_guard_fails_closed_when_process_remains_dumpable(self) -> None:
+        fake_resource = SimpleNamespace(RLIMIT_CORE=4, setrlimit=Mock())
+        safe_core_pattern = SimpleNamespace(read_text=Mock(return_value="core\n"))
+        libc = Mock()
+        libc.prctl.side_effect = (0, 1)
+        with (
+            patch("testops.worker.isolated_executor.sys.platform", "linux"),
+            patch(
+                "testops.worker.isolated_executor.CORE_PATTERN_PATH",
+                safe_core_pattern,
+            ),
+            patch.dict("sys.modules", {"resource": fake_resource}),
+            patch("testops.worker.isolated_executor.ctypes.CDLL", return_value=libc),
+            self.assertRaisesRegex(RuntimeError, "remains dumpable"),
+        ):
+            disable_process_crash_dumps()
 
     def test_parent_forwards_only_complete_new_child_events(self) -> None:
         control_plane = Mock()

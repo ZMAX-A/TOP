@@ -11,6 +11,9 @@ import type {
   Project,
   RunnerPool,
   RunnerWorker,
+  SupplyChainVerifierKey,
+  SupplyChainVerifierKeyReadiness,
+  SupplyChainVerifierKeyStatus,
   SystemRole,
   User as ManagedUser,
   UserStatus,
@@ -20,7 +23,7 @@ import { formatDate } from '@/presentation'
 
 const route = useRoute()
 const router = useRouter()
-const allowedTabs = new Set(['users', 'projects', 'runners', 'sessions', 'audit'])
+const allowedTabs = new Set(['users', 'projects', 'runners', 'supply-chain', 'sessions', 'audit'])
 const requestedTab = typeof route.query.view === 'string' ? route.query.view : 'users'
 const activeTab = ref(allowedTabs.has(requestedTab) ? requestedTab : 'users')
 const loading = ref(false)
@@ -46,6 +49,7 @@ const auditOffset = ref(0)
 const auditAction = ref('')
 const runnerPools = ref<RunnerPool[]>([])
 const runnerWorkers = ref<RunnerWorker[]>([])
+const verifierKeyReadiness = ref<SupplyChainVerifierKeyReadiness>()
 
 const userCreateVisible = ref(false)
 const userCreateBusy = ref(false)
@@ -59,6 +63,9 @@ const passwordVisible = ref(false)
 const passwordBusy = ref(false)
 const passwordUser = ref<ManagedUser>()
 const replacementPassword = ref('')
+const replacementPasswordMinLength = computed(() =>
+  passwordUser.value?.system_role === 'SYSTEM_ADMIN' ? 12 : 6,
+)
 const projectCreateVisible = ref(false)
 const projectCreateBusy = ref(false)
 const projectForm = reactive({ key: '', name: '', description: '' })
@@ -161,10 +168,22 @@ async function loadRunners(): Promise<void> {
   }
 }
 
+async function loadVerifierKeys(): Promise<void> {
+  loading.value = true
+  try {
+    verifierKeyReadiness.value = await api.supplyChainVerifierKeyReadiness()
+  } catch (error) {
+    report(error, '验证器密钥状态加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 async function loadActiveTab(): Promise<void> {
   if (activeTab.value === 'users') await loadUsers()
   else if (activeTab.value === 'projects') await loadProjects()
   else if (activeTab.value === 'runners') await loadRunners()
+  else if (activeTab.value === 'supply-chain') await loadVerifierKeys()
   else if (activeTab.value === 'sessions') await loadSessions()
   else await loadAudit()
 }
@@ -189,8 +208,8 @@ function openCreateUser(): void {
 }
 
 async function createUser(): Promise<void> {
-  if (!userForm.username || !userForm.display_name || userForm.password.length < 12) {
-    ElMessage.warning('请完整填写用户信息，初始密码至少 12 位')
+  if (!userForm.username || !userForm.display_name || userForm.password.length < 6) {
+    ElMessage.warning('请完整填写用户信息，初始密码至少 6 位')
     return
   }
   userCreateBusy.value = true
@@ -213,8 +232,8 @@ function openPasswordReset(user: ManagedUser): void {
 }
 
 async function resetPassword(): Promise<void> {
-  if (!passwordUser.value || replacementPassword.value.length < 12) {
-    ElMessage.warning('新密码至少 12 位')
+  if (!passwordUser.value || replacementPassword.value.length < replacementPasswordMinLength.value) {
+    ElMessage.warning(`新密码至少 ${replacementPasswordMinLength.value} 位`)
     return
   }
   passwordBusy.value = true
@@ -323,6 +342,39 @@ function poolCapacityPercent(pool: RunnerPool): number {
   return effective ? Math.min(100, Math.round((pool.active_leases / effective) * 100)) : 0
 }
 
+function verifierReadinessLabel(status: SupplyChainVerifierKeyReadiness['status']): string {
+  return { READY: '可安全轮换', WARNING: '需要关注', BLOCKED: '不可用' }[status]
+}
+
+function verifierKeyStatusLabel(status: SupplyChainVerifierKeyStatus): string {
+  return {
+    ACTIVE: '有效',
+    EXPIRING_SOON: '即将到期',
+    NOT_YET_ACTIVE: '尚未启用',
+    EXPIRED: '已到期',
+    REVOKED: '已吊销',
+  }[status]
+}
+
+function verifierKeyTagType(
+  status: SupplyChainVerifierKeyStatus,
+): 'success' | 'warning' | 'danger' | 'info' {
+  if (status === 'ACTIVE') return 'success'
+  if (status === 'EXPIRING_SOON' || status === 'NOT_YET_ACTIVE') return 'warning'
+  if (status === 'EXPIRED' || status === 'REVOKED') return 'danger'
+  return 'info'
+}
+
+function verifierWarningText(warning: SupplyChainVerifierKeyReadiness['warnings'][number]): string {
+  return {
+    NO_ED25519_KEYS: '尚未配置 Ed25519 验证器公钥，可信验证入口不可用。',
+    NO_ACCEPTING_KEYS: '当前没有处于有效窗口的验证器密钥。',
+    NO_OVERLAPPING_ACTIVE_KEYS: '只有一把有效密钥，尚未形成可无缝切换的双密钥重叠窗口。',
+    ACTIVE_KEY_EXPIRING_SOON: '存在即将在预警窗口内到期的有效密钥，请安排轮换。',
+    LEGACY_HMAC_ENABLED: '历史 HMAC 兼容入口仍处于启用状态。',
+  }[warning]
+}
+
 async function toggleProject(project: Project): Promise<void> {
   try {
     await api.updateProject(project.id, {
@@ -364,7 +416,7 @@ onMounted(loadActiveTab)
       <div>
         <span class="eyebrow-dark">System administration</span>
         <h1>系统管理中心</h1>
-        <p>集中管理平台账号、项目空间、Runner Pool、登录会话和不可变审计记录。</p>
+        <p>集中管理平台账号、项目空间、Runner Pool、验证器密钥、登录会话和不可变审计记录。</p>
       </div>
       <el-button :icon="Refresh" @click="loadActiveTab">刷新当前视图</el-button>
     </header>
@@ -528,7 +580,7 @@ onMounted(loadActiveTab)
                 />
               </template>
             </el-table-column>
-            <el-table-column label="池上限" width="130">
+            <el-table-column label="池上限（1–500）" width="150">
               <template #default="scope">
                 <el-input-number
                   :model-value="scope.row.max_concurrency"
@@ -622,6 +674,74 @@ onMounted(loadActiveTab)
               </template>
             </el-table-column>
           </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="验证器密钥" name="supply-chain">
+          <template v-if="verifierKeyReadiness">
+            <div class="toolbar">
+              <div>
+                <strong>供应链验证器密钥</strong>
+                <span class="section-note">仅展示身份、指纹和生命周期元数据，不返回公钥原文或私钥</span>
+              </div>
+              <el-tag
+                size="large"
+                :type="verifierKeyReadiness.status === 'READY' ? 'success' : verifierKeyReadiness.status === 'WARNING' ? 'warning' : 'danger'"
+              >
+                {{ verifierReadinessLabel(verifierKeyReadiness.status) }}
+              </el-tag>
+            </div>
+
+            <div class="key-readiness-grid">
+              <article><strong>{{ verifierKeyReadiness.configured_key_count }}</strong><span>已配置密钥</span></article>
+              <article><strong>{{ verifierKeyReadiness.accepting_key_count }}</strong><span>当前有效</span></article>
+              <article><strong>{{ verifierKeyReadiness.future_key_count }}</strong><span>待启用</span></article>
+              <article><strong>{{ verifierKeyReadiness.expiring_soon_key_count }}</strong><span>{{ verifierKeyReadiness.expiry_warning_days }} 天内到期</span></article>
+            </div>
+
+            <p class="section-note">
+              配置摘要（所有 API 实例应一致）：<code>{{ verifierKeyReadiness.configuration_digest }}</code>
+            </p>
+
+            <el-alert
+              v-for="warning in verifierKeyReadiness.warnings"
+              :key="warning"
+              class="key-warning"
+              type="warning"
+              :closable="false"
+              :title="verifierWarningText(warning)"
+            />
+
+            <el-table :data="verifierKeyReadiness.keys" empty-text="尚未配置 Ed25519 验证器密钥">
+              <el-table-column label="Credential" min-width="260">
+                <template #default="scope">
+                  <strong>{{ scope.row.credential_id }}</strong>
+                  <div class="muted">{{ scope.row.verifier }}</div>
+                </template>
+              </el-table-column>
+              <el-table-column label="状态" width="130">
+                <template #default="scope">
+                  <el-tag :type="verifierKeyTagType((scope.row as SupplyChainVerifierKey).status)">
+                    {{ verifierKeyStatusLabel((scope.row as SupplyChainVerifierKey).status) }}
+                  </el-tag>
+                </template>
+              </el-table-column>
+              <el-table-column label="工作负载身份" min-width="320">
+                <template #default="scope"><code>{{ scope.row.workload_identity }}</code></template>
+              </el-table-column>
+              <el-table-column label="公钥指纹" min-width="250">
+                <template #default="scope"><code>{{ scope.row.key_fingerprint }}</code></template>
+              </el-table-column>
+              <el-table-column label="启用时间" width="180">
+                <template #default="scope">{{ scope.row.not_before ? formatDate(scope.row.not_before) : '未限制' }}</template>
+              </el-table-column>
+              <el-table-column label="到期时间" width="180">
+                <template #default="scope">{{ scope.row.not_after ? formatDate(scope.row.not_after) : '未限制' }}</template>
+              </el-table-column>
+              <el-table-column label="吊销时间" width="180">
+                <template #default="scope">{{ scope.row.revoked_at ? formatDate(scope.row.revoked_at) : '未吊销' }}</template>
+              </el-table-column>
+            </el-table>
+          </template>
         </el-tab-pane>
 
         <el-tab-pane label="会话管理" name="sessions">
@@ -741,11 +861,16 @@ onMounted(loadActiveTab)
     <el-dialog v-model="userCreateVisible" title="创建平台用户" width="520px" destroy-on-close>
       <el-form label-position="top">
         <el-form-item label="用户名" required>
-          <el-input v-model="userForm.username" placeholder="英文、数字、点、横线或下划线" />
+          <el-input v-model="userForm.username" placeholder="英文、数字、点、横线或下划线" minlength="3" maxlength="64" />
+          <p class="form-field-hint">必填；3–64 位，必须以小写字母或数字开头，仅支持小写字母、数字、点、下划线和横线。</p>
         </el-form-item>
-        <el-form-item label="显示名" required><el-input v-model="userForm.display_name" /></el-form-item>
+        <el-form-item label="显示名" required>
+          <el-input v-model="userForm.display_name" maxlength="128" />
+          <p class="form-field-hint">必填；1–128 个字符。</p>
+        </el-form-item>
         <el-form-item label="初始密码" required>
-          <el-input v-model="userForm.password" type="password" show-password minlength="12" />
+          <el-input v-model="userForm.password" type="password" show-password minlength="6" maxlength="256" />
+          <p class="form-field-hint">必填；6–256 位字符。</p>
         </el-form-item>
         <el-form-item label="系统角色">
           <el-select v-model="userForm.system_role" style="width: 100%">
@@ -769,7 +894,16 @@ onMounted(loadActiveTab)
       />
       <el-form label-position="top" class="dialog-form">
         <el-form-item label="新密码" required>
-          <el-input v-model="replacementPassword" type="password" show-password minlength="12" />
+          <el-input
+            v-model="replacementPassword"
+            type="password"
+            show-password
+            :minlength="replacementPasswordMinLength"
+            maxlength="256"
+          />
+          <p class="form-field-hint">
+            必填；{{ replacementPasswordMinLength }}–256 位字符，重置后该用户现有会话会立即失效。
+          </p>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -783,9 +917,11 @@ onMounted(loadActiveTab)
         <div class="dialog-grid">
           <el-form-item label="资源池标识" required>
             <el-input v-model="runnerPoolForm.key" placeholder="web-chromium" />
+            <p class="form-field-hint">必填；必须以小写字母或数字开头，仅支持小写字母、数字、下划线和横线。</p>
           </el-form-item>
           <el-form-item label="资源池名称" required>
             <el-input v-model="runnerPoolForm.name" />
+            <p class="form-field-hint">必填；不能只包含空格。</p>
           </el-form-item>
         </div>
         <el-form-item label="支持的目标类型" required>
@@ -797,6 +933,7 @@ onMounted(loadActiveTab)
         </el-form-item>
         <el-form-item label="池级最大并发">
           <el-input-number v-model="runnerPoolForm.max_concurrency" :min="1" :max="500" />
+          <p class="form-field-hint">请输入 1–500 之间的整数。</p>
         </el-form-item>
         <el-form-item label="说明">
           <el-input v-model="runnerPoolForm.description" type="textarea" :rows="3" />
@@ -812,8 +949,12 @@ onMounted(loadActiveTab)
       <el-form label-position="top">
         <el-form-item label="项目标识" required>
           <el-input v-model="projectForm.key" placeholder="例如 payments-web" />
+          <p class="form-field-hint">必填；必须以小写字母或数字开头，仅支持小写字母、数字、下划线和横线。</p>
         </el-form-item>
-        <el-form-item label="项目名称" required><el-input v-model="projectForm.name" /></el-form-item>
+        <el-form-item label="项目名称" required>
+          <el-input v-model="projectForm.name" />
+          <p class="form-field-hint">必填；不能只包含空格。</p>
+        </el-form-item>
         <el-form-item label="说明">
           <el-input v-model="projectForm.description" type="textarea" :rows="3" />
         </el-form-item>
@@ -854,6 +995,40 @@ onMounted(loadActiveTab)
 .runner-worker-heading {
   margin-top: 18px;
   border-top: 1px solid #edf0f2;
+}
+
+.key-readiness-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.key-readiness-grid article {
+  padding: 14px 16px;
+  border: 1px solid #e5eaee;
+  border-radius: 9px;
+  background: #f8fafb;
+}
+
+.key-readiness-grid strong,
+.key-readiness-grid span {
+  display: block;
+}
+
+.key-readiness-grid strong {
+  color: #17324d;
+  font-size: 22px;
+}
+
+.key-readiness-grid span {
+  margin-top: 3px;
+  color: #718096;
+  font-size: 12px;
+}
+
+.key-warning {
+  margin-bottom: 10px;
 }
 
 .dialog-grid {

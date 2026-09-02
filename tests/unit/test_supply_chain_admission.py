@@ -2,8 +2,9 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import json
 import unittest
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta, timezone
 from unittest.mock import patch
 from uuid import uuid4
 
@@ -76,9 +77,12 @@ class SupplyChainAdmissionTests(unittest.TestCase):
             "SUPPLY_CHAIN_VERIFIER_ED25519_KEYS": (
                 '[{"credential_id":"verifier-a/ed25519-current",'
                 '"workload_identity":"spiffe://ci.example.invalid/testops/verifier-a",'
-                '"public_key":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"}]'
+                '"public_key":"11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo",'
+                '"not_before":"2026-08-21T00:00:00Z",'
+                '"not_after":"2026-09-21T00:00:00Z"}]'
             ),
             "SUPPLY_CHAIN_ALLOW_LEGACY_HMAC": "true",
+            "SUPPLY_CHAIN_KEY_EXPIRY_WARNING_DAYS": "14",
             "SUPPLY_CHAIN_VERIFIER_HMAC_KEYS": (
                 "verifier-a/current=0123456789abcdef0123456789abcdef,"
                 "verifier-a/previous=fedcba9876543210fedcba9876543210"
@@ -91,6 +95,7 @@ class SupplyChainAdmissionTests(unittest.TestCase):
         self.assertEqual(defaults.supply_chain_verifier_public_keys, ())
         self.assertEqual(defaults.supply_chain_verifier_credentials, ())
         self.assertFalse(defaults.supply_chain_allow_legacy_hmac)
+        self.assertEqual(defaults.supply_chain_key_expiry_warning_days, 30)
 
         with patch.dict("os.environ", names, clear=True):
             configured = Settings.from_environment()
@@ -126,12 +131,24 @@ class SupplyChainAdmissionTests(unittest.TestCase):
         self.assertTrue(
             configured.supply_chain_verifier_public_keys[0].key_fingerprint.startswith("sha256:")
         )
+        self.assertEqual(
+            configured.supply_chain_verifier_public_keys[0].not_before,
+            datetime(2026, 8, 21, tzinfo=UTC),
+        )
+        self.assertEqual(
+            configured.supply_chain_verifier_public_keys[0].not_after,
+            datetime(2026, 9, 21, tzinfo=UTC),
+        )
         self.assertTrue(configured.supply_chain_allow_legacy_hmac)
+        self.assertEqual(configured.supply_chain_key_expiry_warning_days, 14)
         self.assertNotIn(
             "0123456789abcdef0123456789abcdef",
             repr(configured),
         )
         self.assertNotIn("d75a9801", repr(configured))
+
+        with self.assertRaisesRegex(ValueError, "between 1 and 365"):
+            Settings(supply_chain_key_expiry_warning_days=0)
 
     def test_supply_chain_verifier_credentials_reject_weak_or_duplicate_keys(self) -> None:
         with self.assertRaisesRegex(ValueError, "at least 32 bytes"):
@@ -187,6 +204,68 @@ class SupplyChainAdmissionTests(unittest.TestCase):
             self.assertRaisesRegex(ValueError, "duplicate credential id"),
         ):
             Settings.from_environment()
+
+    def test_supply_chain_ed25519_keys_reject_invalid_lifecycle_windows(self) -> None:
+        public_key = "11qYAYKxCrfVS_7TyWQHOg7hcvPapiMlrwIaaPcHURo"
+
+        def document(**fields: str) -> str:
+            return json.dumps(
+                [
+                    {
+                        "credential_id": "trusted-verifier/current",
+                        "workload_identity": "spiffe://ci.example.invalid/testops/verifier",
+                        "public_key": public_key,
+                        **fields,
+                    }
+                ]
+            )
+
+        for invalid_timestamp in (
+            "2026-08-21T00:00:00+00:00",
+            "2026-08-21T00:00:00.000Z",
+            "not-a-timestamp",
+        ):
+            with (
+                patch.dict(
+                    "os.environ",
+                    {"SUPPLY_CHAIN_VERIFIER_ED25519_KEYS": document(not_before=invalid_timestamp)},
+                    clear=True,
+                ),
+                self.assertRaisesRegex(ValueError, "canonical UTC format"),
+            ):
+                Settings.from_environment()
+
+        with (
+            patch.dict(
+                "os.environ",
+                {
+                    "SUPPLY_CHAIN_VERIFIER_ED25519_KEYS": document(
+                        not_before="2026-09-21T00:00:00Z",
+                        not_after="2026-09-21T00:00:00Z",
+                    )
+                },
+                clear=True,
+            ),
+            self.assertRaisesRegex(ValueError, "earlier than not_after"),
+        ):
+            Settings.from_environment()
+
+        with self.assertRaisesRegex(ValueError, "timezone-aware UTC"):
+            SupplyChainVerifierPublicKey(
+                credential_id="trusted-verifier/current",
+                verifier="trusted-verifier",
+                workload_identity="spiffe://ci.example.invalid/testops/verifier",
+                public_key=b"k" * 32,
+                revoked_at=datetime(2026, 8, 21),
+            )
+        with self.assertRaisesRegex(ValueError, "timezone-aware UTC"):
+            SupplyChainVerifierPublicKey(
+                credential_id="trusted-verifier/current",
+                verifier="trusted-verifier",
+                workload_identity="spiffe://ci.example.invalid/testops/verifier",
+                public_key=b"k" * 32,
+                revoked_at=datetime(2026, 8, 21, tzinfo=timezone(timedelta(hours=8))),
+            )
 
     def test_legacy_hmac_requires_explicit_migration_switch(self) -> None:
         secret = "0123456789abcdef0123456789abcdef"

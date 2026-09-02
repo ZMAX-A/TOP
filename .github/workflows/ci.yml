@@ -45,6 +45,8 @@ jobs:
           python scripts/export_schemas.py --check
           python scripts/verify_artifacts.py
           python scripts/submit_supply_chain_verification.py --help
+          python scripts/check_supply_chain_key_readiness.py --help
+          python scripts/check_supply_chain_keyring_fleet.py --help
       - name: Verify the migration graph and offline SQL
         run: |
           python -c "from alembic.config import Config; from alembic.script import ScriptDirectory; heads=ScriptDirectory.from_config(Config('alembic.ini')).get_heads(); assert len(heads) == 1, heads"
@@ -161,7 +163,7 @@ jobs:
         run: docker compose --profile smoke down --volumes --remove-orphans
 
   observability-config:
-    name: Prometheus configuration
+    name: Prometheus and Alertmanager configuration
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -175,3 +177,10 @@ jobs:
           --volume "${PWD}/infra/observability:/etc/prometheus:ro"
           prom/prometheus:v3.13.1@sha256:3c42b892cf723fa54d2f262c37a0e1f80aa8c8ddb1da7b9b0df9455a35a7f893
           check config /etc/prometheus/prometheus.yml
+      - name: Validate Alertmanager routing
+        run: >-
+          docker run --rm
+          --entrypoint /bin/amtool
+          --volume "${PWD}/infra/observability:/etc/alertmanager:ro"
+          quay.io/prometheus/alertmanager:v0.33.1@sha256:9e082985f56f4c8c9f724e18f2288c6708f472e56a5286b8863d080434ea065d
+          check-config /etc/alertmanager/alertmanager.local.yml

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>TestOps 实时观看</title>
+    <style>
+      :root { color-scheme: dark; font-family: Inter, "Microsoft YaHei", sans-serif; }
+      * { box-sizing: border-box; }
+      html, body, #screen { width: 100%; height: 100%; margin: 0; overflow: hidden; }
+      body { background: #091c2c; }
+      #screen { display: flex; align-items: center; justify-content: center; }
+      #status {
+        position: fixed; z-index: 10; top: 14px; left: 50%; transform: translateX(-50%);
+        max-width: calc(100% - 32px); padding: 8px 14px; border-radius: 999px;
+        background: rgba(7, 24, 38, 0.88); color: #d8e7ef; font-size: 13px;
+        box-shadow: 0 6px 24px rgba(0, 0, 0, 0.24); transition: opacity .25s;
+      }
+      #status.connected { opacity: .18; }
+      #status.error { color: #ffb4b4; opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <div id="status">正在连接只读实时画面…</div>
+    <div id="screen" aria-label="自动化执行实时画面"></div>
+    <script type="module" src="./viewer.js"></script>
+  </body>
+</html>

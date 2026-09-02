@@ -602,6 +602,11 @@ class RunnerExecutionIsolationCapabilities(ApiModel):
         return self
 
 
+class RunnerLiveViewCapabilities(ApiModel):
+    enabled: bool
+    read_only: Literal[True]
+
+
 class RunnerCapabilities(ApiModel):
     target_types: Annotated[tuple[TargetType, ...], Field(min_length=1, max_length=8)]
     browsers: Annotated[
@@ -617,6 +622,7 @@ class RunnerCapabilities(ApiModel):
         Field(max_length=50),
     ] = ()
     execution_isolation: RunnerExecutionIsolationCapabilities | None = None
+    live_view: RunnerLiveViewCapabilities | None = None
 
     @model_validator(mode="after")
     def unique_capabilities(self) -> RunnerCapabilities:
@@ -720,6 +726,44 @@ class RunnerWorkerResponse(ApiModel):
     last_heartbeat_at: datetime
     created_at: datetime
     updated_at: datetime
+
+
+class SupplyChainVerifierKeyResponse(ApiModel):
+    credential_id: str
+    verifier: str
+    workload_identity: str
+    key_fingerprint: Digest
+    status: Literal["ACTIVE", "EXPIRING_SOON", "NOT_YET_ACTIVE", "EXPIRED", "REVOKED"]
+    accepts_now: bool
+    not_before: datetime | None
+    not_after: datetime | None
+    revoked_at: datetime | None
+
+
+class SupplyChainVerifierKeyReadinessResponse(ApiModel):
+    status: Literal["READY", "WARNING", "BLOCKED"]
+    configuration_digest: Digest
+    generated_at: datetime
+    expiry_warning_days: Annotated[int, Field(ge=1, le=365)]
+    configured_key_count: Annotated[int, Field(ge=0, le=16)]
+    accepting_key_count: Annotated[int, Field(ge=0, le=16)]
+    future_key_count: Annotated[int, Field(ge=0, le=16)]
+    expiring_soon_key_count: Annotated[int, Field(ge=0, le=16)]
+    expired_key_count: Annotated[int, Field(ge=0, le=16)]
+    revoked_key_count: Annotated[int, Field(ge=0, le=16)]
+    overlap_ready: bool
+    legacy_hmac_enabled: bool
+    warnings: tuple[
+        Literal[
+            "NO_ED25519_KEYS",
+            "NO_ACCEPTING_KEYS",
+            "NO_OVERLAPPING_ACTIVE_KEYS",
+            "ACTIVE_KEY_EXPIRING_SOON",
+            "LEGACY_HMAC_ENABLED",
+        ],
+        ...,
+    ]
+    keys: tuple[SupplyChainVerifierKeyResponse, ...]
 
 
 class TargetCreate(ApiModel):
@@ -961,6 +1005,96 @@ class AutomationPackageResponse(ApiModel):
     updated_at: datetime
 
 
+GitReleaseTag = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    ),
+]
+GitReleaseAssetName = Annotated[
+    str,
+    StringConstraints(
+        strip_whitespace=True,
+        min_length=1,
+        max_length=128,
+        pattern=r"^[A-Za-z0-9][A-Za-z0-9._-]*$",
+    ),
+]
+GitCommitSha = Annotated[str, StringConstraints(pattern=r"^[0-9a-f]{40}$")]
+
+
+class GitReleaseSyncRequest(ApiModel):
+    repository_url: Annotated[NonEmptyText, StringConstraints(max_length=500)]
+    tag: GitReleaseTag
+    asset_name: GitReleaseAssetName = "testops-release-manifest.json"
+
+
+class GitReleaseApplyRequest(GitReleaseSyncRequest):
+    expected_revision: GitCommitSha
+    expected_baseline_digest: Digest
+    expected_package_digest: Digest
+
+
+class GitReleaseSource(ApiModel):
+    repository_url: Annotated[NonEmptyText, StringConstraints(max_length=500)]
+    tag: GitReleaseTag
+    revision: GitCommitSha
+
+
+class GitReleaseAutomationPackage(AutomationPackageCreate):
+    pass
+
+
+class GitReleaseManifest(ApiModel):
+    schema_version: Literal["1.0"] = "1.0"
+    source: GitReleaseSource
+    baseline: CaseBaseline
+    baseline_digest: Digest
+    automation_package: GitReleaseAutomationPackage
+
+
+class GitReleaseCaseChange(ApiModel):
+    change_type: Literal["ADD", "MODIFY", "DELETE"]
+    case_id: UUID
+    case_code: str
+    changed_fields: tuple[str, ...]
+
+
+class GitReleasePreviewResponse(ApiModel):
+    repository_url: str
+    tag: str
+    revision: GitCommitSha
+    base_baseline_id: UUID
+    base_baseline_version: str
+    base_baseline_digest: Digest
+    candidate_baseline_id: UUID
+    candidate_baseline_version: str
+    candidate_baseline_digest: Digest
+    case_count: int
+    enabled_case_count: int
+    added_count: int
+    modified_count: int
+    deleted_count: int
+    unchanged_count: int
+    baseline_changed: bool
+    changes: tuple[GitReleaseCaseChange, ...]
+    automation_package: GitReleaseAutomationPackage
+    supersedes_id: UUID | None
+
+
+class GitReleaseApplyResponse(ApiModel):
+    repository_url: str
+    tag: str
+    revision: GitCommitSha
+    baseline_changed: bool
+    baseline_id: UUID
+    change_request_id: UUID | None
+    automation_package: AutomationPackageResponse
+
+
 class RunCreate(ApiModel):
     project_id: UUID
     target_id: UUID
@@ -968,6 +1102,7 @@ class RunCreate(ApiModel):
     baseline_id: UUID
     automation_package_id: UUID
     case_codes: tuple[Annotated[str, StringConstraints(pattern=r"^TC-[A-Z0-9-]+$")], ...] = ()
+    headless: bool | None = None
 
 
 class RunResponse(ApiModel):
@@ -1001,6 +1136,27 @@ class RunResponse(ApiModel):
     @field_validator("scheduled_for", "timeout_at")
     @classmethod
     def utc_run_time(cls, value: datetime | None) -> datetime | None:
+        return _as_utc(value)
+
+
+class RunLiveViewStatusResponse(ApiModel):
+    status: Literal["DISABLED", "STARTING", "READY", "ENDED", "UNAVAILABLE"]
+    read_only: bool
+
+
+class RunLiveViewTicketResponse(ApiModel):
+    ticket: Annotated[
+        str,
+        StringConstraints(pattern=r"^[A-Za-z0-9_-]{32,128}$"),
+    ]
+    password: Annotated[str, StringConstraints(pattern=r"^[A-Za-z0-9]{8}$")]
+    viewer_path: Literal["/viewer/session.html"]
+    read_only: bool
+    expires_at: datetime
+
+    @field_validator("expires_at")
+    @classmethod
+    def utc_expiration(cls, value: datetime) -> datetime:
         return _as_utc(value)
 
 
@@ -1084,7 +1240,15 @@ class InternalRunResultResponse(ApiModel):
     created: bool
 
 
-RunnerEventType = Literal["run_started", "case_started", "case_finished", "run_finished"]
+RunnerEventType = Literal[
+    "run_started",
+    "case_started",
+    "case_finished",
+    "progress_updated",
+    "run_finished",
+    "live_view_ready",
+    "live_view_ended",
+]
 
 
 class InternalRunEventCreate(ApiModel):
@@ -1093,6 +1257,16 @@ class InternalRunEventCreate(ApiModel):
     at: datetime
     case_code: Annotated[str, StringConstraints(pattern=r"^TC-[A-Z0-9-]+$")] | None = None
     status: RunStatus | CaseResultStatus | None = None
+    current_round: Annotated[int, Field(ge=1, le=3)] | None = None
+    total_rounds: Annotated[int, Field(ge=1, le=3)] | None = None
+    round_completed: Annotated[int, Field(ge=0)] | None = None
+    round_total: Annotated[int, Field(ge=0)] | None = None
+    completed: Annotated[int, Field(ge=0)] | None = None
+    total: Annotated[int, Field(ge=0)] | None = None
+    passed: Annotated[int, Field(ge=0)] | None = None
+    failed: Annotated[int, Field(ge=0)] | None = None
+    skipped: Annotated[int, Field(ge=0)] | None = None
+    current_case_code: Annotated[str, StringConstraints(pattern=r"^TC-[A-Z0-9-]+$")] | None = None
 
     @model_validator(mode="after")
     def validate_event_shape(self) -> InternalRunEventCreate:
@@ -1117,6 +1291,44 @@ class InternalRunEventCreate(ApiModel):
             RunStatus.INFRA_ERROR.value,
         }:
             raise ValueError("run_finished requires a terminal Run status")
+        progress_values = (
+            self.current_round,
+            self.total_rounds,
+            self.round_completed,
+            self.round_total,
+            self.completed,
+            self.total,
+            self.passed,
+            self.failed,
+            self.skipped,
+        )
+        if self.event == "progress_updated":
+            if any(value is None for value in progress_values):
+                raise ValueError("progress_updated requires complete progress counters")
+            assert self.current_round is not None
+            assert self.total_rounds is not None
+            assert self.round_completed is not None
+            assert self.round_total is not None
+            assert self.completed is not None
+            assert self.total is not None
+            assert self.passed is not None
+            assert self.failed is not None
+            assert self.skipped is not None
+            if self.case_code is not None or self.status is not None:
+                raise ValueError("progress_updated forbids case_code and status")
+            if self.current_round > self.total_rounds:
+                raise ValueError("current_round cannot exceed total_rounds")
+            if self.round_completed > self.round_total:
+                raise ValueError("round_completed cannot exceed round_total")
+            if self.completed > self.total:
+                raise ValueError("completed cannot exceed total")
+            if self.passed + self.failed + self.skipped != self.completed:
+                raise ValueError("progress result counters must equal completed")
+        elif (
+            any(value is not None for value in progress_values)
+            or self.current_case_code is not None
+        ):
+            raise ValueError("progress counters are only valid for progress_updated")
         return self
 
 

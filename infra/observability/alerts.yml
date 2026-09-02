@@ -63,6 +63,54 @@ groups:
           summary: TestOps quality operations metrics are unavailable
           description: The API has failed to query quality evaluator and Webhook state for five minutes.
 
+      - alert: TestOpsSupplyChainKeyReadinessSnapshotUnavailable
+        expr: testops_supply_chain_key_readiness_snapshot_success{job="testops-api"} == 0
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps verifier key readiness metrics are unavailable
+          description: The API has failed to calculate verifier key readiness for five minutes.
+
+      - alert: TestOpsSupplyChainVerifierKeysBlocked
+        expr: testops_supply_chain_key_readiness{job="testops-api",status="BLOCKED"} == 1
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: TestOps has no accepting Ed25519 verifier key
+          description: Supply-chain verification is blocked because no configured Ed25519 key is currently acceptable.
+
+      - alert: TestOpsSupplyChainVerifierRotationNotReady
+        expr: |
+          testops_supply_chain_rotation_overlap_ready{job="testops-api"} == 0
+          and on(job, instance)
+          testops_supply_chain_key_readiness{job="testops-api",status="BLOCKED"} == 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps verifier key rotation overlap is not ready
+          description: At least one verifier workload identity lacks two concurrently accepting Ed25519 keys.
+
+      - alert: TestOpsSupplyChainVerifierKeyExpiringSoon
+        expr: testops_supply_chain_verifier_keys{job="testops-api",status="EXPIRING_SOON"} > 0
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps verifier key is approaching expiry
+          description: At least one accepting Ed25519 verifier key is within the configured expiry warning window.
+
+      - alert: TestOpsSupplyChainLegacyHmacEnabled
+        expr: testops_supply_chain_legacy_hmac_enabled{job="testops-api"} == 1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: TestOps legacy supply-chain HMAC remains enabled
+          description: Disable the migration-only HMAC verifier after all trusted clients use Ed25519 envelopes.
+
       - alert: TestOpsDispatchBacklogOldest
         expr: |
           testops_dispatch_waiting_runs{job="testops-api"} > 0

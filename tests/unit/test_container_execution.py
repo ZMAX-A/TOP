@@ -61,6 +61,10 @@ class ContainerExecutionTests(unittest.TestCase):
             runner_container_cpu_millis=1250,
             runner_container_pids_limit=192,
             runner_container_shm_bytes=512 * 1024 * 1024,
+            runner_live_view_enabled=False,
+            runner_live_view_port=5900,
+            runner_live_view_ready_timeout_seconds=2,
+            broker_url="redis://redis:6379/0",
         )
         self.image_id = "sha256:" + "a" * 64
 
@@ -103,8 +107,47 @@ class ContainerExecutionTests(unittest.TestCase):
         self.assertEqual(options["mem_limit"], 768 * 1024 * 1024)
         self.assertEqual(options["nano_cpus"], 1_250_000_000)
         self.assertEqual(options["pids_limit"], 192)
+        self.assertEqual(
+            options["ulimits"],
+            [{"Name": "core", "Soft": 0, "Hard": 0}],
+        )
         self.assertEqual(options["user"], "pwuser")
+        self.assertEqual(options["command"][0], "python")
         self.assertNotIn("/var/run/docker.sock", json.dumps(options))
+
+        assert self.job.web_config is not None
+        headed_job = self.job.model_copy(
+            update={"web_config": self.job.web_config.model_copy(update={"headless": False})}
+        )
+        headed = container_create_options(
+            headed_job,
+            self.settings,
+            self.image_id,
+            "testops-headed-run-volume",
+            "testops-headed-run-input",
+            environ={},
+        )
+        self.assertEqual(headed["command"][0:2], ["xvfb-run", "--auto-servernum"])
+        self.assertIn("1440x900x24", headed["command"][2])
+        self.assertIn("python", headed["command"])
+
+        live_settings = SimpleNamespace(**vars(self.settings))
+        live_settings.runner_live_view_enabled = True
+        live_view = container_create_options(
+            headed_job,
+            live_settings,
+            self.image_id,
+            "testops-live-run-volume",
+            "testops-live-run-input",
+            environ={},
+            live_view_password="Ab12Cd34",
+        )
+        self.assertEqual(
+            live_view["command"][:3],
+            ["python", "-m", "testops.worker.live_view_executor"],
+        )
+        self.assertEqual(live_view["environment"]["TESTOPS_LIVE_VIEW_PASSWORD"], "Ab12Cd34")
+        self.assertNotIn("ports", live_view)
 
         deny_all = SimpleNamespace(**vars(self.settings))
         deny_all.runner_container_network_policy = "DENY_ALL"
@@ -201,6 +244,7 @@ class ContainerExecutionTests(unittest.TestCase):
                 "ShmSize": 512 * 1024 * 1024,
                 "CapDrop": ["ALL"],
                 "SecurityOpt": ["no-new-privileges:true"],
+                "Ulimits": [{"Name": "core", "Soft": 0, "Hard": 0}],
                 "Tmpfs": {"/tmp": "options", "/home/pwuser": "options"},
             },
             "Mounts": [

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from fastapi.testclient import TestClient
 
+import testops.api.main as main_module
 from testops.api.config import Settings
 from testops.api.main import API_VERSION, create_app
 
@@ -35,6 +36,10 @@ def test_metrics_require_configured_bearer_and_use_route_templates() -> None:
         in metrics.text
     )
     assert "testops_database_ready 1.0" in metrics.text
+    assert 'testops_supply_chain_key_readiness{status="BLOCKED"} 1.0' in metrics.text
+    assert 'testops_supply_chain_key_readiness{status="READY"} 0.0' in metrics.text
+    assert "testops_supply_chain_rotation_overlap_ready 0.0" in metrics.text
+    assert "testops_supply_chain_key_readiness_snapshot_success 1.0" in metrics.text
     assert "sqlite" not in metrics.text
 
 
@@ -45,3 +50,16 @@ def test_metrics_are_open_when_no_token_is_configured() -> None:
 
     assert response.status_code == 200
     assert "testops_http_request_duration_seconds" in response.text
+
+
+def test_supply_chain_readiness_snapshot_failure_does_not_break_metrics(monkeypatch) -> None:
+    def fail_snapshot(*_args, **_kwargs):
+        raise RuntimeError("synthetic readiness failure")
+
+    monkeypatch.setattr(main_module, "collect_supply_chain_key_readiness", fail_snapshot)
+    app = create_app(Settings(database_url="sqlite+aiosqlite:///:memory:"))
+    with TestClient(app) as client:
+        response = client.get("/metrics")
+
+    assert response.status_code == 200
+    assert "testops_supply_chain_key_readiness_snapshot_success 0.0" in response.text

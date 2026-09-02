@@ -22,6 +22,10 @@ def test_release_version_is_coherent_across_runtime_and_packaging() -> None:
     )
     environment = (ROOT / ".env.example").read_text(encoding="utf-8")
     compose = (ROOT / "compose.yaml").read_text(encoding="utf-8")
+    worker_config = (ROOT / "services/worker/src/testops/worker/config.py").read_text(
+        encoding="utf-8"
+    )
+    kubernetes_runner = (ROOT / "infra/kubernetes/m9.5.3-runner.yaml").read_text(encoding="utf-8")
 
     version = project["project"]["version"]
     assert version == API_VERSION == PACKAGE_VERSION
@@ -30,6 +34,8 @@ def test_release_version_is_coherent_across_runtime_and_packaging() -> None:
     assert frontend_lock["packages"][""]["version"] == version
     assert f"TESTOPS_IMAGE_TAG={version}" in environment
     assert set(re.findall(r"TESTOPS_IMAGE_TAG:-([0-9]+\.[0-9]+\.[0-9]+)", compose)) == {version}
+    assert f'os.getenv("RUNNER_VERSION", "{version}")' in worker_config
+    assert f"RUNNER_VERSION: {version}" in kubernetes_runner
 
 
 def test_release_has_one_migration_head_and_required_operations_evidence() -> None:
@@ -41,6 +47,8 @@ def test_release_has_one_migration_head_and_required_operations_evidence() -> No
         ROOT / ".github/workflows/ci.yml",
         ROOT / "infra/observability/prometheus.yml",
         ROOT / "infra/observability/alerts.yml",
+        ROOT / "infra/observability/alertmanager.local.yml",
+        ROOT / "infra/observability/alertmanager-sink-nginx.conf",
         ROOT / "docs/operations/production-runbook.md",
         ROOT / "docs/operations/release-checklist.md",
         ROOT / "docs/milestones/M6-release-hardening.md",
@@ -66,7 +74,14 @@ def test_release_has_one_migration_head_and_required_operations_evidence() -> No
         ROOT / "docs/milestones/M9.5.2-container-execution-isolation.md",
         ROOT / "docs/milestones/M9.5.3-kubernetes-job-isolation.md",
         ROOT / "docs/milestones/M9.6.1-asymmetric-verifier-identity.md",
+        ROOT / "docs/milestones/M9.6.2-verifier-key-lifecycle.md",
+        ROOT / "docs/milestones/M9.7-verifier-key-readiness.md",
+        ROOT / "docs/milestones/M9.8-verifier-key-observability.md",
+        ROOT / "docs/milestones/M9.9-verifier-keyring-preflight.md",
+        ROOT / "docs/milestones/M10.1-keyring-fleet-rollout-gate.md",
         ROOT / "infra/kubernetes/m9.5.3-runner.yaml",
+        ROOT / "scripts/check_supply_chain_key_readiness.py",
+        ROOT / "scripts/check_supply_chain_keyring_fleet.py",
         ROOT / "scripts/submit_supply_chain_verification.py",
     )
     assert all(path.is_file() and path.stat().st_size > 0 for path in required)

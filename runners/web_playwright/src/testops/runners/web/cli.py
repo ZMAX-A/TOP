@@ -30,6 +30,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     args = _parser().parse_args(argv)
     if args.command == "validate-job":
         job = load_run_snapshot(args.path)
+        adapter = PlaywrightWebAdapter(
+            workspace_root="artifacts/runs",
+            secret_provider=EnvironmentSecretProvider(),
+        )
+        adapter.validate(job)
         safe_summary = {
             "run_id": str(job.run_id),
             "target_type": job.target_type.value,

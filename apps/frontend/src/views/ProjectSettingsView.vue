@@ -30,6 +30,7 @@ import type {
   Target,
 } from '@/api/types'
 import { auth } from '@/auth'
+import { createClientRequestId } from '@/idempotency'
 import { formatDate, formatUtcDate, shortDigest } from '@/presentation'
 
 const route = useRoute()
@@ -557,7 +558,7 @@ async function triggerSchedule(schedule: RegressionSchedule): Promise<void> {
     const run = await api.triggerRegressionSchedule(
       projectId.value,
       schedule.id,
-      `manual:${schedule.id}:${crypto.randomUUID()}`,
+      `manual:${schedule.id}:${createClientRequestId()}`,
     )
     ElMessage.success('已创建一次立即回归 Run')
     await router.push({ name: 'run-detail', params: { projectId: projectId.value, runId: run.id } })
@@ -890,6 +891,7 @@ onMounted(load)
                   :disabled="!canManage"
                   controls-position="right"
                 />
+                <p class="form-field-hint">请输入 1–500 之间的整数。</p>
               </el-form-item>
               <el-form-item label="每日最大创建量">
                 <el-input-number
@@ -900,6 +902,7 @@ onMounted(load)
                   :disabled="!canManage"
                   controls-position="right"
                 />
+                <p class="form-field-hint">请输入 1–100000 之间的整数。</p>
               </el-form-item>
               <el-form-item label="单次 Run 超时（秒）">
                 <el-input-number
@@ -911,6 +914,7 @@ onMounted(load)
                   :disabled="!canManage"
                   controls-position="right"
                 />
+                <p class="form-field-hint">请输入 60–86400 秒，建议按 60 秒递增。</p>
               </el-form-item>
               <el-button
                 v-if="canManage"
@@ -956,8 +960,14 @@ onMounted(load)
 
     <el-dialog v-model="targetVisible" title="创建测试目标" width="540px" destroy-on-close>
       <el-form label-position="top">
-        <el-form-item label="目标标识" required><el-input v-model="targetForm.key" placeholder="web" /></el-form-item>
-        <el-form-item label="目标名称" required><el-input v-model="targetForm.name" /></el-form-item>
+        <el-form-item label="目标标识" required>
+          <el-input v-model="targetForm.key" placeholder="web" />
+          <p class="form-field-hint">必填；必须以小写字母或数字开头，仅支持小写字母、数字、下划线和横线。</p>
+        </el-form-item>
+        <el-form-item label="目标名称" required>
+          <el-input v-model="targetForm.name" />
+          <p class="form-field-hint">必填；不能只包含空格。</p>
+        </el-form-item>
         <el-form-item label="目标类型" required>
           <el-select v-model="targetForm.target_type" style="width: 100%">
             <el-option label="Web" value="WEB" />
@@ -998,11 +1008,18 @@ onMounted(load)
       />
       <el-form label-position="top" class="dialog-form">
         <div class="form-grid">
-          <el-form-item label="环境标识" required><el-input v-model="environmentForm.key" /></el-form-item>
-          <el-form-item label="环境名称" required><el-input v-model="environmentForm.name" /></el-form-item>
+          <el-form-item label="环境标识" required>
+            <el-input v-model="environmentForm.key" />
+            <p class="form-field-hint">必填；必须以小写字母或数字开头，仅支持小写字母、数字、下划线和横线。</p>
+          </el-form-item>
+          <el-form-item label="环境名称" required>
+            <el-input v-model="environmentForm.name" />
+            <p class="form-field-hint">必填；不能只包含空格。</p>
+          </el-form-item>
         </div>
         <el-form-item v-if="environmentTarget?.target_type === 'WEB'" label="Base URL" required>
           <el-input v-model="environmentForm.base_url" placeholder="https://test.example.com" />
+          <p class="form-field-hint">必填；必须是以 http:// 或 https:// 开头且不含空格的完整地址。</p>
         </el-form-item>
         <el-form-item label="Runner Pool（可覆盖目标绑定）">
           <el-select v-model="environmentForm.runner_pool_id" clearable placeholder="继承目标绑定" style="width: 100%">
@@ -1016,6 +1033,7 @@ onMounted(load)
         </el-form-item>
         <el-form-item label="Secret 引用（每行 NAME=secret://path）">
           <el-input v-model="environmentForm.secret_bindings" type="textarea" :rows="5" />
+          <p class="form-field-hint">可选；每行一个 NAME=secret://path，NAME 仅支持大写字母、数字和下划线并以大写字母开头；不要填写真实密钥。</p>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1026,7 +1044,10 @@ onMounted(load)
 
     <el-dialog v-model="environmentEditVisible" title="编辑运行环境" width="580px" destroy-on-close>
       <el-form label-position="top">
-        <el-form-item label="环境名称" required><el-input v-model="environmentEditForm.name" /></el-form-item>
+        <el-form-item label="环境名称" required>
+          <el-input v-model="environmentEditForm.name" />
+          <p class="form-field-hint">必填；不能只包含空格。</p>
+        </el-form-item>
         <el-form-item label="状态">
           <el-select v-model="environmentEditForm.status" style="width: 100%">
             <el-option label="启用" value="ACTIVE" />
@@ -1045,6 +1066,7 @@ onMounted(load)
         </el-form-item>
         <el-form-item label="Secret 引用（每行 NAME=secret://path）">
           <el-input v-model="environmentEditForm.secret_bindings" type="textarea" :rows="6" />
+          <p class="form-field-hint">可选；每行一个 NAME=secret://path，NAME 仅支持大写字母、数字和下划线并以大写字母开头；不要填写真实密钥。</p>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1069,9 +1091,11 @@ onMounted(load)
         <div class="form-grid">
           <el-form-item label="计划标识" required>
             <el-input v-model="scheduleForm.key" :disabled="Boolean(scheduleEditId)" placeholder="nightly-login" />
+            <p class="form-field-hint">必填；必须以小写字母或数字开头，仅支持小写字母、数字、下划线和横线，创建后不可修改。</p>
           </el-form-item>
           <el-form-item label="计划名称" required>
             <el-input v-model="scheduleForm.name" placeholder="每日登录回归" />
+            <p class="form-field-hint">必填；不能只包含空格。</p>
           </el-form-item>
         </div>
         <el-form-item label="说明"><el-input v-model="scheduleForm.description" /></el-form-item>
@@ -1123,10 +1147,12 @@ onMounted(load)
         </div>
         <el-form-item label="用例编号（逗号或空格分隔；留空表示全部启用用例）">
           <el-input v-model="scheduleForm.case_codes" type="textarea" :rows="2" placeholder="TC-LOGIN-001, TC-LOGIN-007" />
+          <p class="form-field-hint">可选；每个编号必须符合 TC-大写字母/数字/横线，例如 TC-LOGIN-001；可用逗号、空格或换行分隔。</p>
         </el-form-item>
         <div class="form-grid">
           <el-form-item label="Cron 表达式" required>
-            <el-input v-model="scheduleForm.cron_expression" placeholder="0 2 * * *" />
+            <el-input v-model="scheduleForm.cron_expression" placeholder="0 2 * * *" maxlength="128" />
+            <p class="form-field-hint">必填；5 段格式“分钟 小时 日 月 星期”，最多 128 个字符。</p>
           </el-form-item>
           <el-form-item label="IANA 时区" required>
             <el-select
@@ -1141,6 +1167,7 @@ onMounted(load)
               <el-option label="America/New_York" value="America/New_York" />
               <el-option label="Europe/London" value="Europe/London" />
             </el-select>
+            <p class="form-field-hint">必填；请输入有效的 IANA 时区名称，最多 64 个字符，例如 Asia/Shanghai。</p>
           </el-form-item>
         </div>
         <div class="form-grid schedule-policy-grid">
@@ -1152,6 +1179,7 @@ onMounted(load)
           </el-form-item>
           <el-form-item label="宽限时间（秒）">
             <el-input-number v-model="scheduleForm.misfire_grace_seconds" :min="60" :max="86400" style="width: 100%" />
+            <p class="form-field-hint">请输入 60–86400 之间的整数。</p>
           </el-form-item>
           <el-form-item label="状态">
             <el-select v-model="scheduleForm.status" style="width: 100%">

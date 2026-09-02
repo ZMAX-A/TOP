@@ -41,7 +41,7 @@ from testops.api.supply_chain_auth import (
     supply_chain_detached_jws_signing_input,
     supply_chain_jws_protected_header,
 )
-from testops.contracts import CaseBaseline, canonical_sha256
+from testops.contracts import CaseBaseline, LiveViewRegistration, canonical_sha256
 from testops.worker.outbox import dispatch_outbox_batch
 from testops.worker.quality_webhooks import dispatch_quality_webhook_batch
 
@@ -181,6 +181,27 @@ class RecordingQualityWebhookSender:
         return self.statuses.pop(0)
 
 
+class RecordingLiveViewStore:
+    def __init__(self) -> None:
+        self.registrations: dict[UUID, LiveViewRegistration] = {}
+        self.issued: list[tuple[UUID, int]] = []
+
+    async def get_registration(self, run_id: UUID) -> LiveViewRegistration | None:
+        return self.registrations.get(run_id)
+
+    async def issue_ticket(
+        self,
+        registration: LiveViewRegistration,
+        *,
+        ttl_seconds: int,
+    ) -> tuple[str, datetime]:
+        self.issued.append((registration.run_id, ttl_seconds))
+        return "T" * 43, datetime.now(UTC) + timedelta(seconds=ttl_seconds)
+
+    async def aclose(self) -> None:
+        return None
+
+
 class ControlPlaneApiTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temporary_directory = tempfile.TemporaryDirectory()
@@ -214,7 +235,8 @@ class ControlPlaneApiTests(unittest.TestCase):
                 ),
             ),
         )
-        self.app = create_app(settings)
+        self.live_view_store = RecordingLiveViewStore()
+        self.app = create_app(settings, live_view_store=self.live_view_store)
         self.client_context = TestClient(self.app)
         self.client = self.client_context.__enter__()
         bootstrap = self.client.post(
@@ -866,7 +888,7 @@ class ControlPlaneApiTests(unittest.TestCase):
     def test_full_run_creation_is_idempotent_and_writes_outbox(self) -> None:
         resources = self._bootstrap()
         request_headers = {**self.headers, "Idempotency-Key": "login-smoke-0001"}
-        payload = self._run_payload(resources, "TC-LOGIN-007")
+        payload = {**self._run_payload(resources, "TC-LOGIN-007"), "headless": False}
 
         first = self.client.post("/api/v1/runs", headers=request_headers, json=payload)
         self.assertEqual(first.status_code, 201, first.text)
@@ -883,6 +905,7 @@ class ControlPlaneApiTests(unittest.TestCase):
         snapshot = detail.json()["snapshot"]
         self.assertEqual(snapshot["case_baseline"]["version"], "case-v1.0.1")
         self.assertEqual([case["case_code"] for case in snapshot["cases"]], ["TC-LOGIN-007"])
+        self.assertFalse(snapshot["web_config"]["headless"])
         serialized = json.dumps(snapshot)
         self.assertIn("secret://yanjia/staging/test-password", serialized)
         self.assertNotIn("super-secret", serialized)
@@ -906,6 +929,56 @@ class ControlPlaneApiTests(unittest.TestCase):
             outbox_payload["run_snapshot"]["run_id"],
             first_payload["id"],
         )
+        self.assertFalse(outbox_payload["run_snapshot"]["web_config"]["headless"])
+
+        run_id = UUID(first_payload["id"])
+        starting = self.client.get(
+            f"/api/v1/runs/{run_id}/live-view",
+            headers=self.headers,
+        )
+        self.assertEqual(starting.status_code, 200, starting.text)
+        self.assertEqual(starting.json(), {"status": "STARTING", "read_only": True})
+        self.assertEqual(starting.headers["cache-control"], "no-store")
+
+        registration = LiveViewRegistration(
+            run_id=run_id,
+            session_id="S" * 43,
+            host=f"testops-run-{run_id.hex}",
+            password="Ab12Cd34",
+        )
+        self.live_view_store.registrations[run_id] = registration
+        ready = self.client.get(
+            f"/api/v1/runs/{run_id}/live-view",
+            headers=self.headers,
+        )
+        self.assertEqual(ready.json(), {"status": "READY", "read_only": True})
+
+        access = self.client.post(
+            f"/api/v1/runs/{run_id}/live-view/ticket",
+            headers=self.headers,
+        )
+        self.assertEqual(access.status_code, 200, access.text)
+        self.assertEqual(access.json()["ticket"], "T" * 43)
+        self.assertEqual(access.json()["password"], "Ab12Cd34")
+        self.assertEqual(access.json()["viewer_path"], "/viewer/session.html")
+        self.assertTrue(access.json()["read_only"])
+        self.assertEqual(access.headers["cache-control"], "no-store")
+
+        async def inspect_live_view_audit() -> tuple[int, str]:
+            async with self.app.state.session_factory() as session:
+                audit = await session.scalar(
+                    select(AuditLogRecord).where(
+                        AuditLogRecord.action == "run.live_view_access_granted",
+                        AuditLogRecord.resource_id == str(run_id),
+                    )
+                )
+                assert audit is not None
+                return int(audit.details["expires_in_seconds"]), json.dumps(audit.details)
+
+        expires_in_seconds, audit_json = asyncio.run(inspect_live_view_audit())
+        self.assertEqual(expires_in_seconds, 30)
+        self.assertNotIn("Ab12Cd34", audit_json)
+        self.assertNotIn("T" * 43, audit_json)
 
     def test_idempotency_key_rejects_a_different_request(self) -> None:
         resources = self._bootstrap()
@@ -1730,6 +1803,19 @@ class ControlPlaneApiTests(unittest.TestCase):
         )
         self.assertIn("testops_quality_webhook_replay_deliveries 1.0", metrics.text)
         self.assertIn("testops_quality_operations_snapshot_success 1.0", metrics.text)
+        self.assertIn(
+            'testops_supply_chain_key_readiness{status="READY"} 1.0',
+            metrics.text,
+        )
+        self.assertIn(
+            'testops_supply_chain_verifier_keys{status="ACTIVE"} 2.0',
+            metrics.text,
+        )
+        self.assertIn("testops_supply_chain_rotation_overlap_ready 1.0", metrics.text)
+        self.assertIn("testops_supply_chain_legacy_hmac_enabled 0.0", metrics.text)
+        self.assertIn("testops_supply_chain_key_readiness_snapshot_success 1.0", metrics.text)
+        self.assertNotIn(VERIFIER_CREDENTIAL_ID, metrics.text)
+        self.assertNotIn(VERIFIER_WORKLOAD_IDENTITY, metrics.text)
 
     def test_project_quality_policy_trends_and_failure_clusters(self) -> None:
         resources = self._bootstrap()
@@ -2970,6 +3056,21 @@ class ControlPlaneApiTests(unittest.TestCase):
                 "at": finished_at_text,
             },
             {
+                "event": "progress_updated",
+                "run_id": run_id,
+                "at": finished_at_text,
+                "current_round": 1,
+                "total_rounds": 3,
+                "round_completed": 1,
+                "round_total": 1,
+                "completed": 1,
+                "total": 1,
+                "passed": 1,
+                "failed": 0,
+                "skipped": 0,
+                "current_case_code": case["case_code"],
+            },
+            {
                 "event": "run_finished",
                 "run_id": run_id,
                 "status": "PASSED",
@@ -3005,6 +3106,12 @@ class ControlPlaneApiTests(unittest.TestCase):
             json=unknown_case_event,
         )
         self.assertEqual(rejected_event.status_code, 422, rejected_event.text)
+        invalid_progress = self.client.post(
+            f"/api/v1/internal/runs/{run_id}/events",
+            headers=RUNNER_HEADERS,
+            json={**runner_events[3], "failed": 1},
+        )
+        self.assertEqual(invalid_progress.status_code, 422, invalid_progress.text)
         artifact_id = uuid4()
         result_document = {
             "schema_version": "1.0",
@@ -3077,6 +3184,11 @@ class ControlPlaneApiTests(unittest.TestCase):
             list(range(1, len(event_documents) + 1)),
         )
         self.assertIn("result_recorded", [event["event_type"] for event in event_documents])
+        progress_document = next(
+            event for event in event_documents if event["event_type"] == "progress_updated"
+        )
+        self.assertEqual(progress_document["payload"]["current_round"], 1)
+        self.assertEqual(progress_document["payload"]["passed"], 1)
         after = self.client.get(
             f"/api/v1/runs/{run_id}/events?after_sequence=4",
             headers=self.headers,
@@ -3181,6 +3293,21 @@ class ControlPlaneApiTests(unittest.TestCase):
             headers=self.headers,
         )
         self.assertEqual(baselines.json()[0]["case_count"], 92)
+        verifier_keys = self.client.get(
+            "/api/v1/admin/supply-chain/verifier-keys",
+            headers=self.headers,
+        )
+        self.assertEqual(verifier_keys.status_code, 200, verifier_keys.text)
+        verifier_readiness = verifier_keys.json()
+        self.assertEqual(verifier_readiness["status"], "READY")
+        self.assertEqual(verifier_readiness["configured_key_count"], 2)
+        self.assertEqual(verifier_readiness["accepting_key_count"], 2)
+        self.assertTrue(verifier_readiness["overlap_ready"])
+        self.assertRegex(
+            verifier_readiness["configuration_digest"],
+            r"^sha256:[0-9a-f]{64}$",
+        )
+        self.assertNotIn("public_key", verifier_readiness["keys"][0])
 
         missing_actor = self.client.post(
             "/api/v1/projects",

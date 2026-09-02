@@ -931,6 +931,7 @@ onUnmounted(() => {
               controls-position="right"
             />
             <span class="unit">%</span>
+            <p class="form-field-hint">请输入 1–100 之间的整数。</p>
           </el-form-item>
           <el-form-item label="默认滚动窗口">
             <el-select v-model="policyForm.window_days" :disabled="!canManage">
@@ -950,6 +951,7 @@ onUnmounted(() => {
               controls-position="right"
             />
             <span class="unit points-unit">百分点</span>
+            <p class="form-field-hint">请输入 1–99 之间的整数，且必须小于严重阈值。</p>
           </el-form-item>
           <el-form-item label="下降严重阈值">
             <el-input-number
@@ -960,6 +962,7 @@ onUnmounted(() => {
               controls-position="right"
             />
             <span class="unit points-unit">百分点</span>
+            <p class="form-field-hint">请输入 2–100 之间的整数，且必须大于警告阈值。</p>
           </el-form-item>
           <el-button
             v-if="canManage"
@@ -1005,11 +1008,12 @@ onUnmounted(() => {
                 type="password"
                 show-password
                 :disabled="!canManage"
+                maxlength="2048"
                 :placeholder="webhookConfig.endpoint_display || 'https://hooks.example.com/...'
                 "
                 autocomplete="new-password"
               />
-              <span class="webhook-hint">留空将保留当前地址，仅允许 HTTPS 443。</span>
+              <p class="form-field-hint">首次配置必填；仅支持公网 HTTPS 443 地址，不允许凭据、片段、localhost 或内网 IP；已配置时留空将保留当前地址。</p>
             </el-form-item>
             <el-form-item label="最低通知等级">
               <el-select v-model="webhookForm.minimum_alert_status" :disabled="!canManage">
@@ -1026,7 +1030,7 @@ onUnmounted(() => {
                 controls-position="right"
                 :disabled="!canManage"
               />
-              <span class="webhook-hint">恢复后的同等级重复告警在冷却期内不会重新入队，单位为秒。</span>
+              <p class="form-field-hint">请输入 60–86400 秒；恢复后的同等级重复告警在冷却期内不会重新入队。</p>
             </el-form-item>
             <div class="signing-heading">
               <strong>请求签名</strong>
@@ -1038,15 +1042,19 @@ onUnmounted(() => {
               <el-input
                 v-model="webhookForm.signing_secret_name"
                 :disabled="!canManage || webhookForm.clear_signing_secret"
+                maxlength="100"
                 placeholder="QUALITY_WEBHOOK_PROJECT_KEY"
               />
+              <p class="form-field-hint">与密钥引用同时填写或同时留空；1–100 位，必须以大写字母开头，仅支持大写字母、数字和下划线。</p>
             </el-form-item>
             <el-form-item label="密钥引用">
               <el-input
                 v-model="webhookForm.signing_secret_ref"
                 :disabled="!canManage || webhookForm.clear_signing_secret"
+                maxlength="500"
                 placeholder="secret://quality/project/webhook-signing"
               />
+              <p class="form-field-hint">与环境变量名称同时填写或同时留空；必须以 secret:// 开头且不含空格，最长 500 个字符。</p>
             </el-form-item>
             <el-checkbox
               v-if="webhookConfig.signing_configured"
@@ -1080,7 +1088,7 @@ onUnmounted(() => {
                   placeholder="选择未来时间"
                   :disabled="!webhookConfig.enabled"
                 />
-                <span class="webhook-hint">最长 30 天；静默期间状态评估仍会继续。</span>
+                <p class="form-field-hint">设置静默时必填；必须晚于当前时间且最长不超过 30 天，静默期间状态评估仍会继续。</p>
               </el-form-item>
               <el-form-item label="静默原因">
                 <el-input
@@ -1090,6 +1098,7 @@ onUnmounted(() => {
                   :disabled="!webhookConfig.enabled"
                   placeholder="例如：发布维护窗口"
                 />
+                <p class="form-field-hint">设置静默时必填；1–500 个字符。</p>
               </el-form-item>
               <div class="webhook-actions silence-actions">
                 <el-button

@@ -5,15 +5,19 @@ from __future__ import annotations
 import logging
 import os
 import time
+from threading import Event, Lock, Thread
 
 from celery import Celery
-from celery.signals import heartbeat_sent, worker_ready
+from celery.signals import heartbeat_sent, worker_ready, worker_shutdown
 
 from .config import WorkerSettings
 from .control_plane import ControlPlaneClient
 
 LOGGER = logging.getLogger(__name__)
 _last_runner_heartbeat = 0.0
+_runner_heartbeat_lock = Lock()
+_runner_heartbeat_stop = Event()
+_runner_heartbeat_thread: Thread | None = None
 
 celery_app = Celery(
     "testops-worker",
@@ -38,31 +42,63 @@ def _report_runner_heartbeat(*, force: bool = False) -> None:
     settings = WorkerSettings.from_environment()
     if settings.runner_worker_key is None or settings.runner_pool_key is None:
         return
-    moment = time.monotonic()
-    if not force and moment - _last_runner_heartbeat < settings.runner_heartbeat_interval_seconds:
+    with _runner_heartbeat_lock:
+        moment = time.monotonic()
+        if (
+            not force
+            and moment - _last_runner_heartbeat < settings.runner_heartbeat_interval_seconds
+        ):
+            return
+        _last_runner_heartbeat = moment
+        try:
+            ControlPlaneClient(
+                settings.control_plane_url,
+                settings.runner_callback_token,
+            ).report_worker_heartbeat(
+                settings.runner_worker_key,
+                pool_key=settings.runner_pool_key,
+                display_name=settings.runner_display_name,
+                runner_version=settings.runner_version,
+                max_slots=settings.runner_max_slots,
+                capabilities=settings.runner_capabilities,
+            )
+        except Exception as exc:
+            LOGGER.warning("Runner heartbeat failed: %s", exc)
+
+
+def _runner_heartbeat_loop(stop_event: Event, interval_seconds: float) -> None:
+    while not stop_event.wait(interval_seconds):
+        _report_runner_heartbeat()
+
+
+def _start_runner_heartbeat_thread() -> None:
+    global _runner_heartbeat_thread
+    settings = WorkerSettings.from_environment()
+    if settings.runner_worker_key is None or settings.runner_pool_key is None:
         return
-    _last_runner_heartbeat = moment
-    try:
-        ControlPlaneClient(
-            settings.control_plane_url,
-            settings.runner_callback_token,
-        ).report_worker_heartbeat(
-            settings.runner_worker_key,
-            pool_key=settings.runner_pool_key,
-            display_name=settings.runner_display_name,
-            runner_version=settings.runner_version,
-            max_slots=settings.runner_max_slots,
-            capabilities=settings.runner_capabilities,
-        )
-    except Exception as exc:
-        LOGGER.warning("Runner heartbeat failed: %s", exc)
+    if _runner_heartbeat_thread is not None and _runner_heartbeat_thread.is_alive():
+        return
+    _runner_heartbeat_stop.clear()
+    _runner_heartbeat_thread = Thread(
+        target=_runner_heartbeat_loop,
+        args=(_runner_heartbeat_stop, settings.runner_heartbeat_interval_seconds),
+        name="testops-runner-heartbeat",
+        daemon=True,
+    )
+    _runner_heartbeat_thread.start()
 
 
 @worker_ready.connect(weak=False)
 def _worker_ready_heartbeat(**_kwargs: object) -> None:
     _report_runner_heartbeat(force=True)
+    _start_runner_heartbeat_thread()
 
 
 @heartbeat_sent.connect(weak=False)
 def _periodic_runner_heartbeat(**_kwargs: object) -> None:
     _report_runner_heartbeat()
+
+
+@worker_shutdown.connect(weak=False)
+def _stop_periodic_runner_heartbeat(**_kwargs: object) -> None:
+    _runner_heartbeat_stop.set()

@@ -41,7 +41,7 @@ from .security import (
     session_token_hash,
     verify_password,
 )
-from .services import ResourceConflict, ResourceNotFound, ServiceError
+from .services import InvalidRequest, ResourceConflict, ResourceNotFound, ServiceError
 
 
 class AuthenticationRequired(ServiceError):
@@ -435,6 +435,8 @@ async def reset_user_password(
     user = await session.get(UserRecord, user_id)
     if user is None:
         raise ResourceNotFound("user not found")
+    if user.system_role == SystemRole.SYSTEM_ADMIN.value and len(payload.password) < 12:
+        raise InvalidRequest("System Admin password must contain at least 12 characters")
     user.password_hash = hash_password(payload.password)
     revoked_sessions = await _revoke_user_sessions(session, user.id)
     session.add(

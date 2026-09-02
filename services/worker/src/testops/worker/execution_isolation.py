@@ -15,7 +15,7 @@ from typing import Protocol
 
 from testops.contracts import RunResult, RunSnapshot
 
-from .isolated_executor import MAX_SNAPSHOT_BYTES
+from .isolated_executor import MAX_SNAPSHOT_BYTES, virtual_display_prefix
 
 SAFE_PARENT_ENVIRONMENT = frozenset(
     {
@@ -29,6 +29,7 @@ SAFE_PARENT_ENVIRONMENT = frozenset(
         "LANG",
         "LC_ALL",
         "PLAYWRIGHT_BROWSERS_PATH",
+        "TESTOPS_LEGACY_PYTEST_PROJECT_ROOT",
         "SSL_CERT_FILE",
         "SSL_CERT_DIR",
     }
@@ -198,6 +199,8 @@ class SubprocessRunExecutor:
             "--workspace-root",
             str(workspace_root),
         )
+        if os.name != "nt" and not environment.get("DISPLAY"):
+            command = (*virtual_display_prefix(job), *command)
         process: subprocess.Popen[bytes] | None = None
         try:
             process = subprocess.Popen(

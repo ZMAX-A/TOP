@@ -20,6 +20,7 @@ import type {
   Target,
 } from '@/api/types'
 import { auth } from '@/auth'
+import { createClientRequestId } from '@/idempotency'
 import {
   changeStatusLabel,
   changeTagType,
@@ -148,7 +149,7 @@ async function startRun(): Promise<void> {
   actionBusy.value = true
   const payload = { ...runForm }
   try {
-    const key = `${runKind.value}-${requestId.value}-${crypto.randomUUID()}`
+    const key = `${runKind.value}-${requestId.value}-${createClientRequestId()}`
     const run =
       runKind.value === 'validation'
         ? await api.startValidation(projectId.value, requestId.value, payload, key)
@@ -431,7 +432,8 @@ onMounted(load)
       />
       <el-form label-position="top" class="review-form">
         <el-form-item label="评审意见" :required="reviewForm.decision === 'REQUEST_CHANGES'">
-          <el-input v-model="reviewForm.comment" type="textarea" :rows="4" maxlength="4000" />
+          <el-input v-model="reviewForm.comment" type="textarea" :rows="4" maxlength="4000" show-word-limit />
+          <p class="form-field-hint">提出修改时必填，审批通过时可选；最多 4000 个字符。</p>
         </el-form-item>
       </el-form>
       <template #footer>

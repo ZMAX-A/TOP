@@ -41,6 +41,9 @@ class WorkerSettings:
     runner_container_cpu_millis: int
     runner_container_pids_limit: int
     runner_container_shm_bytes: int
+    runner_live_view_enabled: bool
+    runner_live_view_port: int
+    runner_live_view_ready_timeout_seconds: float
     runner_kubernetes_namespace: str
     runner_kubernetes_service_account: str
     runner_kubernetes_network_policy: str
@@ -99,6 +102,8 @@ class WorkerSettings:
             raise RuntimeError(
                 "execution_isolation is derived from RUNNER_EXECUTION_MODE and cannot be overridden"
             )
+        if "live_view" in capabilities:
+            raise RuntimeError("live_view is derived from Runner settings and cannot be overridden")
         package_catalog = PackageRuntimeCatalog.from_json(os.getenv("RUNNER_PACKAGE_CATALOG", "[]"))
         if worker_key is not None and not package_catalog.packages:
             raise RuntimeError("RUNNER_PACKAGE_CATALOG is required for a registered Runner Worker")
@@ -140,6 +145,19 @@ class WorkerSettings:
         container_shm_mib = int(os.getenv("RUNNER_CONTAINER_SHM_MIB", "512"))
         if not 64 <= container_shm_mib <= 4096:
             raise RuntimeError("RUNNER_CONTAINER_SHM_MIB must be between 64 and 4096")
+        live_view_enabled = _environment_boolean("RUNNER_LIVE_VIEW_ENABLED", default=False)
+        if live_view_enabled and execution_mode != "CONTAINER":
+            raise RuntimeError("RUNNER_LIVE_VIEW_ENABLED requires CONTAINER execution")
+        live_view_port = int(os.getenv("RUNNER_LIVE_VIEW_PORT", "5900"))
+        if live_view_port != 5900:
+            raise RuntimeError("RUNNER_LIVE_VIEW_PORT must be 5900")
+        live_view_ready_timeout_seconds = float(
+            os.getenv("RUNNER_LIVE_VIEW_READY_TIMEOUT_SECONDS", "15")
+        )
+        if not 1 <= live_view_ready_timeout_seconds <= 60:
+            raise RuntimeError(
+                "RUNNER_LIVE_VIEW_READY_TIMEOUT_SECONDS must be between 1 and 60"
+            )
         kubernetes_namespace = os.getenv("RUNNER_KUBERNETES_NAMESPACE", "testops-runs").strip()
         kubernetes_service_account = os.getenv(
             "RUNNER_KUBERNETES_SERVICE_ACCOUNT", "testops-runner"
@@ -244,6 +262,10 @@ class WorkerSettings:
                 "network_policy": "WORKER_DEFAULT",
                 "resource_limits_enforced": False,
             }
+        capabilities["live_view"] = {
+            "enabled": live_view_enabled,
+            "read_only": True,
+        }
         return cls(
             database_url=os.getenv(
                 "DATABASE_URL",
@@ -264,7 +286,7 @@ class WorkerSettings:
             runner_worker_key=worker_key,
             runner_pool_key=pool_key,
             runner_display_name=os.getenv("RUNNER_DISPLAY_NAME", worker_key or "Legacy Worker"),
-            runner_version=os.getenv("RUNNER_VERSION", "0.30.0"),
+            runner_version=os.getenv("RUNNER_VERSION", "0.35.0"),
             runner_max_slots=max_slots,
             runner_capabilities=capabilities,
             runner_package_catalog=package_catalog,
@@ -278,6 +300,9 @@ class WorkerSettings:
             runner_container_cpu_millis=container_cpu_millis,
             runner_container_pids_limit=container_pids_limit,
             runner_container_shm_bytes=container_shm_mib * 1024 * 1024,
+            runner_live_view_enabled=live_view_enabled,
+            runner_live_view_port=live_view_port,
+            runner_live_view_ready_timeout_seconds=live_view_ready_timeout_seconds,
             runner_kubernetes_namespace=kubernetes_namespace,
             runner_kubernetes_service_account=kubernetes_service_account,
             runner_kubernetes_network_policy=kubernetes_network_policy,

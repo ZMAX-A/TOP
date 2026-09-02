@@ -48,9 +48,13 @@ class RunWorkspace:
             if path.name == "run-result.json":
                 continue
             relative = path.relative_to(self.path).as_posix()
+            if relative.startswith("_runtime-project/"):
+                continue
             payload = path.read_bytes()
             suffix = path.suffix.lower()
-            if suffix == ".png":
+            if "/allure-results/" in f"/{relative}":
+                kind = ArtifactKind.ALLURE
+            elif suffix == ".png":
                 kind = ArtifactKind.SCREENSHOT
             elif suffix == ".zip":
                 kind = ArtifactKind.TRACE

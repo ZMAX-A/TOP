@@ -9,6 +9,8 @@ import type {
   ChangeDetail,
   ChangeSummary,
   Environment,
+  GitReleaseApplyResult,
+  GitReleasePreview,
   ExecutionPolicy,
   LoginSession,
   ManagedSession,
@@ -27,12 +29,16 @@ import type {
   RegressionScheduleFiring,
   Run,
   RunBatchCancelResult,
+  RunCreate,
   RunDetail,
   RunEvent,
   RunList,
+  RunLiveViewStatus,
+  RunLiveViewTicket,
   RunnerPool,
   RunnerPoolCatalog,
   RunnerWorker,
+  SupplyChainVerifierKeyReadiness,
   Target,
   User,
   UserStatus,
@@ -167,6 +173,8 @@ export const api = {
       `/api/v1/admin/runner-workers/${workerId}`,
       json('PATCH', payload),
     ),
+  supplyChainVerifierKeyReadiness: () =>
+    request<SupplyChainVerifierKeyReadiness>('/api/v1/admin/supply-chain/verifier-keys'),
   projects: () => request<Project[]>('/api/v1/projects'),
   createProject: (payload: unknown) =>
     request<Project>('/api/v1/projects', json('POST', payload)),
@@ -329,6 +337,16 @@ export const api = {
       `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/drafts`,
       json('POST', payload),
     ),
+  previewGitRelease: (projectId: string, targetId: string, payload: unknown) =>
+    request<GitReleasePreview>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/git-release/preview`,
+      json('POST', payload),
+    ),
+  applyGitRelease: (projectId: string, targetId: string, payload: unknown) =>
+    request<GitReleaseApplyResult>(
+      `/api/v1/projects/${projectId}/targets/${targetId}/automation-packages/git-release/apply`,
+      json('POST', payload),
+    ),
   createPackageValidationRun: (
     projectId: string,
     targetId: string,
@@ -418,6 +436,11 @@ export const api = {
       `/api/v1/projects/${projectId}/change-requests/${requestId}/publish`,
       json('POST', { regression_run_id: regressionRunId, confirmation: 'PUBLISH' }),
     ),
+  createRun: (payload: RunCreate, idempotencyKey: string) =>
+    request<Run>(
+      '/api/v1/runs',
+      json('POST', payload, { 'Idempotency-Key': idempotencyKey }),
+    ),
   runs: (
     projectId: string,
     filters: {
@@ -447,6 +470,12 @@ export const api = {
       json('POST', { mode }, { 'Idempotency-Key': idempotencyKey }),
     ),
   run: (runId: string) => request<RunDetail>(`/api/v1/runs/${runId}`),
+  runLiveViewStatus: (runId: string) =>
+    request<RunLiveViewStatus>(`/api/v1/runs/${runId}/live-view`),
+  createRunLiveViewTicket: (runId: string) =>
+    request<RunLiveViewTicket>(`/api/v1/runs/${runId}/live-view/ticket`, {
+      method: 'POST',
+    }),
   runEvents: (runId: string, afterSequence = 0) =>
     request<RunEvent[]>(
       `/api/v1/runs/${runId}/events?after_sequence=${afterSequence}&limit=500`,

@@ -2,14 +2,14 @@
 
 ## 适用范围
 
-本手册覆盖 `0.30.x` 控制面、Run Outbox、质量告警 Evaluator、Webhook Dispatcher、Scheduler、Reaper、Celery Worker、
+本手册覆盖 `0.35.x` 控制面、Run Outbox、质量告警 Evaluator、Webhook Dispatcher、Scheduler、Reaper、Celery Worker、
 PostgreSQL、Redis 和 MinIO 的发布、备份、恢复与基础故障处置。Compose 是单机验收基座，不替代生产 TLS、Ingress、托管
 数据库、对象存储权限和集中日志方案。
 
 ## 发布前准备
 
 1. 确认 CI 的 Python、Frontend、PostgreSQL migration、Compose smoke 和
-   Prometheus config 必需任务全部通过；
+   Prometheus/Alertmanager config 必需任务全部通过；
 2. 将所有 `change-me-*` 值替换为独立随机密钥；`BOOTSTRAP_ADMIN_TOKEN` 只在首次创建
    管理员时短暂启用，完成后从运行环境移除；
 3. 固定应用与基础镜像到经过验证的不可变摘要，并保存镜像清单；
@@ -40,16 +40,60 @@ Cosign、不拉取 Registry 内容，也不保存原始证明；原始 Sigstore 
 使用通配符、个人分支身份或示例值。新报告为 REJECTED 时，新执行、计划触发和重跑立即停止；在途 Run 不会被
 改写，值班人员还必须根据事件完成包吊销和影响评估。
 
-`SUPPLY_CHAIN_VERIFIER_ED25519_KEYS` 是 JSON 数组，每项只包含 `credential_id`、`workload_identity` 和 32 字节原始
-Ed25519 公钥的无填充 base64url。身份只接受 HTTPS 或 SPIFFE URI。Envelope 必须携带
+`SUPPLY_CHAIN_VERIFIER_ED25519_KEYS` 是 JSON 数组，每项必须包含 `credential_id`、`workload_identity` 和 32 字节原始
+Ed25519 公钥的无填充 base64url；还可包含 `not_before`、`not_after`、`revoked_at`。三个时间字段只接受
+`YYYY-MM-DDTHH:MM:SSZ` 整秒 UTC，`not_before` 必须早于 `not_after`。生产 key 必须显式设置启用和到期时间；紧急吊销时
+设置不晚于当前时间的 `revoked_at` 并重启 API。身份只接受 HTTPS 或 SPIFFE URI。Envelope 必须携带
 `X-TestOps-Verifier-Key-Id`、Unix 秒级 `X-TestOps-Envelope-Created`、小写 UUID `X-TestOps-Envelope-Nonce` 和 compact
 detached JWS。受保护 Header 固定为 `alg=EdDSA`、匹配请求 Header 的 `kid` 和 TestOps profile type；签名输入覆盖 v2
 profile、HTTP 方法、路径、created、nonce、原始 JSON SHA-256、credential id 和绑定的工作负载身份。默认仅接受 300 秒
 内且未来偏差不超过 30 秒的请求。成功消费的 credential/nonce 在数据库唯一保存，同一 nonce 再次提交返回 409；相同
-报告使用新 nonce 重试返回原判定并追加 Envelope 审计。
+报告使用新 nonce 重试返回原判定并追加 Envelope 审计。Envelope 签发时间和服务端验签时间必须同时位于
+`not_before`（含）至 `not_after`（不含）之间，且都早于 `revoked_at`；任一边界不满足均返回统一 401。
 
-轮换时先同时配置旧、新公钥，重启 API 后让验证器切换到新私钥和 key-id，确认工作台显示新 key 指纹但保持同一工作
-负载身份，再移除旧公钥并重启。`SUPPLY_CHAIN_ALLOW_LEGACY_HMAC=false` 是默认值；只有迁移窗口才可显式设为 `true` 并
+`SUPPLY_CHAIN_KEY_EXPIRY_WARNING_DAYS` 控制管理员视图的到期预警窗口，默认 30 天，只允许 1 至 365。每次变更公钥环并
+重启全部 API 后，System Admin 必须读取 `GET /api/v1/admin/supply-chain/verifier-keys`：`BLOCKED` 表示没有任何当前可接受
+的 Ed25519 key；`WARNING` 表示至少一个验证器/工作负载身份没有双 key 重叠、存在即将到期 key，或历史 HMAC 仍启用；
+只有每个已配置身份都至少有两把当前可接受 key 且无预警时才返回 `READY`。接口只返回 credential、工作负载身份、公钥
+SHA-256 指纹和生命周期元数据，不返回公钥原文或任何私钥材料。该状态不能替代生产配置对显式启用/到期时间的人工复核。
+
+发布前必须在最终注入环境中运行失败关闭预检：
+
+```bash
+python scripts/check_supply_chain_key_readiness.py
+```
+
+命令输出单行 JSON，`READY` 返回 0、`WARNING` 返回 2、`BLOCKED` 返回 3、配置非法返回 4。报告包含
+`configuration_digest`、聚合计数和稳定告警代码，不包含逐 key credential、工作负载身份、公钥指纹、公钥或 secret。
+生产门禁不得使用 `--allow-warning`；该选项只允许在有负责人、到期时间和风险接受记录的受控迁移窗口使用。
+
+同一 keyring 配置会生成稳定的 `sha256:` 摘要，不受 JSON 数组顺序和抓取时间影响。滚动发布必须绕过负载均衡入口，逐个
+API Pod/实例执行 CLI，或逐实例读取管理员接口，并把实例标识、镜像摘要、配置摘要和就绪状态写入发布证据；任何摘要不同
+都必须停止发布并重新注入配置、重启后复核。摘要覆盖 Ed25519 credential、工作负载身份、公钥指纹、生命周期、预警窗口、
+HMAC 兼容开关和 HMAC credential id，但故意不覆盖 HMAC secret，因此不能证明旧 HMAC secret 在副本间一致；生产应保持
+HMAC 关闭。配置摘要也不得加入 Prometheus 标签，否则会随轮换产生高基数时序。
+
+`0.35.x` 应使用多实例门禁代替人工比对。先把专用 System Admin 的短期会话 Token 写入仅当前发布作业可读的临时文件，
+再列出至少两个绕过负载均衡的直连 HTTPS origin，并锁定审批记录里的摘要：
+
+```bash
+python scripts/check_supply_chain_keyring_fleet.py \
+  --instance api-0=https://api-0.testops.internal \
+  --instance api-1=https://api-1.testops.internal \
+  --token-file /run/secrets/testops-fleet-admin-token \
+  --ca-file /run/secrets/testops-internal-ca.pem \
+  --expected-digest sha256:<approved-64-lowercase-hex>
+```
+
+只有 `READY`/退出码 0 才可继续放量；`NOT_READY`、`DRIFT`、`INVALID` 分别返回 2、3、4。生产不得使用
+`--allow-http`，`--allow-warning` 仍只适用于有负责人、风险接受和到期时间的迁移例外。命令完成后必须吊销会话并删除
+Token 文件。输出只保存安全聚合字段，但发布证据仍应按组织的数据分级要求限制访问；任何实例请求失败都必须整批重试，
+不得删除失败实例后把剩余副本当作通过。
+
+轮换时为新公钥设置未来 `not_before`、为旧公钥设置覆盖观察期的 `not_after`，同时配置后重启 API；新 key 到点后让
+验证器切换私钥和 key-id，确认工作台显示新指纹但保持同一工作负载身份。观察期结束后确认旧 key 到期拒绝，再从配置
+移除旧公钥并重启。所有节点必须保持可靠 UTC 时钟，配置变更只有在 API 重启后生效。`SUPPLY_CHAIN_ALLOW_LEGACY_HMAC=false`
+是默认值；只有迁移窗口才可显式设为 `true` 并
 临时配置 `SUPPLY_CHAIN_VERIFIER_HMAC_KEYS`，切换完成后必须再次关闭并移除共享秘密。禁止把私钥或 HMAC secret 写入
 报告、数据库、日志、前端变量或 Compose 公共环境锚点；生产仍必须使用 TLS，签名不提供传输机密性。
 
@@ -215,8 +259,16 @@ authorization:
 
 仓库告警规则覆盖：API 连续不可抓取、数据库就绪失败、5xx 比例持续超过 5%、五分钟
 p95 延迟持续超过 2 秒，以及可靠性快照、派发积压、定时计划延迟、失联 Worker 租约、质量运营快照、质量
-评估延迟和 Webhook PENDING 积压。
+评估延迟、Webhook PENDING 积压和验证器 key 就绪度。
 上线前必须把这些规则接入实际通知接收器并执行一次测试告警。
+
+本地验收可运行 `docker compose --profile observability up -d`，启动 Prometheus、固定摘要的 Alertmanager 和
+`alertmanager-sink`。默认 `infra/observability/alertmanager.local.yml` 只把 firing/resolved Webhook 发送到同一 Compose
+网络内的审计 sink；sink 返回 204，访问日志不记录请求体。该配置只证明 Prometheus → Alertmanager → Webhook 链路，绝不
+是生产接收器。生产必须通过 `ALERTMANAGER_CONFIG_FILE` 挂载经评审的配置，把 PagerDuty、企业告警平台或批准的 HTTPS
+Webhook 凭据放在受限文件/Secret 中，并限制 9093 管理端口和接收器出口；不得把 Token 写入仓库、Compose 环境锚点或日志。
+发布证据至少记录 Alertmanager 镜像摘要、`amtool check-config`、Prometheus active manager、一次 firing 与对应 resolved
+通知。接收器不可达、resolved 未送达或本地审计配置未替换时，生产告警门禁保持未完成。
 
 项目质量 Webhook 只允许 HTTPS 443，默认拒绝解析到私网或保留地址的目标。签名密钥通过
 `TESTOPS_SECRET_<配置名称>` 注入 `quality-webhooks` 进程，数据库只保存 `secret://` 引用；生产还应在网络层
@@ -232,6 +284,12 @@ Dispatcher 使用的 Python/certifi 信任库并完成真实签名投递，不�
 生成一个直接重放记录；若重放再次失败，应从新的失败记录继续，禁止反复点击旧记录制造并行重复投递。
 值班看板应同时展示 `testops_quality_operations_snapshot_success`、evaluator 到期量/延迟、活跃静默、PENDING
 数量/最老年龄和 FAILED 历史量；FAILED 是保留证据，不应单独按总量持续报警。
+
+验证器 key 看板应展示 `testops_supply_chain_key_readiness_snapshot_success`、
+`testops_supply_chain_key_readiness{status}`、`testops_supply_chain_verifier_keys{status}`、
+`testops_supply_chain_rotation_overlap_ready` 和 `testops_supply_chain_legacy_hmac_enabled`。状态标签只允许代码中固定的枚举值；
+禁止增加 credential、workload identity 或指纹标签。`BLOCKED` 告警按关键故障处置；轮换未就绪、即将到期或历史 HMAC
+告警必须在发布窗口前消除或形成获批例外。快照成功指标为 0 时先排查 API 配置解析和日志，不能把旧时序值当作当前状态。
 
 ## 常见故障处置
 
@@ -254,6 +312,7 @@ Dispatcher 使用的 Python/certifi 信任库并完成真实签名投递，不�
 | 自动告警状态长期不更新 | `quality-alerts` 日志、配置 `next_evaluation_at`、数据库锁与批量上限 | 恢复 evaluator；不要手工改状态或通知序号，先用状态 API 确认积压范围 |
 | 静默到期后仍未补发 | 静默截止时间、`next_evaluation_at`、当前状态与最后已通知状态 | 恢复 evaluator 或解除静默触发重新评估；不要手工创建投递或修改通知序号 |
 | 质量运营快照失败或 evaluator 延迟 | API 日志、数据库就绪、`quality-alerts` 进程和到期配置量 | 先恢复快照查询与 evaluator；不要以旧指标值判断当前无积压 |
+| Prometheus 规则 firing 但无人收到通知 | `/api/v1/alertmanagers`、Alertmanager 集群/接收器状态、sink/接收器状态码和出口策略 | 先恢复接收链路并补做 firing/resolved 演练；禁止仅确认规则表达式通过就关闭事件 |
 | 误发布或迁移失败 | 发布版本、Alembic current、备份校验结果 | 停止写入，按批准的备份恢复；不直接编辑迁移版本表 |
 
 ## 演练与证据

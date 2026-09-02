@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { reactive, ref } from 'vue'
+import { computed, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Lock, User } from '@element-plus/icons-vue'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -12,10 +12,17 @@ const route = useRoute()
 const router = useRouter()
 const formRef = ref<FormInstance>()
 const submitting = ref(false)
+const credentialError = ref('')
 const form = reactive({ username: '', password: '' })
+const usernameError = computed(() => credentialError.value ? '请检查用户名是否正确' : '')
+const passwordError = computed(() => credentialError.value ? '请检查密码是否正确' : '')
 const rules: FormRules = {
   username: [{ required: true, message: '请输入用户名', trigger: 'blur' }],
   password: [{ required: true, message: '请输入密码', trigger: 'blur' }],
+}
+
+function clearCredentialError(): void {
+  credentialError.value = ''
 }
 
 async function submit(): Promise<void> {
@@ -26,7 +33,11 @@ async function submit(): Promise<void> {
     const redirect = typeof route.query.redirect === 'string' ? route.query.redirect : '/projects'
     await router.replace(redirect)
   } catch (error) {
-    ElMessage.error(error instanceof ApiError ? error.message : '登录失败，请稍后重试')
+    if (error instanceof ApiError && error.status === 401) {
+      credentialError.value = '账号或密码错误，请重新输入'
+    } else {
+      ElMessage.error(error instanceof ApiError ? error.message : '登录失败，请稍后重试')
+    }
   } finally {
     submitting.value = false
   }
@@ -56,23 +67,42 @@ async function submit(): Promise<void> {
           <h2>登录控制台</h2>
           <p>使用平台管理员分配的账号继续</p>
         </div>
+        <el-alert
+          v-if="credentialError"
+          class="login-error"
+          type="error"
+          :closable="false"
+          show-icon
+          :title="credentialError"
+        />
         <el-form ref="formRef" :model="form" :rules="rules" size="large" @submit.prevent="submit">
-          <el-form-item prop="username">
-            <el-input v-model="form.username" autocomplete="username" placeholder="用户名">
+          <el-form-item prop="username" :error="usernameError">
+            <el-input
+              v-model="form.username"
+              autocomplete="username"
+              placeholder="用户名"
+              minlength="3"
+              maxlength="64"
+              @input="clearCredentialError"
+            >
               <template #prefix><el-icon><User /></el-icon></template>
             </el-input>
+            <p v-if="!credentialError" class="form-field-hint">必填；3–64 位，仅支持小写字母、数字、点、下划线和横线。</p>
           </el-form-item>
-          <el-form-item prop="password">
+          <el-form-item prop="password" :error="passwordError">
             <el-input
               v-model="form.password"
               type="password"
               autocomplete="current-password"
               placeholder="密码"
+              maxlength="256"
               show-password
+              @input="clearCredentialError"
               @keyup.enter="submit"
             >
               <template #prefix><el-icon><Lock /></el-icon></template>
             </el-input>
+            <p v-if="!credentialError" class="form-field-hint">必填；最多 256 位，区分大小写。</p>
           </el-form-item>
           <el-button native-type="submit" type="primary" size="large" :loading="submitting">
             进入平台
@@ -223,6 +253,10 @@ async function submit(): Promise<void> {
 .login-card .el-button {
   width: 100%;
   margin-top: 7px;
+}
+
+.login-error {
+  margin-bottom: 20px;
 }
 
 .login-help {

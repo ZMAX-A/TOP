@@ -108,6 +108,7 @@ class KubernetesExecutionTests(unittest.TestCase):
         self.assertFalse(runner["securityContext"]["allowPrivilegeEscalation"])
         self.assertEqual(runner["securityContext"]["capabilities"]["drop"], ["ALL"])
         self.assertEqual(runner["resources"]["limits"], runner["resources"]["requests"])
+        self.assertNotIn("xvfb-run", runner["command"][2])
         self.assertNotIn("hostPath", serialized)
         self.assertNotIn("docker.sock", serialized)
         policy = documents["network_policy"]["spec"]
@@ -124,6 +125,19 @@ class KubernetesExecutionTests(unittest.TestCase):
             isolation_evidence_from_environment(child_environment),
             kubernetes_isolation_evidence(self.settings, self.job.automation_package.digest),
         )
+
+        assert self.job.web_config is not None
+        headed_job = self.job.model_copy(
+            update={
+                "web_config": self.job.web_config.model_copy(update={"headless": False})
+            }
+        )
+        headed_documents = kubernetes_resources(headed_job, self.settings, environ={})
+        headed_command = headed_documents["job"]["spec"]["template"]["spec"]["containers"][0][
+            "command"
+        ][2]
+        self.assertIn("xvfb-run --auto-servernum", headed_command)
+        self.assertIn("1440x900x24", headed_command)
 
     def test_runtime_verification_rejects_mutated_pod_security(self) -> None:
         documents = kubernetes_resources(self.job, self.settings, environ={})

@@ -6,6 +6,7 @@ import {
   Box,
   CircleCheck,
   CircleClose,
+  Download,
   Plus,
   Refresh,
   VideoPlay,
@@ -20,12 +21,14 @@ import type {
   AutomationPackageSupplyChainVerification,
   Baseline,
   Environment,
+  GitReleasePreview,
   Project,
   ProjectMember,
   Run,
   Target,
 } from '@/api/types'
 import { auth } from '@/auth'
+import { createClientRequestId } from '@/idempotency'
 import { formatDate, runTagType, shortDigest } from '@/presentation'
 
 type RetirementAction = 'DEPRECATE' | 'REVOKE'
@@ -82,6 +85,14 @@ const draftForm = reactive({
   runner_type: 'WEB_PLAYWRIGHT' as const,
   image_repository: '',
   supersedes_id: '',
+})
+
+const syncVisible = ref(false)
+const syncPreview = ref<GitReleasePreview>()
+const syncForm = reactive({
+  repository_url: '',
+  tag: '',
+  asset_name: 'testops-release-manifest.json',
 })
 
 const validationVisible = ref(false)
@@ -255,6 +266,95 @@ async function selectPackage(row: AutomationPackage | null): Promise<void> {
   }
 }
 
+function invalidateSyncPreview(): void {
+  syncPreview.value = undefined
+}
+
+function openGitReleaseSync(): void {
+  Object.assign(syncForm, {
+    repository_url:
+      project.value?.key === 'yanjia-ai-web' ? 'https://github.com/ZMAX-A/web' : '',
+    tag: '',
+    asset_name: 'testops-release-manifest.json',
+  })
+  syncPreview.value = undefined
+  syncVisible.value = true
+}
+
+function validSyncSource(): boolean {
+  if (!/^https:\/\/github\.com\/[A-Za-z0-9._-]+\/[A-Za-z0-9._-]+(?:\.git)?$/.test(
+    syncForm.repository_url.trim(),
+  )) {
+    ElMessage.warning('请填写完整的 HTTPS GitHub 仓库地址')
+    return false
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(syncForm.tag.trim())) {
+    ElMessage.warning('请填写 Git 标签，例如 v1.0.1')
+    return false
+  }
+  if (!/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(syncForm.asset_name.trim())) {
+    ElMessage.warning('Release 清单文件名格式不正确')
+    return false
+  }
+  return true
+}
+
+async function previewGitRelease(): Promise<void> {
+  if (!validSyncSource()) return
+  actionBusy.value = true
+  try {
+    syncPreview.value = await api.previewGitRelease(
+      projectId.value,
+      selectedTargetId.value,
+      {
+        repository_url: syncForm.repository_url.trim(),
+        tag: syncForm.tag.trim(),
+        asset_name: syncForm.asset_name.trim(),
+      },
+    )
+    ElMessage.success('标签、提交、基线和 OCI 摘要已校验，可以创建草稿')
+  } catch (error) {
+    syncPreview.value = undefined
+    report(error, 'Git Release 预览失败')
+  } finally {
+    actionBusy.value = false
+  }
+}
+
+async function applyGitRelease(): Promise<void> {
+  const preview = syncPreview.value
+  if (!preview || !validSyncSource()) {
+    ElMessage.warning('请先完成 Git Release 预览校验')
+    return
+  }
+  actionBusy.value = true
+  try {
+    const result = await api.applyGitRelease(
+      projectId.value,
+      selectedTargetId.value,
+      {
+        repository_url: syncForm.repository_url.trim(),
+        tag: syncForm.tag.trim(),
+        asset_name: syncForm.asset_name.trim(),
+        expected_revision: preview.revision,
+        expected_baseline_digest: preview.candidate_baseline_digest,
+        expected_package_digest: preview.automation_package.digest,
+      },
+    )
+    syncVisible.value = false
+    ElMessage.success(
+      result.change_request_id
+        ? '已创建用例变更草稿和自动化包草稿，尚未激活'
+        : '用例未变化，已创建自动化包草稿，尚未激活',
+    )
+    await loadTargetData(result.automation_package.id)
+  } catch (error) {
+    report(error, 'Git Release 同步失败')
+  } finally {
+    actionBusy.value = false
+  }
+}
+
 function openDraft(): void {
   const base = selectedPackage.value
   Object.assign(draftForm, {
@@ -331,7 +431,7 @@ async function startValidation(): Promise<void> {
       projectId.value,
       selectedTargetId.value,
       current.id,
-      crypto.randomUUID(),
+      createClientRequestId(),
       validationForm,
     )
     validationVisible.value = false
@@ -462,6 +562,11 @@ onMounted(initialize)
           />
         </el-select>
         <el-button :icon="Refresh" @click="refreshTargetData">刷新</el-button>
+        <el-button
+          v-if="canManage && selectedTargetId"
+          :icon="Download"
+          @click="openGitReleaseSync"
+        >从 Git 标签同步</el-button>
         <el-button
           v-if="canManage && selectedTargetId"
           type="primary"
@@ -727,6 +832,102 @@ onMounted(initialize)
       </aside>
     </div>
 
+    <el-dialog
+      v-model="syncVisible"
+      title="从 GitHub Release 同步"
+      width="820px"
+      destroy-on-close
+    >
+      <el-alert
+        title="平台只读取标签对应的不可变 Release 清单。确认后创建用例变更草稿和自动化包草稿，不会直接发布基线或激活包。"
+        type="info"
+        :closable="false"
+        show-icon
+      />
+      <el-form label-position="top" class="dialog-form">
+        <el-form-item label="GitHub 仓库" required>
+          <el-input
+            v-model="syncForm.repository_url"
+            placeholder="https://github.com/ZMAX-A/web"
+            @input="invalidateSyncPreview"
+          />
+        </el-form-item>
+        <div class="form-grid">
+          <el-form-item label="发布标签" required>
+            <el-input
+              v-model="syncForm.tag"
+              placeholder="v1.0.1"
+              @input="invalidateSyncPreview"
+            />
+          </el-form-item>
+          <el-form-item label="Release 清单文件" required>
+            <el-input
+              v-model="syncForm.asset_name"
+              @input="invalidateSyncPreview"
+            />
+          </el-form-item>
+        </div>
+      </el-form>
+
+      <section v-if="syncPreview" class="sync-summary">
+        <el-descriptions :column="2" border size="small">
+          <el-descriptions-item label="提交">
+            <code>{{ syncPreview.revision }}</code>
+          </el-descriptions-item>
+          <el-descriptions-item label="自动化包">
+            {{ syncPreview.automation_package.name }}@{{ syncPreview.automation_package.version }}
+          </el-descriptions-item>
+          <el-descriptions-item label="当前基线">
+            {{ syncPreview.base_baseline_version }}
+          </el-descriptions-item>
+          <el-descriptions-item label="候选基线">
+            {{ syncPreview.candidate_baseline_version }}
+          </el-descriptions-item>
+          <el-descriptions-item label="OCI 摘要" :span="2">
+            <code class="wrap">{{ syncPreview.automation_package.digest }}</code>
+          </el-descriptions-item>
+        </el-descriptions>
+        <div class="change-counts">
+          <el-tag type="success">新增 {{ syncPreview.added_count }}</el-tag>
+          <el-tag type="warning">修改 {{ syncPreview.modified_count }}</el-tag>
+          <el-tag type="danger">删除 {{ syncPreview.deleted_count }}</el-tag>
+          <el-tag type="info">未变 {{ syncPreview.unchanged_count }}</el-tag>
+        </div>
+        <el-table
+          v-if="syncPreview.changes.length"
+          :data="syncPreview.changes"
+          size="small"
+          max-height="260"
+        >
+          <el-table-column label="类型" prop="change_type" width="90" />
+          <el-table-column label="用例" prop="case_code" width="170" />
+          <el-table-column label="变化字段">
+            <template #default="scope">
+              <span class="mono wrap">{{ scope.row.changed_fields.join(', ') }}</span>
+            </template>
+          </el-table-column>
+        </el-table>
+        <el-alert
+          v-else
+          title="Excel 规范化用例未变化；本次只会创建新的自动化包草稿。"
+          type="success"
+          :closable="false"
+          show-icon
+        />
+      </section>
+
+      <template #footer>
+        <el-button @click="syncVisible = false">取消</el-button>
+        <el-button :loading="actionBusy" @click="previewGitRelease">预览并校验</el-button>
+        <el-button
+          type="primary"
+          :disabled="!syncPreview"
+          :loading="actionBusy"
+          @click="applyGitRelease"
+        >创建草稿</el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="draftVisible" title="创建自动化包草稿" width="680px" destroy-on-close>
       <el-alert
         title="创建后状态为待供应链验证。可信 CI 必须验证最终 OCI 摘要的签名、provenance 和 SBOM，准入后才能执行全量验证。"
@@ -738,16 +939,20 @@ onMounted(initialize)
         <div class="form-grid">
           <el-form-item label="包名" required>
             <el-input v-model="draftForm.name" placeholder="yanjia-web" />
+            <p class="form-field-hint">必填；必须以小写字母或数字开头，仅支持小写字母、数字、点、下划线和横线。</p>
           </el-form-item>
           <el-form-item label="版本" required>
             <el-input v-model="draftForm.version" placeholder="0.2.0" />
+            <p class="form-field-hint">必填；填写可追溯且不可变的版本号，例如 0.35.0。</p>
           </el-form-item>
         </div>
         <el-form-item label="OCI 仓库（不带协议、标签和摘要）" required>
           <el-input v-model="draftForm.image_repository" placeholder="registry.example.com/testops/yanjia-web" />
+          <p class="form-field-hint">必填；不得包含协议、空格、@digest 或可变标签，例如 :latest。</p>
         </el-form-item>
         <el-form-item label="OCI Manifest Digest" required>
           <el-input v-model="draftForm.digest" class="mono-input" placeholder="sha256:..." />
+          <p class="form-field-hint">必填；格式为 sha256: 后跟 64 位小写十六进制字符。</p>
         </el-form-item>
         <div class="form-grid">
           <el-form-item label="Runner 类型">
@@ -864,6 +1069,7 @@ onMounted(initialize)
       <el-form label-position="top" class="dialog-form">
         <el-form-item label="可审计原因" required>
           <el-input v-model="retirementForm.reason" type="textarea" :rows="4" maxlength="500" show-word-limit />
+          <p class="form-field-hint">必填；1–500 个字符，请说明弃用或吊销原因。</p>
         </el-form-item>
       </el-form>
       <template #footer>
@@ -1092,6 +1298,18 @@ onMounted(initialize)
 
 .dialog-form {
   margin-top: 20px;
+}
+
+.sync-summary {
+  display: grid;
+  gap: 14px;
+  margin-top: 18px;
+}
+
+.change-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .form-grid {

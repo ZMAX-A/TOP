@@ -25,7 +25,7 @@ class AssertionExecutionError(AssertionError):
 
 
 class WebCaseEngine:
-    """Execute the login-module capability slice against a Playwright-like page."""
+    """Execute the supported YanJia Web capability slices against a Playwright-like page."""
 
     SUPPORTED_OPERATIONS = {"input", "click"}
     SUPPORTED_ASSERTIONS = {
@@ -48,11 +48,7 @@ class WebCaseEngine:
             raise RunnerJobValidationError(
                 f"case {case.case_code} uses unsupported assertion: {case.assertion.type}"
             )
-        for precondition in case.preconditions:
-            if "打开登录" not in precondition and "未登录" not in precondition:
-                raise RunnerJobValidationError(
-                    f"case {case.case_code} uses unsupported precondition"
-                )
+        self._validate_preconditions(case)
         if case.assertion.type == "url_contains":
             keywords = self._url_keywords(str(case.assertion.expected or ""))
             if keywords == ["/"]:
@@ -67,11 +63,33 @@ class WebCaseEngine:
         config: WebRunConfig,
         resolver: VariableResolver,
     ) -> None:
-        self._apply_preconditions(page, case, config)
         timeout_ms = round((case.timeout_seconds or config.action_timeout_seconds) * 1000)
+        self._apply_preconditions(page, case, config, resolver, timeout_ms)
         for step in case.steps:
             self._execute_step(page, step, resolver, timeout_ms)
         self._assert_case(page, case, timeout_ms)
+
+    @staticmethod
+    def _is_login_page_precondition(precondition: str) -> bool:
+        return "打开登录" in precondition or "未登录" in precondition
+
+    @staticmethod
+    def _is_authenticated_precondition(precondition: str) -> bool:
+        return "已登录" in precondition or "登录成功" in precondition
+
+    def _validate_preconditions(self, case: CaseDefinition) -> None:
+        if not case.preconditions:
+            return
+        for precondition in case.preconditions:
+            if case.module_key == "login" and self._is_login_page_precondition(precondition):
+                continue
+            if case.module_key == "home-search" and self._is_authenticated_precondition(
+                precondition
+            ):
+                continue
+            raise RunnerJobValidationError(
+                f"case {case.case_code} uses unsupported precondition"
+            )
 
     @staticmethod
     def _login_url(base_url: str) -> str:
@@ -88,17 +106,81 @@ class WebCaseEngine:
         page: Any,
         case: CaseDefinition,
         config: WebRunConfig,
+        resolver: VariableResolver,
+        timeout_ms: int,
     ) -> None:
         if not case.preconditions:
             return
         login_url = self._login_url(config.base_url)
         for precondition in case.preconditions:
-            if "打开登录" in precondition or "未登录" in precondition:
+            if self._is_login_page_precondition(precondition):
                 page.goto(
                     login_url,
                     wait_until="domcontentloaded",
                     timeout=round(config.navigation_timeout_seconds * 1000),
                 )
+                continue
+            if self._is_authenticated_precondition(precondition):
+                self._authenticate(page, config, resolver, timeout_ms)
+
+    def _authenticate(
+        self,
+        page: Any,
+        config: WebRunConfig,
+        resolver: VariableResolver,
+        timeout_ms: int,
+    ) -> None:
+        page.goto(
+            self._login_url(config.base_url),
+            wait_until="domcontentloaded",
+            timeout=round(config.navigation_timeout_seconds * 1000),
+        )
+        self._input(
+            page,
+            StepDefinition(
+                operation="input",
+                locator="#username",
+                input="${TEST_USERNAME}",
+            ),
+            resolver,
+            timeout_ms,
+        )
+        self._input(
+            page,
+            StepDefinition(
+                operation="input",
+                locator="#password",
+                input="${TEST_PASSWORD}",
+            ),
+            resolver,
+            timeout_ms,
+        )
+        if page.locator("#store").count() > 0:
+            self._click(page, StepDefinition(operation="click", locator="#store"), timeout_ms)
+        self._click(
+            page,
+            StepDefinition(operation="click", locator="button[type='submit']"),
+            timeout_ms,
+        )
+        attempts = max(1, math.ceil(timeout_ms / 250))
+        for _ in range(attempts):
+            if "/login" not in page.url:
+                self._dismiss_optional_modal(page, timeout_ms)
+                return
+            page.wait_for_timeout(250)
+        raise StepExecutionError("authenticated precondition failed: URL is still on /login")
+
+    @staticmethod
+    def _dismiss_optional_modal(page: Any, timeout_ms: int) -> None:
+        button = page.locator("text=知道了")
+        if button.count() == 0:
+            return
+        try:
+            button.first.click(timeout=min(timeout_ms, 3000))
+            page.wait_for_timeout(300)
+        except Exception:
+            # This notification is optional and must not block the business case.
+            return
 
     def _execute_step(
         self,

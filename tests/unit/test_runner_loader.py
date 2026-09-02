@@ -33,9 +33,22 @@ class RunnerLoaderTests(unittest.TestCase):
         self.assertEqual(job.case_baseline.version, "case-v1.0.1")
         self.assertEqual(len(job.cases), 7)
         self.assertEqual({case.module_key for case in job.cases}, {"login"})
-        self.assertEqual(job.automation_package.digest, runner_digest())
+        self.assertEqual(job.automation_package.version, "0.1.0")
         for case in job.cases:
             WebCaseEngine().validate_case(case)
+        dumped = job.model_dump_json()
+        self.assertNotIn("super-secret", dumped)
+        self.assertIn("secret://yanjia/staging/test-password", dumped)
+
+    def test_home_search_job_is_pinned_to_current_runner(self) -> None:
+        job = load_run_snapshot(ROOT / "examples/jobs/yanjia-home-search-smoke.json")
+
+        self.assertEqual(job.case_baseline.version, "case-v1.0.1")
+        self.assertEqual(tuple(case.case_code for case in job.cases), ("TC-HOME-002",))
+        self.assertEqual({case.module_key for case in job.cases}, {"home-search"})
+        self.assertEqual(job.automation_package.version, "0.2.0")
+        self.assertEqual(job.automation_package.digest, runner_digest())
+        WebCaseEngine().validate_case(job.cases[0])
         dumped = job.model_dump_json()
         self.assertNotIn("super-secret", dumped)
         self.assertIn("secret://yanjia/staging/test-password", dumped)

@@ -325,6 +325,10 @@ export interface RunnerCapabilities {
     service_account_name?: string | null
     service_account_token_automounted?: boolean | null
   }
+  live_view?: {
+    enabled: boolean
+    read_only: true
+  }
 }
 
 export interface RunnerWorker {
@@ -341,6 +345,48 @@ export interface RunnerWorker {
   last_heartbeat_at: string
   created_at: string
   updated_at: string
+}
+
+export type SupplyChainVerifierKeyStatus =
+  | 'ACTIVE'
+  | 'EXPIRING_SOON'
+  | 'NOT_YET_ACTIVE'
+  | 'EXPIRED'
+  | 'REVOKED'
+
+export interface SupplyChainVerifierKey {
+  credential_id: string
+  verifier: string
+  workload_identity: string
+  key_fingerprint: string
+  status: SupplyChainVerifierKeyStatus
+  accepts_now: boolean
+  not_before: string | null
+  not_after: string | null
+  revoked_at: string | null
+}
+
+export interface SupplyChainVerifierKeyReadiness {
+  status: 'READY' | 'WARNING' | 'BLOCKED'
+  configuration_digest: string
+  generated_at: string
+  expiry_warning_days: number
+  configured_key_count: number
+  accepting_key_count: number
+  future_key_count: number
+  expiring_soon_key_count: number
+  expired_key_count: number
+  revoked_key_count: number
+  overlap_ready: boolean
+  legacy_hmac_enabled: boolean
+  warnings: Array<
+    | 'NO_ED25519_KEYS'
+    | 'NO_ACCEPTING_KEYS'
+    | 'NO_OVERLAPPING_ACTIVE_KEYS'
+    | 'ACTIVE_KEY_EXPIRING_SOON'
+    | 'LEGACY_HMAC_ENABLED'
+  >
+  keys: SupplyChainVerifierKey[]
 }
 
 export interface Target {
@@ -450,6 +496,53 @@ export interface AutomationPackage {
   supply_chain_verified_at: string | null
   created_at: string
   updated_at: string
+}
+
+export interface GitReleaseAutomationPackage {
+  name: string
+  version: string
+  digest: string
+  runner_type: 'WEB_PLAYWRIGHT'
+  image_repository: string
+}
+
+export interface GitReleaseCaseChange {
+  change_type: 'ADD' | 'MODIFY' | 'DELETE'
+  case_id: string
+  case_code: string
+  changed_fields: string[]
+}
+
+export interface GitReleasePreview {
+  repository_url: string
+  tag: string
+  revision: string
+  base_baseline_id: string
+  base_baseline_version: string
+  base_baseline_digest: string
+  candidate_baseline_id: string
+  candidate_baseline_version: string
+  candidate_baseline_digest: string
+  case_count: number
+  enabled_case_count: number
+  added_count: number
+  modified_count: number
+  deleted_count: number
+  unchanged_count: number
+  baseline_changed: boolean
+  changes: GitReleaseCaseChange[]
+  automation_package: GitReleaseAutomationPackage
+  supersedes_id: string | null
+}
+
+export interface GitReleaseApplyResult {
+  repository_url: string
+  tag: string
+  revision: string
+  baseline_changed: boolean
+  baseline_id: string
+  change_request_id: string | null
+  automation_package: AutomationPackage
 }
 
 export interface AutomationPackageSupplyChainVerification {
@@ -586,6 +679,16 @@ export interface ChangeDetail extends ChangeSummary {
   approvals: Approval[]
 }
 
+export interface RunCreate {
+  project_id: string
+  target_id: string
+  environment_id: string
+  baseline_id: string
+  automation_package_id: string
+  case_codes: string[]
+  headless: boolean
+}
+
 export interface Run {
   id: string
   project_id: string
@@ -697,6 +800,7 @@ export interface RunSnapshot {
   target_id: string
   environment_id: string
   browser: string | null
+  web_config: ({ headless?: boolean } & Record<string, unknown>) | null
   config_hash: string
   case_baseline: {
     baseline_id: string
@@ -733,6 +837,19 @@ export interface RunDetail extends Run {
   result: RunResult | null
   cases: RunCase[]
   artifacts: Artifact[]
+}
+
+export interface RunLiveViewStatus {
+  status: 'DISABLED' | 'STARTING' | 'READY' | 'ENDED' | 'UNAVAILABLE'
+  read_only: boolean
+}
+
+export interface RunLiveViewTicket {
+  ticket: string
+  password: string
+  viewer_path: '/viewer/session.html'
+  read_only: boolean
+  expires_at: string
 }
 
 export interface RunEvent {

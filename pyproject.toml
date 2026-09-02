@@ -1,6 +1,6 @@
 [project]
 name = "testops-platform"
-version = "0.30.0"
+version = "0.35.0"
 description = "Multi-project TestOps governance and execution platform"
 requires-python = ">=3.12"
 dependencies = [
@@ -56,6 +56,7 @@ testpaths = ["tests"]
 pythonpath = [
   "packages/contracts/src",
   "apps/api/src",
+  "runners/legacy_pytest/src",
   "runners/web_playwright/src",
   "packages/migrations/src",
   "services/worker/src",
@@ -67,6 +68,7 @@ target-version = "py312"
 src = [
   "packages/contracts/src",
   "apps/api/src",
+  "runners/legacy_pytest/src",
   "runners/web_playwright/src",
   "packages/migrations/src",
   "services/worker/src",

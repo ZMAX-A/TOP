@@ -229,6 +229,13 @@ async def create_change_request(
         validation_status="PENDING_EXECUTION" if validation_required else "NOT_REQUIRED",
     )
     session.add(record)
+    try:
+        # Persist the parent before its change items because these models do not
+        # define an ORM relationship that would order the foreign-key writes.
+        await session.flush((record,))
+    except IntegrityError as exc:
+        await session.rollback()
+        raise ResourceConflict("candidate baseline version already exists") from exc
     session.add_all(_new_items(request_id, documents))
     session.add(
         CaseBaselineRecord(

@@ -30,13 +30,26 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
         "scheduler",
         "reaper",
         "worker",
+        "viewer-gateway",
         "frontend",
         "smoke-target",
+        "prometheus",
+        "alertmanager",
+        "alertmanager-sink",
     ):
         assert f"  {service}:" in compose
     assert "condition: service_completed_successfully" in compose
     assert 'profiles: ["smoke"]' in compose
     assert "runner-workspaces:/var/lib/testops/runs" in compose
+    for bind_address in (
+        "POSTGRES_BIND_ADDRESS",
+        "REDIS_BIND_ADDRESS",
+        "MINIO_API_BIND_ADDRESS",
+        "MINIO_CONSOLE_BIND_ADDRESS",
+        "TESTOPS_API_BIND_ADDRESS",
+        "FRONTEND_BIND_ADDRESS",
+    ):
+        assert f"${{{bind_address}:-127.0.0.1}}" in compose
     assert "RUNNER_WORKER_KEY:" in compose
     assert "RUNNER_POOL_KEY:" in compose
     assert "RUNNER_CAPABILITIES:" in compose
@@ -45,7 +58,7 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "RUNNER_EXECUTOR_TIMEOUT_SECONDS:" in compose
     assert (
         "RUNNER_CONTAINER_IMAGE: "
-        "${RUNNER_CONTAINER_IMAGE:-testops-worker:${TESTOPS_IMAGE_TAG:-0.30.0}}" in compose
+        "${RUNNER_CONTAINER_IMAGE:-testops-worker:${TESTOPS_IMAGE_TAG:-0.35.0}}" in compose
     )
     assert (
         "RUNNER_CONTAINER_NETWORK_POLICY: ${RUNNER_CONTAINER_NETWORK_POLICY:-ALLOWLIST}" in compose
@@ -53,6 +66,8 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "RUNNER_CONTAINER_MEMORY_MIB:" in compose
     assert "RUNNER_CONTAINER_CPU_MILLIS:" in compose
     assert "RUNNER_CONTAINER_PIDS_LIMIT:" in compose
+    assert "RUNNER_LIVE_VIEW_ENABLED:" in compose
+    assert "RUNNER_LIVE_VIEW_PORT:" in compose
     for setting in (
         "SUPPLY_CHAIN_POLICY_VERSION",
         "SUPPLY_CHAIN_ALLOWED_VERIFIERS",
@@ -85,6 +100,7 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "internal: true" in compose
     assert '"image_repository":"testops-worker"' in compose
     assert "--queues=celery,testops.pool.${RUNNER_POOL_KEY:-default-web}" in compose
+    assert "testops.worker.viewer_gateway:app" in compose
     assert "scripts/schedule_regressions.py" in compose
     assert "scripts/reap_run_reliability.py" in compose
 
@@ -110,6 +126,12 @@ def test_frontend_proxy_preserves_authenticated_sse_streaming() -> None:
     assert "proxy_read_timeout 3600s;" in nginx
     assert "client_max_body_size 1m;" in nginx
     assert "server_tokens off;" in nginx
+    assert "location = /viewer/ws" in nginx
+    assert "proxy_pass http://viewer-gateway:6080/ws;" in nginx
+    assert "proxy_set_header Upgrade $http_upgrade;" in nginx
+    assert 'proxy_set_header Connection "upgrade";' in nginx
+    assert "location /viewer/" in nginx
+    assert nginx.count("proxy_hide_header X-Frame-Options;") == 2
 
 
 def test_container_base_images_are_pinned_and_bootstrap_can_be_disabled() -> None:
@@ -234,3 +256,44 @@ def test_kubernetes_runner_template_scopes_controller_and_run_identities() -> No
         '"NetworkPolicy"',
     ):
         assert boundary in executor
+
+
+def test_prometheus_alerts_cover_supply_chain_key_rotation_readiness() -> None:
+    alerts = (ROOT / "infra/observability/alerts.yml").read_text("utf-8")
+
+    for alert in (
+        "TestOpsSupplyChainKeyReadinessSnapshotUnavailable",
+        "TestOpsSupplyChainVerifierKeysBlocked",
+        "TestOpsSupplyChainVerifierRotationNotReady",
+        "TestOpsSupplyChainVerifierKeyExpiringSoon",
+        "TestOpsSupplyChainLegacyHmacEnabled",
+    ):
+        assert f"- alert: {alert}" in alerts
+    for metric in (
+        "testops_supply_chain_key_readiness_snapshot_success",
+        "testops_supply_chain_key_readiness",
+        "testops_supply_chain_rotation_overlap_ready",
+        "testops_supply_chain_verifier_keys",
+        "testops_supply_chain_legacy_hmac_enabled",
+    ):
+        assert metric in alerts
+    assert "credential_id" not in alerts
+    assert "workload_identity" not in alerts
+
+
+def test_prometheus_routes_to_a_pinned_alertmanager_with_validatable_local_sink() -> None:
+    compose = (ROOT / "compose.yaml").read_text("utf-8")
+    prometheus = (ROOT / "infra/observability/prometheus.yml").read_text("utf-8")
+    alertmanager = (ROOT / "infra/observability/alertmanager.local.yml").read_text("utf-8")
+    sink = (ROOT / "infra/observability/alertmanager-sink-nginx.conf").read_text("utf-8")
+
+    assert "alertmanager:9093" in prometheus
+    assert "quay.io/prometheus/alertmanager:v0.33.1@sha256:" in compose
+    assert "ALERTMANAGER_CONFIG_FILE" in compose
+    assert 'profiles: ["observability"]' in compose
+    assert "local-webhook-audit" in alertmanager
+    assert "http://alertmanager-sink:8080/alerts" in alertmanager
+    assert "send_resolved: true" in alertmanager
+    assert "location = /alerts" in sink
+    assert "return 204;" in sink
+    assert "request_body" not in sink

@@ -5,7 +5,7 @@ import io
 import json
 import tempfile
 from contextlib import redirect_stdout
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 from uuid import UUID
@@ -26,7 +26,10 @@ from scripts.submit_supply_chain_verification import (
 )
 
 from testops.api.config import Settings, SupplyChainVerifierPublicKey
-from testops.api.supply_chain_auth import SupplyChainVerifierAuth
+from testops.api.supply_chain_auth import (
+    SupplyChainVerifierAuth,
+    SupplyChainVerifierAuthenticationRequired,
+)
 
 PROJECT_ID = UUID("10000000-0000-4000-8000-000000000001")
 TARGET_ID = UUID("20000000-0000-4000-8000-000000000002")
@@ -112,6 +115,98 @@ def test_client_request_is_accepted_by_server_envelope_authentication() -> None:
     }
     assert signed.path == path
     assert signed.headers["X-TestOps-Envelope-Signature"].count(".") == 2
+
+
+def test_server_enforces_public_key_activation_expiry_and_revocation() -> None:
+    path = (
+        f"/api/v1/projects/{PROJECT_ID}/targets/{TARGET_ID}/automation-packages/"
+        f"{PACKAGE_ID}/supply-chain-verifications"
+    )
+    verified_at = datetime(2026, 8, 21, 12, 0, tzinfo=UTC)
+    public_key = PRIVATE_KEY.public_key().public_bytes(
+        encoding=serialization.Encoding.Raw,
+        format=serialization.PublicFormat.Raw,
+    )
+    signed = build_signed_request(
+        base_url="http://127.0.0.1",
+        project_id=PROJECT_ID,
+        target_id=TARGET_ID,
+        package_id=PACKAGE_ID,
+        report=report(),
+        credential_id=CREDENTIAL_ID,
+        workload_identity=WORKLOAD_IDENTITY,
+        private_key=PRIVATE_KEY,
+        allow_http=True,
+        created=str(int(verified_at.timestamp())),
+        nonce="40000000-0000-4000-8000-000000000005",
+    )
+
+    def authenticate(
+        key: SupplyChainVerifierPublicKey,
+        *,
+        now: datetime = verified_at,
+    ) -> int:
+        app = FastAPI()
+        app.state.settings = Settings(supply_chain_verifier_public_keys=(key,))
+
+        @app.post(path)
+        async def verify(principal: SupplyChainVerifierAuth) -> dict[str, str]:
+            return {"credential_id": principal.credential_id}
+
+        try:
+            with patch("testops.api.supply_chain_auth.utc_now", return_value=now):
+                response = TestClient(app).post(path, content=signed.body, headers=signed.headers)
+        except SupplyChainVerifierAuthenticationRequired as exc:
+            return exc.status_code
+        return response.status_code
+
+    common = {
+        "credential_id": CREDENTIAL_ID,
+        "verifier": "trusted-verifier",
+        "workload_identity": WORKLOAD_IDENTITY,
+        "public_key": public_key,
+    }
+    assert (
+        authenticate(
+            SupplyChainVerifierPublicKey(
+                **common,
+                not_before=verified_at,
+                not_after=verified_at + timedelta(minutes=5),
+            )
+        )
+        == 200
+    )
+    assert (
+        authenticate(
+            SupplyChainVerifierPublicKey(
+                **common,
+                not_before=verified_at + timedelta(seconds=1),
+            ),
+            now=verified_at + timedelta(seconds=2),
+        )
+        == 401
+    )
+    assert authenticate(SupplyChainVerifierPublicKey(**common, not_after=verified_at)) == 401
+    assert (
+        authenticate(
+            SupplyChainVerifierPublicKey(
+                **common,
+                not_after=verified_at + timedelta(seconds=1),
+            ),
+            now=verified_at + timedelta(seconds=2),
+        )
+        == 401
+    )
+    assert (
+        authenticate(
+            SupplyChainVerifierPublicKey(
+                **common,
+                revoked_at=verified_at + timedelta(seconds=1),
+            ),
+            now=verified_at + timedelta(seconds=2),
+        )
+        == 401
+    )
 
 
 def test_client_refuses_http_identity_mismatch_and_noncanonical_nonce() -> None:

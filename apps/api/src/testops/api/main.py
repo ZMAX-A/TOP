@@ -17,28 +17,39 @@ from testops.contracts.schema_export import schemas
 from .artifact_store import MinioArtifactStore
 from .config import Settings
 from .database import create_database_runtime, create_schema, database_ready
+from .github_release import GitReleaseFetcher, HttpxGitHubReleaseFetcher
 from .governance_routes import router as governance_router
 from .identity_routes import router as identity_router
+from .live_view import LiveViewStore, RedisLiveViewStore
 from .observability import ApiMetrics, PrometheusMiddleware
 from .quality_operations_services import collect_quality_operations_snapshot
+from .release_sync_routes import router as release_sync_router
 from .reliability_services import collect_reliability_snapshot
 from .routes import router
-from .services import ServiceError
+from .services import ServiceError, utc_now
+from .supply_chain_operations import collect_supply_chain_key_readiness
 
-API_VERSION = "0.30.0"
+API_VERSION = "0.35.0"
 LOGGER = logging.getLogger(__name__)
 
 
-def create_app(settings: Settings | None = None) -> FastAPI:
+def create_app(
+    settings: Settings | None = None,
+    *,
+    live_view_store: LiveViewStore | None = None,
+    git_release_fetcher: GitReleaseFetcher | None = None,
+) -> FastAPI:
     resolved_settings = settings or Settings.from_environment()
     engine, session_factory = create_database_runtime(resolved_settings)
     metrics = ApiMetrics(API_VERSION)
+    resolved_live_view_store = live_view_store or RedisLiveViewStore(resolved_settings.redis_url)
 
     @asynccontextmanager
     async def lifespan(application: FastAPI) -> AsyncIterator[None]:
         if resolved_settings.auto_create_schema:
             await create_schema(engine)
         yield
+        await resolved_live_view_store.aclose()
         await engine.dispose()
 
     application = FastAPI(
@@ -51,6 +62,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     application.state.engine = engine
     application.state.session_factory = session_factory
     application.state.artifact_store = MinioArtifactStore.from_settings(resolved_settings)
+    application.state.live_view_store = resolved_live_view_store
+    application.state.git_release_fetcher = git_release_fetcher or HttpxGitHubReleaseFetcher(
+        resolved_settings
+    )
     application.state.metrics = metrics
     application.add_middleware(PrometheusMiddleware, metrics=metrics)
     application.add_middleware(
@@ -101,6 +116,16 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     media_type="text/plain",
                     headers={"WWW-Authenticate": "Bearer", "Cache-Control": "no-store"},
                 )
+        try:
+            metrics.update_supply_chain_key_readiness(
+                collect_supply_chain_key_readiness(
+                    resolved_settings,
+                    generated_at=utc_now(),
+                )
+            )
+        except Exception:
+            LOGGER.exception("Failed to collect the supply-chain key readiness metrics snapshot")
+            metrics.supply_chain_key_readiness_snapshot_success.set(0)
         ready = await database_ready(engine)
         metrics.database_ready.set(1 if ready else 0)
         if ready:
@@ -146,6 +171,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     application.include_router(identity_router)
     application.include_router(governance_router)
+    application.include_router(release_sync_router)
     application.include_router(router)
     return application
 

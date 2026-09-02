@@ -30,7 +30,8 @@ from .engine import (
 from .variables import SecretProvider, SecretResolutionError, VariableResolver
 from .workspace import RunWorkspace
 
-RUNNER_VERSION = "0.1.0"
+RUNNER_VERSION = "0.2.0"
+SUPPORTED_MODULES = {"login", "home-search"}
 
 
 class PlaywrightWebAdapter(AutomationAdapter):
@@ -64,9 +65,10 @@ class PlaywrightWebAdapter(AutomationAdapter):
         if job.browser not in {"chromium", "firefox", "webkit"}:
             raise RunnerJobValidationError(f"unsupported browser: {job.browser}")
         for case in job.cases:
-            if case.module_key != "login":
+            if case.module_key not in SUPPORTED_MODULES:
                 raise RunnerJobValidationError(
-                    f"runner version {RUNNER_VERSION} only supports the login module; "
+                    f"runner version {RUNNER_VERSION} only supports modules "
+                    f"{', '.join(sorted(SUPPORTED_MODULES))}; "
                     f"received {case.case_code} ({case.module_key})"
                 )
             self._engine.validate_case(case)
@@ -291,7 +293,7 @@ class PlaywrightWebAdapter(AutomationAdapter):
         return {
             "adapter": "WebPlaywrightAdapter",
             "runner_version": RUNNER_VERSION,
-            "supported_modules": ["login"],
+            "supported_modules": sorted(SUPPORTED_MODULES),
             "supported_operations": sorted(self._engine.SUPPORTED_OPERATIONS),
             "supported_assertions": sorted(self._engine.SUPPORTED_ASSERTIONS),
             "browser_backend": self._browser_backend.health(),

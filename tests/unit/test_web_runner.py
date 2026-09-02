@@ -56,6 +56,8 @@ class FakeLocator:
         return self
 
     def count(self) -> int:
+        if self.selector == "text=知道了":
+            return 0
         return 1
 
     def wait_for(self, **_kwargs: Any) -> None:
@@ -70,6 +72,10 @@ class FakeLocator:
             return
         if "用户协议" in self.selector:
             self.page.url = "https://example.invalid/user-agreemen"
+            return
+        if "搜 索" in self.selector:
+            keyword = self.page.fields.get("input[placeholder='请输入关键字']", "")
+            self.page.body_text = "暂无内容" if keyword == "不存在的用户xyz123" else keyword
             return
         if "submit" not in self.selector:
             return
@@ -164,6 +170,30 @@ def login_case(
     )
 
 
+def home_search_case(*, module_key: str = "home-search") -> CaseDefinition:
+    return CaseDefinition(
+        case_id=UUID("11000000-0000-0000-0000-000000000002"),
+        case_code="TC-HOME-002",
+        module_key=module_key,
+        module_name="首页搜索",
+        title="搜索-不存在的用户",
+        test_point="验证无结果提示",
+        priority=CasePriority.P1,
+        preconditions=("已登录成功",),
+        steps=(
+            StepDefinition(
+                operation="input",
+                locator="input[placeholder='请输入关键字']",
+                input="不存在的用户xyz123",
+            ),
+            StepDefinition(operation="click", locator="button:has-text('搜 索')"),
+        ),
+        assertion=AssertionDefinition(type="text_visible", expected="页面显示'暂无'"),
+        tags=("legacy-excel", "module:home-search"),
+        enabled=True,
+    )
+
+
 def login_job(case: CaseDefinition | None = None) -> RunSnapshot:
     return RunSnapshot(
         run_id=UUID("22000000-0000-0000-0000-000000000001"),
@@ -179,7 +209,7 @@ def login_job(case: CaseDefinition | None = None) -> RunSnapshot:
         ),
         automation_package=AutomationPackageRef(
             name="yanjia-web",
-            version="0.1.0",
+            version="0.2.0",
             digest=DIGEST,
         ),
         cases=(case or login_case(),),
@@ -242,6 +272,18 @@ class WebCaseEngineTests(unittest.TestCase):
         with self.assertRaisesRegex(RunnerJobValidationError, "weak URL assertion"):
             WebCaseEngine().validate_case(case)
 
+    def test_authenticated_home_search_case_logs_in_and_finds_empty_state(self) -> None:
+        job = login_job(home_search_case())
+        resolver = VariableResolver(job, secret_provider())
+        page = FakePage()
+
+        WebCaseEngine().execute_case(page, job.cases[0], job.web_config, resolver)
+
+        self.assertEqual(page.url, "https://example.invalid/")
+        self.assertEqual(page.fields["#username"], "good-user")
+        self.assertEqual(page.fields["#password"], "super-secret")
+        self.assertEqual(page.body_text, "暂无内容")
+
 
 class PlaywrightWebAdapterTests(unittest.TestCase):
     def test_adapter_returns_structured_pass_and_artifacts(self) -> None:
@@ -284,6 +326,32 @@ class PlaywrightWebAdapterTests(unittest.TestCase):
             self.assertEqual(result.status, RunStatus.FAILED)
             self.assertEqual(result.case_results[0].status, CaseResultStatus.FAILED)
             self.assertNotIn("super-secret", result.case_results[0].error_message or "")
+
+    def test_adapter_executes_home_search_migration_slice(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            adapter = PlaywrightWebAdapter(
+                workspace_root=temporary_directory,
+                secret_provider=secret_provider(),
+                browser_backend=FakeBrowserBackend(),
+            )
+
+            result = adapter.execute(login_job(home_search_case()), lambda _event: None)
+
+            self.assertEqual(result.status, RunStatus.PASSED)
+            self.assertEqual(result.case_results[0].case_code, "TC-HOME-002")
+            self.assertEqual(result.case_results[0].status, CaseResultStatus.PASSED)
+
+    def test_adapter_rejects_modules_outside_migrated_slices(self) -> None:
+        unsupported = home_search_case(module_key="customer-list")
+        with tempfile.TemporaryDirectory() as temporary_directory:
+            adapter = PlaywrightWebAdapter(
+                workspace_root=temporary_directory,
+                secret_provider=secret_provider(),
+                browser_backend=FakeBrowserBackend(),
+            )
+
+            with self.assertRaisesRegex(RunnerJobValidationError, "customer-list"):
+                adapter.validate(login_job(unsupported))
 
     def test_cancel_before_execution_is_terminal_canceled(self) -> None:
         with tempfile.TemporaryDirectory() as temporary_directory:

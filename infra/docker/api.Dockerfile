@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=60 \
     PIP_RETRIES=8 \
-    PYTHONPATH=/app/packages/contracts/src:/app/apps/api/src:/app/runners/web_playwright/src:/app/services/worker/src
+    PYTHONPATH=/app/packages/contracts/src:/app/apps/api/src:/app/runners/web_playwright/src:/app/runners/legacy_pytest/src:/app/services/worker/src
 
 WORKDIR /app
 
@@ -19,6 +19,7 @@ COPY --chown=testops:testops alembic.ini ./
 COPY --chown=testops:testops apps/api apps/api
 COPY --chown=testops:testops packages/contracts packages/contracts
 COPY --chown=testops:testops runners/web_playwright runners/web_playwright
+COPY --chown=testops:testops runners/legacy_pytest runners/legacy_pytest
 COPY --chown=testops:testops services/worker services/worker
 COPY --chown=testops:testops scripts scripts
 COPY --chown=testops:testops infra/alembic infra/alembic

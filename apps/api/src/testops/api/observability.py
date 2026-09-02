@@ -20,6 +20,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 if TYPE_CHECKING:
     from .quality_operations_services import QualityOperationsSnapshot
     from .reliability_services import ReliabilitySnapshot
+    from .supply_chain_operations import SupplyChainKeyReadinessSnapshot
 
 HTTP_DURATION_BUCKETS = (
     0.005,
@@ -155,6 +156,38 @@ class ApiMetrics:
             registry=self.registry,
         )
         self.quality_operations_snapshot_success.set(0)
+        self.supply_chain_key_readiness = Gauge(
+            "testops_supply_chain_key_readiness",
+            "Current supply-chain verifier key readiness as a one-hot fixed status.",
+            ("status",),
+            registry=self.registry,
+        )
+        for status in ("READY", "WARNING", "BLOCKED"):
+            self.supply_chain_key_readiness.labels(status=status).set(0)
+        self.supply_chain_verifier_keys = Gauge(
+            "testops_supply_chain_verifier_keys",
+            "Configured supply-chain verifier keys by fixed lifecycle status.",
+            ("status",),
+            registry=self.registry,
+        )
+        for status in ("ACTIVE", "EXPIRING_SOON", "NOT_YET_ACTIVE", "EXPIRED", "REVOKED"):
+            self.supply_chain_verifier_keys.labels(status=status).set(0)
+        self.supply_chain_rotation_overlap_ready = Gauge(
+            "testops_supply_chain_rotation_overlap_ready",
+            "Whether every configured verifier workload identity has two accepting keys.",
+            registry=self.registry,
+        )
+        self.supply_chain_legacy_hmac_enabled = Gauge(
+            "testops_supply_chain_legacy_hmac_enabled",
+            "Whether the legacy supply-chain HMAC verifier remains enabled.",
+            registry=self.registry,
+        )
+        self.supply_chain_key_readiness_snapshot_success = Gauge(
+            "testops_supply_chain_key_readiness_snapshot_success",
+            "Whether the latest verifier key readiness snapshot succeeded.",
+            registry=self.registry,
+        )
+        self.supply_chain_key_readiness_snapshot_success.set(0)
 
     def update_reliability(self, snapshot: ReliabilitySnapshot) -> None:
         self.runs_in_flight.labels(status="QUEUED").set(snapshot.queued_runs)
@@ -176,6 +209,27 @@ class ApiMetrics:
         self.quality_webhook_oldest_pending_age_seconds.set(snapshot.oldest_pending_age_seconds)
         self.quality_webhook_replay_deliveries.set(snapshot.replay_deliveries)
         self.quality_operations_snapshot_success.set(1)
+
+    def update_supply_chain_key_readiness(
+        self,
+        snapshot: SupplyChainKeyReadinessSnapshot,
+    ) -> None:
+        for status in ("READY", "WARNING", "BLOCKED"):
+            self.supply_chain_key_readiness.labels(status=status).set(
+                1 if snapshot["status"] == status else 0
+            )
+        key_counts = {
+            "ACTIVE": snapshot["accepting_key_count"] - snapshot["expiring_soon_key_count"],
+            "EXPIRING_SOON": snapshot["expiring_soon_key_count"],
+            "NOT_YET_ACTIVE": snapshot["future_key_count"],
+            "EXPIRED": snapshot["expired_key_count"],
+            "REVOKED": snapshot["revoked_key_count"],
+        }
+        for status, count in key_counts.items():
+            self.supply_chain_verifier_keys.labels(status=status).set(count)
+        self.supply_chain_rotation_overlap_ready.set(1 if snapshot["overlap_ready"] else 0)
+        self.supply_chain_legacy_hmac_enabled.set(1 if snapshot["legacy_hmac_enabled"] else 0)
+        self.supply_chain_key_readiness_snapshot_success.set(1)
 
     def render(self) -> bytes:
         return generate_latest(self.registry)

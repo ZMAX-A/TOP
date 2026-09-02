@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 
 from fastapi import Request
-from sqlalchemy import MetaData, text
+from sqlalchemy import MetaData, event, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -37,6 +37,16 @@ def create_database_runtime(
         echo=settings.database_echo,
         pool_pre_ping=not settings.database_url.startswith("sqlite"),
     )
+    if settings.database_url.startswith("sqlite"):
+
+        @event.listens_for(engine.sync_engine, "connect")
+        def enable_sqlite_foreign_keys(dbapi_connection: object, _: object) -> None:
+            cursor = dbapi_connection.cursor()  # type: ignore[attr-defined]
+            try:
+                cursor.execute("PRAGMA foreign_keys=ON")
+            finally:
+                cursor.close()
+
     return engine, async_sessionmaker(engine, expire_on_commit=False)
 
 

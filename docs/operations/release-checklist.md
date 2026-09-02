@@ -1,5 +1,93 @@
 # 生产发布验收清单
 
+## 2026-08-24 M10.1 增量预验收证据
+
+- 新增 `scripts/check_supply_chain_keyring_fleet.py`，主动查询至少两个直连 API 实例；仅全部 READY、摘要唯一且可选匹配
+  `--expected-digest` 时返回 0，NOT_READY/DRIFT/INVALID 分别返回 2/3/4；
+- Token 只从有界文件读取且不进入输出；生产默认仅 HTTPS，可加载批准的私有 CA，拒绝重定向、非环回 HTTP、重复实例、
+  越界响应、未知告警代码和不符合契约的 JSON。报告不会复制 credential、工作负载身份或公钥指纹；
+- fleet/单实例预检针对性回归 12 项通过；全量 Pytest `159 passed, 2 skipped`，标准入口 115 项通过、2 项跳过；Ruff
+  全仓检查及 178 个 Python 文件格式检查、Schema、不可变制品、三个 CLI 入口、唯一 Alembic Head 与 43,620 字节离线
+  升级 SQL 均通过；修复了既有单实例预检测试错误比较两次自然生成的 `generated_at` 微秒值导致的不稳定失败；
+- Vue 严格 TypeScript 与 Vite `0.35.0` 生产构建通过；Compose 从当前工作区成功构建 `testops-api:0.35.0`，独立
+  `testops-m101-verify` PostgreSQL/Redis/MinIO/API 最小栈完成迁移并健康，API `/healthz` 回读版本 0.35.0；
+- 两个实际 0.35.0 API 实例均为 READY，fleet CLI 与 `--expected-digest` 锁定检查共同通过，摘要为
+  `sha256:92ca623f1f37a7be851bf763f1300db7a3189e7441921230f3d56f1966f6ec92`；
+- 将负向实例预警窗口改为 31 天后，其摘要变为
+  `sha256:11a04bfaf68a23d3144e29320ab718833c7d2244847ee37140404c528dc488ea`；两个实例仍各自 READY，但 fleet CLI 正确返回
+  DRIFT/退出码 3。负向容器、短期会话和 Token 文件均已删除或吊销；
+- 本机 HTTP 只通过显式 `--allow-http` 且仅绑定 loopback；生产仍须使用真实 Pod 直连 HTTPS、短期运维身份、私有 CA、
+  发布编排发现与凭据销毁，并完成真实轮换、Kubernetes、Alertmanager 接收器及旧 key 拒绝门禁。
+
+## 2026-08-24 M9.9 增量预验收证据
+
+- 就绪快照、System Admin API 与管理端新增稳定 `configuration_digest`；摘要覆盖 Ed25519 指纹/身份/生命周期和轮换策略，
+  不含公钥原文、HMAC secret、抓取时间或当前状态，配置数组重排不会改变摘要；
+- 新增 `scripts/check_supply_chain_key_readiness.py`，默认仅 READY 返回 0，WARNING/BLOCKED/非法配置分别返回 2/3/4；安全
+  JSON 只含摘要、聚合计数和告警，非法配置不会回显可能包含 secret 的异常内容；
+- 生产滚动发布必须绕过负载均衡逐 API 实例运行预检或读取管理员接口，所有摘要完全一致且状态 READY 才能继续；摘要不
+  进入 Prometheus 标签，且因不覆盖 HMAC secret，不能替代关闭历史 HMAC；
+- 摘要、CLI、管理员 API、权限、观测配置、版本和部署契约针对性回归 `25 passed`；全量 Pytest `151 passed, 2 skipped`，标准入口
+  运行 115 项、2 项跳过；Ruff 检查和 175 个 Python 文件格式检查、Schema、制品、双 CLI、迁移及离线 SQL 均通过；
+- 0.34.0 四类镜像构建成功，隔离栈迁移、全服务健康、普通/恢复 Smoke、模块边界、日志和受管资源零残留检查通过；四条 Run
+  均有 8 个事件，成功/失败路径分别验证 1/3 个制品及下载摘要；
+- 两个实际 API 容器均为 READY 且摘要同为 `sha256:92ca623f1f37a7be851bf763f1300db7a3189e7441921230f3d56f1966f6ec92`；
+  31 天预警策略负向对照产生不同摘要，漂移检测通过；
+- Prometheus target/READY 指标和 16 条规则健康；真实 API 中断触发 firing，经固定摘要的 Alertmanager 0.33.1 到达本地 sink，
+  API 恢复后 resolved 也送达；本地 sink 不替代生产真实接收器、凭据、TLS/出口限制与值班测试告警；
+- 本阶段不改变数据库结构，Alembic Head 继续为 `20260821_0019`。
+
+## 2026-08-24 M9.8 增量预验收证据
+
+- `/metrics` 每次授权抓取均从当前 API 启动配置刷新验证器 key 就绪快照，不依赖数据库查询；刷新异常单独将
+  `testops_supply_chain_key_readiness_snapshot_success` 置 0，抓取本身仍返回其他可用指标；
+- 新增固定枚举标签的整体 READY/WARNING/BLOCKED、五类 key 生命周期计数、逐身份轮换重叠和历史 HMAC 状态指标；
+  时序不包含 credential、工作负载身份、公钥指纹、项目、用户或 Envelope 标识；
+- Prometheus 新增快照失败、无可接受 Ed25519 key、轮换重叠未就绪、有效 key 即将到期和旧 HMAC 仍启用五类规则；
+  真实 Alertmanager 接收器、测试告警和生产轮换仍属于外部发布门禁；
+- 全量 Pytest `143 passed, 2 skipped`，仓库标准入口 108 项通过、2 项跳过；针对性回归 19 项通过；Ruff 检查和
+  172 个 Python 文件格式检查、Schema、不可变制品、可信验证器 CLI、发布/部署契约、唯一迁移 Head 与离线 SQL 均通过；
+- 16 条告警 YAML 成功解析，Vue 严格 TypeScript 与 Vite `0.33.0` 生产构建、Compose 配置展开通过；本轮 Docker Linux
+  Engine 未运行，因此未构建 `0.33.0` 镜像，未实跑 Prometheus/Alertmanager、全栈 Smoke 或测试告警；
+- 本阶段不改变数据库结构，Alembic Head 继续为 `20260821_0019`。
+
+## 2026-08-24 M9.7 增量预验收证据
+
+- System Admin 新增只读 `GET /api/v1/admin/supply-chain/verifier-keys`，按当前 UTC 计算 key 生命周期、到期预警和轮换
+  就绪度；普通用户返回 403，响应不包含公钥原文、私钥、HMAC secret 或签名材料；
+- 双 key 重叠按 `(verifier, workload_identity)` 逐组计算，不同身份不能互相凑数；无可接受 key 为 `BLOCKED`，缺少
+  重叠、即将到期或仍启用历史 HMAC 为 `WARNING`，所有身份均具备重叠且无告警时才为 `READY`；
+- 全量 Pytest `141 passed, 2 skipped`，仓库标准入口 108 项通过、2 项跳过；针对性回归 23 项通过；Ruff 检查和
+  171 个 Python 文件格式检查、Schema、不可变制品、可信验证器 CLI、发布/部署契约、唯一迁移 Head 与离线 SQL 均通过；
+- Vue 严格 TypeScript 与 Vite `0.32.0` 生产构建通过；Docker CLI 29.7.2 / Compose 5.3.1 配置展开通过，但本轮验证时
+  Docker Linux Engine 未运行，因此未执行 `0.32.0` 镜像构建和全栈 Smoke；
+- 本阶段不替代生产 API 多副本配置一致性、真实 CI 私钥切换、旧 key 拒绝观测、TLS、真实 Kubernetes 或 OIDC/SPIFFE
+  联邦验证；相关发布门禁保持未勾选。
+
+## 2026-08-21 M9.6.2 增量预验收证据
+
+- `SUPPLY_CHAIN_VERIFIER_ED25519_KEYS` 支持每 key 的严格 UTC `not_before`、`not_after` 与 `revoked_at`，拒绝非规范时间、
+  非整秒值和空/倒置窗口；旧三字段配置保持兼容；
+- 验签同时检查 Envelope 签发时间与服务端当前时间：启用时间为闭区间起点，到期与吊销时间为开区间终点；未启用、
+  已到期或已吊销 key 在验签成功后仍统一返回 401，不泄露生命周期状态；
+- 全量 Pytest `136 passed, 2 skipped`，仓库标准入口 103 项通过、2 项跳过；针对性配置、认证和可信客户端测试
+  14 项通过；Ruff 检查和 168 个 Python 文件格式检查、Schema 导出、不可变制品及发布/部署契约校验通过；
+- Vue 严格 TypeScript 与 Vite `0.31.0` 生产构建通过；Docker Desktop 4.86.0 / Engine 29.7.2 / Compose 5.3.1 的
+  `testops-m962-verify` 隔离栈完成配置展开、镜像构建、迁移与全服务健康检查；
+- 最终镜像普通 Smoke 的成功/预期失败 Run 为 `8c335e1e-b2b4-4952-9ae0-ef6cb30d954d` /
+  `683de1f5-3044-4dd7-b61f-28d216aecd39`，恢复 Smoke 为 `9bcce619-034a-469e-b3b7-40bbc6035f9d` /
+  `08f14907-a0fa-4778-8925-15b7ea800d54`；每条 Run 均有 8 个事件，成功/失败路径分别验证 1/3 个制品及下载摘要；
+- 真实 API 容器接受有效 Ed25519 key 并写入 VERIFIED 与三条幂等 Envelope；未来启用、已到期和已吊销 key 各自实测
+  HTTP 401，最终有效窗口已恢复。该往返发现并修复 PostgreSQL 插入验证记录前更新包外键的顺序问题；SQLite 集成运行时
+  强制 `PRAGMA foreign_keys=ON` 后又暴露并修复告警状态引用投递记录、变更项引用变更请求的两个插入顺序问题；
+- API/Worker 使用 `cryptography 50.0.0`；API 不含 Kubernetes SDK、Worker 包含 Kubernetes SDK。API/Worker/前端镜像
+  ID 分别为 `sha256:e8df658f52c3930775fa526bdd7909b07ce7222face340241d0605dfed467c36`、
+  `sha256:b3de95fc1c920bafa41cb9577aaecafa67b0a6bb1675cd43124aff122fcf684a`、
+  `sha256:729d0672bf2229152785a081327aecc39cb455beb933e9bc7da372e16c7dd67c`；最终日志无问题模式命中，
+  受管 Run 容器和卷均零残留；
+- 本阶段提供可执行的轮换窗口与紧急吊销控制，但没有替代真实 CI 私钥保护、生产 API 重启、TLS 入口、双 key 流量切换、
+  旧 key 拒绝观测和审计证据；这些发布门禁仍保持未勾选。OIDC/SPIFFE 联邦验证也不在本阶段范围内。
+
 ## 2026-08-21 M9.6.1 增量预验收证据
 
 - 全量 Pytest 133 项通过、2 项因仓库外旧工作簿跳过；仓库标准入口 102 项通过；Ruff 检查通过，167 个 Python 文件
@@ -174,7 +262,7 @@
 - [ ] `Frontend typecheck and build` 通过；
 - [ ] `PostgreSQL migration round trip` 通过；
 - [ ] `Full Compose smoke` 通过且失败日志已检查；
-- [ ] `Prometheus configuration` 通过；
+- [ ] `Prometheus and Alertmanager configuration` 通过；
 - [ ] PR 已完成至少一名非提交人的代码评审。
 
 ## 配置与安全
@@ -183,8 +271,11 @@
 - [ ] Bootstrap 管理员完成后已移除 `BOOTSTRAP_ADMIN_TOKEN`；
 - [ ] Runner 只获得所需密钥引用，日志与制品抽检无明文密钥；
 - [ ] 五类供应链允许清单均为非空精确值，已移除 `example/testops` 示例；策略版本与 CI 验证报告一致；
-- [ ] API 只注入批准验证器的 Ed25519 公钥、credential id 与 HTTPS/SPIFFE 工作负载身份；旧、新 key-id 轮换窗口、
-  新指纹观测和旧 key 撤销时间已记录，私钥不进入控制面、数据库、Worker、日志或前端；
+- [ ] API 只注入批准验证器的 Ed25519 公钥、credential id 与 HTTPS/SPIFFE 工作负载身份；每 key 的 `not_before`、
+  `not_after` 和必要的 `revoked_at` 已设置，旧、新 key-id 轮换窗口、新指纹观测和旧 key 拒绝时间已记录，私钥不进入
+  控制面、数据库、Worker、日志或前端；
+- [ ] 已绕过负载均衡对每个 API 实例运行 keyring 预检，全部返回 READY、`configuration_digest` 完全一致，且证据记录
+  实例标识和镜像摘要；生产门禁未使用 `--allow-warning`；
 - [ ] 签名客户端使用 v2 compact detached JWS，并覆盖方法、路径、created、唯一 UUID nonce、原始 JSON 摘要、
   credential 和工作负载身份；过期、未来超限、错误签名、未知 key、身份不匹配和重复 nonce 均已实测失败关闭，
   生产入口强制 TLS；
@@ -204,6 +295,8 @@
 - [ ] MinIO 使用独立读写/备份账号，Bucket 版本控制和保留策略已启用；
 - [ ] 应用和基础镜像已固定到验收过的不可变摘要并完成漏洞扫描；
 - [ ] `/metrics` 不经公网前端代理，Bearer 凭据由受限文件提供。
+- [ ] `ALERTMANAGER_CONFIG_FILE` 已替换本地审计配置并指向批准的生产接收器；配置、凭据文件、9093 访问和出口最小化，
+  `amtool check-config`、真实 firing 与 resolved 通知均有值班确认；
 - [ ] 质量 Webhook 只允许批准的 HTTPS 目标，签名密钥仅注入 dispatcher，出口层已配置域名允许清单；
 - [ ] 告警确认和静默接口仅授权项目管理员，静默原因、确认说明及解除操作均能在审计日志中追溯；
 

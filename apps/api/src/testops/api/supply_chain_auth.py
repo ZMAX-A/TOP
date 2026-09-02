@@ -93,6 +93,7 @@ def _verify_asymmetric_envelope(
     created: str,
     nonce: str,
     request_digest: str,
+    verified_at: datetime,
 ) -> SupplyChainVerifierPrincipal:
     try:
         protected_segment, detached_payload, signature_segment = signature.split(".")
@@ -124,6 +125,7 @@ def _verify_asymmetric_envelope(
         if public_key is not None
         else "spiffe://invalid.testops/verifier"
     )
+    issued_at = datetime.fromtimestamp(int(created), UTC)
     signing_input = supply_chain_detached_jws_signing_input(
         method=method,
         path=path,
@@ -138,13 +140,16 @@ def _verify_asymmetric_envelope(
         Ed25519PublicKey.from_public_bytes(key_bytes).verify(signature_bytes, signing_input)
     except (InvalidSignature, ValueError) as exc:
         raise _authentication_failure() from exc
-    if public_key is None:
+    if public_key is None or not public_key.accepts(
+        issued_at=issued_at,
+        verified_at=verified_at,
+    ):
         raise _authentication_failure()
     return SupplyChainVerifierPrincipal(
         verifier=public_key.verifier,
         credential_id=public_key.credential_id,
         nonce=nonce,
-        issued_at=datetime.fromtimestamp(int(created), UTC),
+        issued_at=issued_at,
         request_digest=request_digest,
         signature_digest="sha256:" + hashlib.sha256(signature_bytes).hexdigest(),
         envelope_profile=ASYMMETRIC_ENVELOPE_PROFILE,
@@ -273,6 +278,7 @@ async def current_supply_chain_verifier(
         )
     return _verify_asymmetric_envelope(
         public_keys=public_keys,
+        verified_at=now,
         **verification_arguments,
     )
 

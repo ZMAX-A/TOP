@@ -300,6 +300,9 @@ async def _evaluate_project(
             created_at=moment,
         )
         session.add(delivery)
+        # The alert state references this delivery, but the models do not expose an
+        # ORM relationship that lets the unit of work infer the insert order.
+        await session.flush((delivery,))
         state.active_notification_status = decision.active_notification_status
         state.last_notified_at = moment
         state.last_delivery_id = delivery_id

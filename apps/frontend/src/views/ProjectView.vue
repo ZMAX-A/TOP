@@ -368,13 +368,16 @@ onMounted(load)
           </el-form-item>
           <el-form-item label="候选版本" required>
             <el-input v-model="draftForm.candidate_version" placeholder="case-v1.0.2" />
+            <p class="form-field-hint">必填；格式必须为 case-v主版本.次版本.修订号，例如 case-v1.0.2。</p>
           </el-form-item>
         </div>
         <el-form-item label="变更申请标题" required>
           <el-input v-model="draftForm.title" maxlength="200" show-word-limit />
+          <p class="form-field-hint">必填；1–200 个字符，不能只包含空格。</p>
         </el-form-item>
         <el-form-item label="变更原因" required>
-          <el-input v-model="draftForm.reason" type="textarea" :rows="3" maxlength="4000" />
+          <el-input v-model="draftForm.reason" type="textarea" :rows="3" maxlength="4000" show-word-limit />
+          <p class="form-field-hint">必填；1–4000 个字符，请说明修改目的和影响。</p>
         </el-form-item>
         <el-form-item label="选择用例" required>
           <el-select
@@ -394,6 +397,7 @@ onMounted(load)
         <el-form-item label="新标题" required>
           <el-input v-model="draftForm.new_title" maxlength="200" show-word-limit />
           <div class="current-value">当前：{{ selectedCase?.title }}</div>
+          <p class="form-field-hint">必填；1–200 个字符，且必须与当前标题不同。</p>
         </el-form-item>
       </el-form>
       <template #footer>

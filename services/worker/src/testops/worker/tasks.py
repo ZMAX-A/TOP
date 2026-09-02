@@ -15,8 +15,10 @@ from testops.contracts import (
     RunSnapshot,
     RunStatus,
 )
+from testops.runners.legacy_pytest import LegacyPytestAdapter
 from testops.runners.web import EnvironmentSecretProvider, PlaywrightWebAdapter
 
+from .adapter_factory import create_automation_adapter
 from .artifact_store import ArtifactUploader
 from .celery_app import celery_app
 from .config import WorkerSettings
@@ -262,9 +264,12 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
         elif settings.runner_execution_mode == "SUBPROCESS":
             result = SubprocessRunExecutor(settings, control_plane).execute(job)
         else:
-            adapter = PlaywrightWebAdapter(
+            adapter = create_automation_adapter(
+                job,
                 workspace_root=settings.workspace_root,
                 secret_provider=EnvironmentSecretProvider(),
+                playwright_adapter_type=PlaywrightWebAdapter,
+                legacy_adapter_type=LegacyPytestAdapter,
             )
             adapter.prepare(job)
 

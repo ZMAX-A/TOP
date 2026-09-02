@@ -1,0 +1,54 @@
+services:
+  worker:
+    image: testops-yanjia-web-pytest:${YANJIA_PYTEST_IMAGE_TAG:-0.35.2}
+    command:
+      - python
+      - -m
+      - celery
+      - -A
+      - testops.worker.celery_app:celery_app
+      - worker
+      - --loglevel=INFO
+      - --pool=solo
+      - --hostname=testops@%h
+      - --queues=celery,testops.pool.${YANJIA_RUNNER_POOL_KEY:-yanjia-web}
+    build:
+      context: .
+      dockerfile: infra/docker/yanjia-web-pytest.Dockerfile
+      additional_contexts:
+        yanjia_web: ${YANJIA_WEB_PACKAGE_CONTEXT:?set YANJIA_WEB_PACKAGE_CONTEXT to a sanitized package export}
+      args:
+        RUNNER_PACKAGE_DIGEST: ${YANJIA_PYTEST_PACKAGE_DIGEST:?set YANJIA_PYTEST_PACKAGE_DIGEST from scripts/package_legacy_pytest.py}
+    environment:
+      RUNNER_WORKER_KEY: ${YANJIA_RUNNER_WORKER_KEY:-compose-yanjia-pytest-1}
+      RUNNER_POOL_KEY: ${YANJIA_RUNNER_POOL_KEY:-yanjia-web}
+      RUNNER_DISPLAY_NAME: ${YANJIA_RUNNER_DISPLAY_NAME:-YanJia Central Pytest Worker 1}
+      RUNNER_PACKAGE_CATALOG: '[{"runner_type":"WEB_PLAYWRIGHT","image_repository":"testops-yanjia-web-pytest","digest":"${YANJIA_PYTEST_PACKAGE_DIGEST:?set YANJIA_PYTEST_PACKAGE_DIGEST from scripts/package_legacy_pytest.py}"}]'
+      RUNNER_CONTAINER_IMAGE: testops-yanjia-web-pytest:${YANJIA_PYTEST_IMAGE_TAG:-0.35.2}
+      TESTOPS_LEGACY_PYTEST_PROJECT_ROOT: /opt/yanjia-web
+      TESTOPS_SECRET_TEST_USERNAME_A: ${YANJIA_TEST_USERNAME_A:?set YANJIA_TEST_USERNAME_A on the platform server}
+      TESTOPS_SECRET_TEST_PASSWORD_A: ${YANJIA_TEST_PASSWORD_A:?set YANJIA_TEST_PASSWORD_A on the platform server}
+      TESTOPS_SECRET_TEST_USERNAME_B: ${YANJIA_TEST_USERNAME_B:?set YANJIA_TEST_USERNAME_B on the platform server}
+      TESTOPS_SECRET_TEST_PASSWORD_B: ${YANJIA_TEST_PASSWORD_B:?set YANJIA_TEST_PASSWORD_B on the platform server}
+    networks:
+      - default
+      - runner-sandbox
+
+  viewer-gateway:
+    image: testops-yanjia-web-pytest:${YANJIA_PYTEST_IMAGE_TAG:-0.35.2}
+    build:
+      context: .
+      dockerfile: infra/docker/yanjia-web-pytest.Dockerfile
+      additional_contexts:
+        yanjia_web: ${YANJIA_WEB_PACKAGE_CONTEXT:?set YANJIA_WEB_PACKAGE_CONTEXT to a sanitized package export}
+      args:
+        RUNNER_PACKAGE_DIGEST: ${YANJIA_PYTEST_PACKAGE_DIGEST:?set YANJIA_PYTEST_PACKAGE_DIGEST from scripts/package_legacy_pytest.py}
+    networks:
+      - default
+      - runner-sandbox
+
+networks:
+  runner-sandbox:
+    # The legacy Playwright container must reach the configured Web target.
+    # It remains separate from the control-plane default network.
+    internal: false

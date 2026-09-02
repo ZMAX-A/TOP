@@ -250,6 +250,20 @@ textarea {
   color: #8392a5;
 }
 
+.form-field-hint {
+  flex: 0 0 100%;
+  margin: 6px 0 0;
+  color: #6f8193;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.form-field-hint::before {
+  color: #43576b;
+  content: "填写要求：";
+  font-weight: 650;
+}
+
 .status-tag {
   min-width: 88px;
   justify-content: center;

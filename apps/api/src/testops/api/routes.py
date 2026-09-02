@@ -38,6 +38,7 @@ from testops.contracts import (
 from .artifact_store import ArtifactStoreError, MinioArtifactStore
 from .database import get_session
 from .identity import CurrentPrincipal, authorize_project, require_system_admin
+from .live_view import issue_live_view_ticket, live_view_status
 from .persistence import (
     ArtifactRecord,
     AutomationPackageRecord,
@@ -126,6 +127,8 @@ from .schemas import (
     RunDetailResponse,
     RunEventResponse,
     RunListResponse,
+    RunLiveViewStatusResponse,
+    RunLiveViewTicketResponse,
     RunnerPoolCatalogResponse,
     RunnerPoolCreate,
     RunnerPoolResponse,
@@ -135,6 +138,7 @@ from .schemas import (
     RunnerWorkerUpdate,
     RunRerunRequest,
     RunResponse,
+    SupplyChainVerifierKeyReadinessResponse,
     TargetCreate,
     TargetResponse,
     TargetUpdate,
@@ -143,6 +147,7 @@ from .services import (
     TERMINAL_RUN_STATUSES,
     activate_automation_package,
     audit_artifact_access,
+    audit_live_view_access,
     cancel_run,
     cancel_runs,
     create_automation_package,
@@ -187,6 +192,7 @@ from .services import (
     update_target,
 )
 from .supply_chain_auth import SupplyChainVerifierAuth
+from .supply_chain_operations import collect_supply_chain_key_readiness
 
 router = APIRouter(prefix="/api/v1")
 Session = Annotated[AsyncSession, Depends(get_session)]
@@ -461,6 +467,22 @@ async def patch_admin_runner_worker(
         worker,
         pool,
         heartbeat_ttl_seconds=request.app.state.settings.runner_heartbeat_ttl_seconds,
+    )
+
+
+@router.get(
+    "/admin/supply-chain/verifier-keys",
+    response_model=SupplyChainVerifierKeyReadinessResponse,
+    tags=["system-management"],
+)
+async def get_admin_supply_chain_verifier_keys(
+    principal: CurrentPrincipal,
+    request: Request,
+) -> object:
+    require_system_admin(principal)
+    return collect_supply_chain_key_readiness(
+        request.app.state.settings,
+        generated_at=utc_now(),
     )
 
 
@@ -1356,6 +1378,54 @@ async def get_run_detail(
     record = await get_run(session, run_id)
     await authorize_project(session, principal, record.project_id, "run:read")
     return await _run_detail_response(session, record)
+
+
+@router.get(
+    "/runs/{run_id}/live-view",
+    response_model=RunLiveViewStatusResponse,
+    tags=["run-live-view"],
+)
+async def get_run_live_view(
+    run_id: UUID,
+    request: Request,
+    response: Response,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RunLiveViewStatusResponse:
+    record = await get_run(session, run_id)
+    await authorize_project(session, principal, record.project_id, "run:read")
+    response.headers["Cache-Control"] = "no-store"
+    return await live_view_status(record, request.app.state.live_view_store)
+
+
+@router.post(
+    "/runs/{run_id}/live-view/ticket",
+    response_model=RunLiveViewTicketResponse,
+    tags=["run-live-view"],
+)
+async def post_run_live_view_ticket(
+    run_id: UUID,
+    request: Request,
+    response: Response,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RunLiveViewTicketResponse:
+    record = await get_run(session, run_id)
+    await authorize_project(session, principal, record.project_id, "run:read")
+    settings = request.app.state.settings
+    ticket = await issue_live_view_ticket(
+        record,
+        request.app.state.live_view_store,
+        ttl_seconds=settings.live_view_ticket_ttl_seconds,
+    )
+    await audit_live_view_access(
+        session,
+        record,
+        actor_id=principal.user_id,
+        expires_in_seconds=settings.live_view_ticket_ttl_seconds,
+    )
+    response.headers["Cache-Control"] = "no-store"
+    return ticket
 
 
 @router.get(

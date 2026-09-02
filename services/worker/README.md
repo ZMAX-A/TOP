@@ -50,7 +50,7 @@ docker compose logs -f worker outbox
 Windows 本地运行：
 
 ```powershell
-$env:PYTHONPATH="packages/contracts/src;apps/api/src;runners/web_playwright/src;services/worker/src"
+$env:PYTHONPATH="packages/contracts/src;apps/api/src;runners/web_playwright/src;runners/legacy_pytest/src;services/worker/src"
 $env:RUNNER_CALLBACK_TOKEN="replace-with-the-api-token"
 $env:MINIO_ENDPOINT="http://127.0.0.1:9000"
 $env:MINIO_ACCESS_KEY="testops-local"
@@ -58,7 +58,7 @@ $env:MINIO_SECRET_KEY="change-me-local-only"
 $env:MINIO_BUCKET="testops-artifacts"
 $env:RUNNER_PACKAGE_CATALOG='[{"runner_type":"WEB_PLAYWRIGHT","image_repository":"testops-worker","digest":"sha256:<64-hex>"}]'
 $env:RUNNER_EXECUTION_MODE="CONTAINER"
-$env:RUNNER_CONTAINER_IMAGE="testops-worker:0.30.0"
+$env:RUNNER_CONTAINER_IMAGE="testops-worker:0.35.0"
 $env:RUNNER_CONTAINER_NETWORK_POLICY="ALLOWLIST"
 $env:RUNNER_CONTAINER_NETWORK="testops-runner-sandbox"
 $env:RUNNER_CONTAINER_MEMORY_MIB="1024"
@@ -67,6 +67,10 @@ $env:RUNNER_CONTAINER_PIDS_LIMIT="256"
 $env:RUNNER_EXECUTOR_TIMEOUT_SECONDS="3600"
 python -m celery -A testops.worker.celery_app:celery_app worker --loglevel=INFO --pool=solo
 ```
+
+完整 YanJia Excel/Pytest 项目使用独立不可变镜像与 Worker Pool，并复用项目现有 A/B 双账号双进程调度器；
+构建、四个账号密钥和包注册步骤见 `docs/milestones/M10.3-central-legacy-pytest-execution.md`。终端用户不需要
+本地 Python、浏览器或项目文件。
 
 持续发布 Outbox：
 

@@ -27,7 +27,7 @@ from .execution_isolation import (
     IsolatedExecutionTimedOut,
     _read_result,
 )
-from .isolated_executor import MAX_SNAPSHOT_BYTES
+from .isolated_executor import MAX_SNAPSHOT_BYTES, virtual_display_prefix
 
 KUBERNETES_WORKSPACE_ROOT = "/var/lib/testops/runs"
 KUBERNETES_INPUT_ROOT = "/run/testops-input"
@@ -176,12 +176,22 @@ def kubernetes_resources(
             }
         )
 
+    executor_command = shlex.join(
+        (
+            *virtual_display_prefix(job),
+            "python",
+            "-m",
+            "testops.worker.isolated_executor",
+            "--workspace-root",
+            KUBERNETES_WORKSPACE_ROOT,
+            "--input-file",
+            KUBERNETES_INPUT_ROOT + "/snapshot.json",
+        )
+    )
     command = " ".join(
         (
             "set +e;",
-            "python -m testops.worker.isolated_executor",
-            f"--workspace-root {shlex.quote(KUBERNETES_WORKSPACE_ROOT)}",
-            f"--input-file {shlex.quote(KUBERNETES_INPUT_ROOT + '/snapshot.json')};",
+            executor_command + ";",
             "code=$?;",
             "printf '%s' \"$code\" > /tmp/testops-exit-code;",
             "touch /tmp/testops-finished;",

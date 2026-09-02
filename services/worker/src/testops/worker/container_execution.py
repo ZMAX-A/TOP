@@ -4,16 +4,26 @@ from __future__ import annotations
 
 import io
 import json
+import logging
 import os
+import secrets
 import shutil
+import string
 import tarfile
 import tempfile
 import time
 from collections.abc import Iterable, Mapping
+from datetime import UTC, datetime
 from pathlib import Path, PurePosixPath
 from typing import Any, Protocol
 
-from testops.contracts import RunExecutionIsolationEvidence, RunResult, RunSnapshot
+from testops.contracts import (
+    LIVE_VIEW_RFB_PORT,
+    LiveViewRegistration,
+    RunExecutionIsolationEvidence,
+    RunResult,
+    RunSnapshot,
+)
 
 from .execution_isolation import (
     ExecutionControlPlane,
@@ -22,7 +32,8 @@ from .execution_isolation import (
     IsolatedExecutionTimedOut,
     _read_result,
 )
-from .isolated_executor import MAX_SNAPSHOT_BYTES
+from .isolated_executor import MAX_SNAPSHOT_BYTES, virtual_display_prefix
+from .live_view_registry import LiveViewPublisher
 
 CONTAINER_WORKSPACE_ROOT = "/var/lib/testops/runs"
 CONTAINER_INPUT_ROOT = "/run/testops-input"
@@ -34,6 +45,8 @@ RUNTIME_GID = 1001
 MAX_EVENT_ARCHIVE_BYTES = 16 * 1024 * 1024
 MAX_RUN_ARCHIVE_BYTES = 512 * 1024 * 1024
 MAX_RUN_ARCHIVE_FILES = 10_000
+CORE_DUMP_ULIMIT = {"Name": "core", "Soft": 0, "Hard": 0}
+LOGGER = logging.getLogger(__name__)
 
 
 class ContainerIsolationSettings(Protocol):
@@ -48,6 +61,10 @@ class ContainerIsolationSettings(Protocol):
     runner_container_cpu_millis: int
     runner_container_pids_limit: int
     runner_container_shm_bytes: int
+    runner_live_view_enabled: bool
+    runner_live_view_port: int
+    runner_live_view_ready_timeout_seconds: float
+    broker_url: str
 
 
 def container_isolation_evidence(
@@ -75,6 +92,7 @@ def container_environment(
     runtime_image_id: str,
     *,
     environ: Mapping[str, str] | None = None,
+    live_view_password: str | None = None,
 ) -> dict[str, str]:
     source = os.environ if environ is None else environ
     environment = {
@@ -91,7 +109,53 @@ def container_environment(
         value = source.get(name)
         if value:
             environment[name] = value
+    if live_view_password is not None:
+        environment["TESTOPS_LIVE_VIEW_PASSWORD"] = live_view_password
     return environment
+
+
+def _live_view_requested(job: RunSnapshot, settings: ContainerIsolationSettings) -> bool:
+    return bool(
+        settings.runner_live_view_enabled
+        and job.web_config is not None
+        and not job.web_config.headless
+    )
+
+
+def container_execution_command(
+    job: RunSnapshot,
+    *,
+    live_view_enabled: bool = False,
+    rfb_port: int = LIVE_VIEW_RFB_PORT,
+) -> list[str]:
+    command = [
+        "python",
+        "-m",
+        "testops.worker.isolated_executor",
+        "--workspace-root",
+        CONTAINER_WORKSPACE_ROOT,
+        "--input-file",
+        f"{CONTAINER_INPUT_ROOT}/snapshot.json",
+    ]
+    if live_view_enabled:
+        return [
+            "python",
+            "-m",
+            "testops.worker.live_view_executor",
+            "--display",
+            ":99",
+            "--width",
+            "1440",
+            "--height",
+            "900",
+            "--depth",
+            "24",
+            "--rfb-port",
+            str(rfb_port),
+            "--",
+            *command,
+        ]
+    return [*virtual_display_prefix(job), *command]
 
 
 def container_create_options(
@@ -102,6 +166,7 @@ def container_create_options(
     input_volume_name: str,
     *,
     environ: Mapping[str, str] | None = None,
+    live_view_password: str | None = None,
 ) -> dict[str, object]:
     network = (
         settings.runner_container_network
@@ -110,17 +175,16 @@ def container_create_options(
     )
     if not network:
         raise IsolatedExecutionError("container allowlist network is unavailable")
+    live_view_enabled = _live_view_requested(job, settings)
+    if live_view_enabled and live_view_password is None:
+        raise IsolatedExecutionError("headed live-view Run has no VNC password")
     return {
         "image": runtime_image_id,
-        "command": [
-            "python",
-            "-m",
-            "testops.worker.isolated_executor",
-            "--workspace-root",
-            CONTAINER_WORKSPACE_ROOT,
-            "--input-file",
-            f"{CONTAINER_INPUT_ROOT}/snapshot.json",
-        ],
+        "command": container_execution_command(
+            job,
+            live_view_enabled=live_view_enabled,
+            rfb_port=settings.runner_live_view_port,
+        ),
         "name": f"testops-run-{job.run_id.hex}",
         "user": "pwuser",
         "working_dir": "/app",
@@ -129,6 +193,7 @@ def container_create_options(
             settings,
             runtime_image_id,
             environ=environ,
+            live_view_password=live_view_password,
         ),
         "labels": {
             "io.testops.managed": "true",
@@ -155,6 +220,7 @@ def container_create_options(
         "nano_cpus": settings.runner_container_cpu_millis * 1_000_000,
         "pids_limit": settings.runner_container_pids_limit,
         "shm_size": settings.runner_container_shm_bytes,
+        "ulimits": [CORE_DUMP_ULIMIT],
         "detach": True,
     }
 
@@ -366,6 +432,44 @@ def _terminate_container(container: Any) -> None:
             raise IsolatedExecutionError("container executor could not terminate the Run") from exc
 
 
+def _generate_live_view_password() -> str:
+    alphabet = string.ascii_letters + string.digits
+    return "".join(secrets.choice(alphabet) for _ in range(8))
+
+
+def _wait_for_live_view(container: Any, *, port: int, timeout_seconds: float) -> None:
+    probe = (
+        "import socket; "
+        f"connection=socket.create_connection(('127.0.0.1',{port}),timeout=0.25); "
+        "connection.close()"
+    )
+    deadline = time.monotonic() + timeout_seconds
+    while time.monotonic() < deadline:
+        container.reload()
+        if not container.attrs.get("State", {}).get("Running", False):
+            raise RuntimeError("Run container exited before live view became ready")
+        try:
+            result = container.exec_run(["python", "-c", probe])
+            exit_code_value = getattr(result, "exit_code", None)
+            if exit_code_value is None:
+                exit_code_value = result[0]
+            exit_code = int(exit_code_value)
+        except Exception:
+            exit_code = -1
+        if exit_code == 0:
+            return
+        time.sleep(0.2)
+    raise RuntimeError("live-view VNC server did not become ready")
+
+
+def _live_view_event(job: RunSnapshot, event: str) -> dict[str, object]:
+    return {
+        "run_id": str(job.run_id),
+        "event": event,
+        "at": datetime.now(UTC).isoformat(),
+    }
+
+
 def _managed_for_run(resource: Any, run_id: object) -> bool:
     labels = getattr(resource, "attrs", {}).get("Labels") or {}
     return labels.get("io.testops.managed") == "true" and labels.get("io.testops.run-id") == str(
@@ -475,6 +579,16 @@ def verify_container_isolation(
         mismatches.append("CapDrop")
     if "no-new-privileges:true" not in (host.get("SecurityOpt") or []):
         mismatches.append("SecurityOpt")
+    core_ulimit = next(
+        (
+            value
+            for value in (host.get("Ulimits") or [])
+            if isinstance(value, dict) and value.get("Name") == "core"
+        ),
+        None,
+    )
+    if core_ulimit != CORE_DUMP_ULIMIT:
+        mismatches.append("CoreUlimit")
     tmpfs = host.get("Tmpfs") or {}
     if not {"/tmp", "/home/pwuser"}.issubset(tmpfs):
         mismatches.append("Tmpfs")
@@ -505,11 +619,13 @@ class ContainerRunExecutor:
         *,
         environ: Mapping[str, str] | None = None,
         client: Any | None = None,
+        live_view_publisher: LiveViewPublisher | None = None,
     ):
         self._settings = settings
         self._control_plane = control_plane
         self._environ = os.environ if environ is None else environ
         self._client = client
+        self._live_view_publisher = live_view_publisher
 
     def execute(self, job: RunSnapshot) -> RunResult:
         phase = "daemon"
@@ -524,6 +640,12 @@ class ContainerRunExecutor:
         input_volume = None
         started = False
         isolation_verified = False
+        live_view_enabled = _live_view_requested(job, self._settings)
+        live_view_password = _generate_live_view_password() if live_view_enabled else None
+        live_view_registration: LiveViewRegistration | None = None
+        live_view_document: str | None = None
+        live_view_publisher = self._live_view_publisher
+        owns_live_view_publisher = False
         try:
             phase = "stale-resource-recovery"
             _reclaim_stale_resources(client, job, volume_name)
@@ -550,6 +672,7 @@ class ContainerRunExecutor:
                 volume_name,
                 input_volume_name,
                 environ=self._environ,
+                live_view_password=live_view_password,
             )
             phase = "container-create"
             container = client.containers.create(**options)
@@ -559,6 +682,37 @@ class ContainerRunExecutor:
             phase = "isolation-verification"
             verify_container_isolation(container, self._settings, image_id)
             isolation_verified = True
+            if live_view_enabled and live_view_password is not None:
+                try:
+                    phase = "live-view-readiness"
+                    _wait_for_live_view(
+                        container,
+                        port=self._settings.runner_live_view_port,
+                        timeout_seconds=self._settings.runner_live_view_ready_timeout_seconds,
+                    )
+                    if live_view_publisher is None:
+                        live_view_publisher = LiveViewPublisher(self._settings.broker_url)
+                        owns_live_view_publisher = True
+                    live_view_registration = LiveViewRegistration(
+                        run_id=job.run_id,
+                        session_id=secrets.token_urlsafe(32),
+                        host=volume_name,
+                        port=self._settings.runner_live_view_port,
+                        password=live_view_password,
+                    )
+                    live_view_document = live_view_publisher.publish(
+                        live_view_registration,
+                        ttl_seconds=self._settings.runner_executor_timeout_seconds + 60,
+                    )
+                    try:
+                        self._control_plane.report_event(
+                            job.run_id,
+                            _live_view_event(job, "live_view_ready"),
+                        )
+                    except Exception:
+                        pass
+                except Exception as exc:
+                    LOGGER.warning("Run %s live view is unavailable: %s", job.run_id, exc)
             deadline = time.monotonic() + self._settings.runner_executor_timeout_seconds
             event_offset = 0
             while True:
@@ -612,6 +766,27 @@ class ContainerRunExecutor:
                 f"container executor failed closed during {phase}"
             ) from exc
         finally:
+            if (
+                live_view_publisher is not None
+                and live_view_registration is not None
+                and live_view_document is not None
+            ):
+                try:
+                    live_view_publisher.unpublish(live_view_registration, live_view_document)
+                except Exception:
+                    pass
+                try:
+                    self._control_plane.report_event(
+                        job.run_id,
+                        _live_view_event(job, "live_view_ended"),
+                    )
+                except Exception:
+                    pass
+            if owns_live_view_publisher and live_view_publisher is not None:
+                try:
+                    live_view_publisher.close()
+                except Exception:
+                    pass
             if container is not None:
                 try:
                     container.remove(force=True)

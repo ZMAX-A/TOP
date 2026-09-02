@@ -1362,6 +1362,10 @@ async def record_automation_package_supply_chain_verification(
         **payload.model_dump(),
     )
     session.add(record)
+    # PostgreSQL enforces the package's verification foreign key when its UPDATE runs.
+    # Persist the referenced row first because these models do not define ORM relationships
+    # that would otherwise give the unit of work an insertion dependency to order by.
+    await session.flush((record,))
     session.add(
         AutomationPackageSupplyChainEnvelopeRecord(
             id=uuid4(),
@@ -1862,6 +1866,8 @@ async def create_run(
     web_config, variables, secret_bindings = _environment_contract(environment)
     if web_config is None:
         raise InvalidRequest("WEB environment has no web_config")
+    if payload.headless is not None:
+        web_config = web_config.model_copy(update={"headless": payload.headless})
     await _enforce_execution_policy(session, project)
     runner_pool_id = environment.runner_pool_id or target.runner_pool_id
     supply_chain = await _automation_package_supply_chain_ref(session, package)
@@ -2132,6 +2138,29 @@ async def audit_artifact_access(
     await session.commit()
 
 
+async def audit_live_view_access(
+    session: AsyncSession,
+    run: TestRunRecord,
+    *,
+    actor_id: UUID,
+    expires_in_seconds: int,
+) -> None:
+    session.add(
+        _audit(
+            actor_id=actor_id,
+            action="run.live_view_access_granted",
+            resource_type="run",
+            resource_id=run.id,
+            project_id=run.project_id,
+            details={
+                "expires_in_seconds": expires_in_seconds,
+                "read_only": True,
+            },
+        )
+    )
+    await session.commit()
+
+
 async def list_run_events(
     session: AsyncSession,
     run_id: UUID,
@@ -2181,6 +2210,17 @@ async def record_run_event(
         )
         if run_case is None:
             raise InvalidRequest("Run event case_code is not in the immutable Run Snapshot")
+    if payload.current_case_code is not None:
+        progress_case = await session.scalar(
+            select(RunCaseRecord.id).where(
+                RunCaseRecord.run_id == run_id,
+                RunCaseRecord.case_code == payload.current_case_code,
+            )
+        )
+        if progress_case is None:
+            raise InvalidRequest(
+                "Run progress current_case_code is not in the immutable Run Snapshot"
+            )
 
     status_value = payload.status.value if payload.status is not None else None
     event, created = await _append_run_event(

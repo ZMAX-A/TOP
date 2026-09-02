@@ -1,6 +1,6 @@
 # TestOps Platform
 
-多项目自动化测试治理与执行平台，当前开发版本为 `0.30.0`。当前仓库是平台新代码的唯一开发目录；同级
+多项目自动化测试治理与执行平台，当前开发版本为 `0.35.0`。当前仓库是平台新代码的唯一开发目录；同级
 `../web` 是现有颜佳 AI Web 自动化项目，只作为首个 Web Runner 的迁移来源。
 
 ## 当前里程碑
@@ -18,8 +18,10 @@ M8.6（质量运营可观测性）已实现，M8 质量告警闭环开发完成�
 M9.2（不可变自动化包运行时准入）、M9.3（自动化包生命周期工作台）和
 M9.4.1（签名、来源证明与 SBOM 准入）、M9.4.2（验证器服务身份与签名 Envelope）和
 M9.5.1（每 Run 子进程与最小凭据隔离）、M9.5.2（每 Run 容器硬隔离）和
-M9.5.3（Kubernetes Job 执行隔离）和 M9.6.1（工作负载身份绑定与 Ed25519 验证器 Envelope）已实现；M9.5.3
-真实集群预验收与生产验证器密钥轮换演练仍是发布门禁。
+M9.5.3（Kubernetes Job 执行隔离）、M9.6.1（工作负载身份绑定与 Ed25519 验证器 Envelope）、
+M9.6.2（验证器公钥启用、到期与紧急吊销）、M9.7（验证器密钥轮换就绪度）、M9.8（验证器密钥就绪度指标与告警）和
+M9.9（验证器密钥环配置摘要与部署预检）、M10.1（多实例密钥环发布门禁）和
+M10.2（首个登录后 Web 业务迁移切片）已实现；M9.5.3 真实集群预验收与生产验证器密钥轮换演练仍是发布门禁。
 
 - 统一动作和断言能力注册表；
 - 平台用例、Runner Job、Runner Result 契约；
@@ -28,7 +30,8 @@ M9.5.3（Kubernetes Job 执行隔离）和 M9.6.1（工作负载身份绑定与 
 - 旧 Excel 到不可变 Case Baseline 的确定性迁移器；
 - 已发布 `yanjia-ai-web/case-v1.0.0`：92 条用例，89 条启用、3 条禁用；
 - 已发布 `case-v1.0.1`，只修复成功登录用例会误通过的弱 URL 断言；
-- Web Runner 可执行登录模块 JSON Job，隔离运行目录并产出结构化 Result/Artifact；
+- Web Runner 可执行登录模块，以及 `TC-HOME-002`“首页搜索不存在用户”JSON Job；每条登录后用例独立登录，
+  隔离运行目录并产出结构化 Result/Artifact；
 - PostgreSQL/SQLAlchemy 控制面模型和首个 Alembic 迁移；
 - 项目、目标、环境、不可变基线、自动化包生命周期和 Run REST API；
 - 自动化包支持草稿、全量验证、激活、弃用和吊销，Runner 类型、OCI 仓库与不可变摘要进入 Run Snapshot；
@@ -41,6 +44,16 @@ M9.5.3（Kubernetes Job 执行隔离）和 M9.6.1（工作负载身份绑定与 
 - 供应链报告默认使用绑定 HTTPS/SPIFFE 工作负载身份和 credential id 的 Ed25519 detached JWS，覆盖方法、路径、
   时间戳、UUID nonce 和原始请求体摘要；控制面只保存公钥、身份与指纹，校验短时时间窗并以数据库唯一约束拒绝
   nonce 重放。旧 HMAC v1 默认关闭，仅供显式迁移窗口使用；
+- Ed25519 公钥可配置严格 UTC `not_before`、`not_after` 和 `revoked_at`；Envelope 签发与服务端验签两个时间点都必须
+  位于有效窗口内，未启用、到期或已吊销 key 统一失败关闭；
+- 系统管理员可只读查看验证器 key 的身份、指纹、生命周期状态、到期预警和逐工作负载身份的双 key 重叠轮换就绪度；
+  API 与前端不返回公钥原文、私钥或签名材料；
+- Prometheus 以固定状态标签暴露验证器 key 就绪度、生命周期计数、轮换重叠和历史 HMAC 状态，并对快照失败、无可用
+  key、轮换未就绪、即将到期及 HMAC 未关闭提供告警；指标不包含 credential、身份或指纹；
+- 管理端/API 返回不含秘密的稳定 keyring 配置摘要，部署前 CLI 默认对 WARNING、BLOCKED 和非法配置失败关闭；运维可
+  逐 API 实例比较摘要发现公钥环、生命周期或轮换策略漂移，摘要不进入 Prometheus 标签；
+- 多实例发布门禁从短期 System Admin Token 文件主动读取至少两个直连 API 实例，只保留安全聚合字段；全部实例必须
+  READY、摘要一致并可选匹配已批准摘要，重定向、HTTP 非环回地址、响应越界、鉴权失败或契约错误均失败关闭；
 - 可信 CI 使用 `scripts/submit_supply_chain_verification.py` 校验报告契约、从受限文件加载 Ed25519 私钥、生成 v2
   Envelope 并提交判定；客户端默认只接受 HTTPS、拒绝重定向且不会在输出中打印私钥或签名 Header；
 - 供应链判定采用追加式记录，最新 VERIFIED/REJECTED 状态控制新执行、计划和重跑；VERIFIED 证明 ID、策略、
@@ -99,10 +112,10 @@ M9.5.3（Kubernetes Job 执行隔离）和 M9.6.1（工作负载身份绑定与 
   保留原事件 ID，重放来源和操作人可审计且同一失败节点不会重复入队；
 - 静默、确认和重放 API 返回当前操作人显示名；Prometheus 公开 evaluator 到期量/延迟、活跃静默、Webhook
   PENDING/FAILED、最老等待时间和重放量，并为快照失败、评估延迟和投递积压提供低基数告警；
-- 控制面输出低基数 Prometheus 指标，支持 Bearer 保护、数据库就绪指标和可选本地
-  Prometheus profile，并附带可用性、错误率、延迟、派发积压、计划延迟和僵尸租约告警规则；
+- 控制面输出低基数 Prometheus 指标，支持 Bearer 保护、数据库就绪指标和本地观测 profile；Prometheus 将规则发送到
+  固定摘要的 Alertmanager，本地审计 sink 可验证 firing/resolved Webhook，生产必须挂载真实接收器配置；
 - GitHub Actions 对 Python、前端、契约制品、迁移图、真实 PostgreSQL 迁移往返、
-  Compose 冒烟与 Prometheus 配置建立只读质量门，并在失败时保留 Compose 日志；
+  Compose 冒烟及 Prometheus/Alertmanager 配置建立只读质量门，并在失败时保留 Compose 日志；
 - 备份恢复工具生成 PostgreSQL 自定义 dump、MinIO 当前对象和逐文件 SHA-256 清单；
   恢复前必须通过完整性、路径逃逸、目标数据库确认和对象冲突预检；
 - 不读取或复制旧项目的 `.env`、`.venv`、报告和登录状态。
@@ -247,7 +260,7 @@ npm.cmd run dev
 另开两个 PowerShell 窗口，并设置相同的环境变量和源码路径：
 
 ```powershell
-$env:PYTHONPATH="packages/contracts/src;apps/api/src;runners/web_playwright/src;services/worker/src"
+$env:PYTHONPATH="packages/contracts/src;apps/api/src;runners/web_playwright/src;runners/legacy_pytest/src;services/worker/src"
 $env:MINIO_ENDPOINT="http://127.0.0.1:9000"
 $env:MINIO_ACCESS_KEY="testops-local"
 $env:MINIO_SECRET_KEY="change-me-local-only"
@@ -271,7 +284,9 @@ python -m testops.runners.web validate-job tests/fixtures/run_snapshot.valid.jso
 
 ```powershell
 python -m testops.runners.web validate-job examples/jobs/yanjia-login-smoke.json
+python -m testops.runners.web validate-job examples/jobs/yanjia-home-search-smoke.json
 python scripts/smoke_playwright.py
+python scripts/smoke_home_search.py
 ```
 
 ## 核心约束
@@ -279,7 +294,7 @@ python scripts/smoke_playwright.py
 1. 已发布用例基线不可直接修改。
 2. Excel 是交换格式，数据库和不可变快照才是事实来源。
 3. 用例版本与自动化脚本包版本分离。
-4. Runner 只接收 JSON Job，不直接读取或回写业务 Excel。
+4. Runner 只接收 JSON Job；Legacy Pytest 包只能读取镜像中的不可变 Excel，并仅回写每 Run 的隔离副本。
 5. 每个 Run 使用独立临时目录、浏览器上下文和登录状态。
 6. 密钥只以引用形式进入 Job，不能写入用例、日志或制品名称。
 7. 已发布基线只能逐字节复用；修复必须发布新版本，不能原地覆盖。
@@ -294,13 +309,20 @@ python scripts/smoke_playwright.py
 15. Runner 只能执行其心跳已声明且本地目录再次确认的精确不可变包，不能按名称、版本或可变标签猜测替代。
 16. 新包验证前必须完成供应链准入；允许清单未配置、身份不匹配或任一签名/provenance/SBOM 检查失败时均关闭准入。
 17. 供应链准入报告只接受短时、完整覆盖并使用唯一 nonce 的验证器签名 Envelope；Ed25519 credential 必须绑定批准的
-    HTTPS/SPIFFE 工作负载身份，用户会话、重复 nonce、身份替换、过期签名或已移除的轮换公钥都不能写入判定。
+    HTTPS/SPIFFE 工作负载身份，且签发与验签时间均位于配置的密钥生命周期内；用户会话、重复 nonce、身份替换、过期
+    签名、未启用、已到期、已吊销或已移除的轮换公钥都不能写入判定。
 18. 注册 Worker 至少使用每 Run 独立子进程并仅注入 Snapshot 声明的测试密钥；生产容器 Worker 还必须强制只读根、
     非默认网络和 CPU/内存/PID 限制，并从 Docker Engine 回读实际参数后才写入隔离证据。
 19. 父 Worker 的 Docker Engine 权限属于高信任执行控制面；Run 容器不得挂载 Docker Socket，只能使用一次性 Snapshot
     只读卷、工作区卷和显式 allowlist/deny-all 网络，任何镜像标签或运行参数不一致都失败关闭。
 20. Kubernetes 控制器只能在专用 Namespace 使用最小 Role 管理受管 Run 资源；Run Pod 必须使用非默认
     ServiceAccount、禁用 Token 自动挂载、无 hostPath/宿主命名空间，并以实际 Pod 与 NetworkPolicy 回读结果作为证据。
+21. 验证器密钥就绪度必须按验证器与工作负载身份逐组计算；不同身份的 key 不能互相凑成轮换重叠窗口，且运维接口只能向
+    System Admin 暴露非秘密元数据。
+22. 验证器密钥 Prometheus 指标只能使用固定状态标签，不能以 credential、工作负载身份、公钥指纹、项目或用户形成
+    时序；就绪快照失败必须单独暴露，不能沿用上一次成功状态冒充当前健康。
+23. 验证器 keyring 配置摘要必须基于稳定规范化输入且不包含 HMAC secret；部署预检默认只允许 READY，生产多副本必须
+    逐实例比较摘要，不能用负载均衡入口的一次响应或 Prometheus 高基数标签代替一致性检查。
 
 阶段设计与验证证据见 [`docs/milestones`](docs/milestones)，M5 与 M6 详见
 [`M5.1-full-stack-runtime.md`](docs/milestones/M5.1-full-stack-runtime.md)、
@@ -328,5 +350,12 @@ python scripts/smoke_playwright.py
 [`M9.5.1-subprocess-execution-isolation.md`](docs/milestones/M9.5.1-subprocess-execution-isolation.md) 和
 [`M9.5.2-container-execution-isolation.md`](docs/milestones/M9.5.2-container-execution-isolation.md) 和
 [`M9.5.3-kubernetes-job-isolation.md`](docs/milestones/M9.5.3-kubernetes-job-isolation.md) 和
-[`M9.6.1-asymmetric-verifier-identity.md`](docs/milestones/M9.6.1-asymmetric-verifier-identity.md)。发布前还必须完成
+[`M9.6.1-asymmetric-verifier-identity.md`](docs/milestones/M9.6.1-asymmetric-verifier-identity.md)、
+[`M9.6.2-verifier-key-lifecycle.md`](docs/milestones/M9.6.2-verifier-key-lifecycle.md) 和
+[`M9.7-verifier-key-readiness.md`](docs/milestones/M9.7-verifier-key-readiness.md) 和
+[`M9.8-verifier-key-observability.md`](docs/milestones/M9.8-verifier-key-observability.md) 和
+[`M9.9-verifier-keyring-preflight.md`](docs/milestones/M9.9-verifier-keyring-preflight.md) 和
+[`M10.1-keyring-fleet-rollout-gate.md`](docs/milestones/M10.1-keyring-fleet-rollout-gate.md)、
+[`M10.2-home-search-migration-slice.md`](docs/milestones/M10.2-home-search-migration-slice.md) 和
+[`M10.3-central-legacy-pytest-execution.md`](docs/milestones/M10.3-central-legacy-pytest-execution.md)。发布前还必须完成
 [`生产验收清单`](docs/operations/release-checklist.md)。

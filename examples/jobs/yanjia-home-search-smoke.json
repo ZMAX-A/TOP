@@ -1,0 +1,96 @@
+{
+  "automation_package": {
+    "digest": "sha256:01bd1368544969cdfa4567a90e633698517c2386d6e978e97448d7681a16ca36",
+    "image_repository": "testops-worker",
+    "name": "yanjia-web",
+    "runner_type": "WEB_PLAYWRIGHT",
+    "version": "0.2.0"
+  },
+  "browser": "chromium",
+  "case_baseline": {
+    "baseline_id": "8865cdb1-fc2d-5272-82bb-9d67faa89c57",
+    "case_count": 92,
+    "digest": "sha256:297c34c2dcd0585908414479e1140d0f112b8a34fb1a625b93c9914d7a6dc2fe",
+    "version": "case-v1.0.1"
+  },
+  "cases": [
+    {
+      "assertion": {
+        "expected": "页面显示'暂无'",
+        "locator": "button:has-text('搜 索')",
+        "type": "text_visible"
+      },
+      "case_code": "TC-HOME-002",
+      "case_id": "83564c69-c010-582f-88d3-5cbc43f10b97",
+      "data_type": "string",
+      "enabled": true,
+      "expected_result": "展示：暂无内容",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 10,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "不存在的用户xyz123",
+          "locator": "input[placeholder='请输入关键字']",
+          "operation": "input"
+        },
+        {
+          "locator": "button:has-text('搜 索')",
+          "operation": "click"
+        }
+      ],
+      "tags": [
+        "legacy-excel",
+        "module:home-search"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 5.0,
+      "title": "搜索-不存在的用户"
+    }
+  ],
+  "config_hash": "sha256:adf437977c28a1992732762a77d6417d28c174989a552223fdcbfdf79b5b8f62",
+  "created_at": "2026-08-24T12:00:00+08:00",
+  "created_by": "b3ef6675-e2a4-5f66-afbe-54eb5ece56fc",
+  "environment_id": "a9299047-5764-5985-b5b3-0e871844acd8",
+  "project_id": "dd6f9be0-097c-5f2b-ae95-8bebd6e03181",
+  "run_id": "9410fdd2-6883-5cb4-8c61-a081731fa03e",
+  "schema_version": "1.0",
+  "secret_bindings": [
+    {
+      "name": "TEST_USERNAME",
+      "ref": "secret://yanjia/staging/test-username"
+    },
+    {
+      "name": "TEST_PASSWORD",
+      "ref": "secret://yanjia/staging/test-password"
+    }
+  ],
+  "target_id": "1bb3d626-0d34-5a8a-9178-7aa05c29655e",
+  "target_type": "WEB",
+  "variables": [
+    {
+      "name": "STORE_NAME",
+      "value": ""
+    }
+  ],
+  "web_config": {
+    "action_timeout_seconds": 15.0,
+    "base_url": "https://example.invalid/login",
+    "capture_trace": true,
+    "headless": true,
+    "ignore_https_errors": false,
+    "navigation_timeout_seconds": 30.0,
+    "viewport_height": 900,
+    "viewport_width": 1440
+  }
+}

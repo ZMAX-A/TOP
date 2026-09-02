@@ -11,6 +11,7 @@ sys.path.insert(0, str(ROOT))
 for relative in (
     "packages/contracts/src",
     "apps/api/src",
+    "runners/legacy_pytest/src",
     "runners/web_playwright/src",
     "packages/migrations/src",
     "services/worker/src",

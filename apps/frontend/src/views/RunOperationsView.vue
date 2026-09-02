@@ -4,6 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   ArrowLeft,
   CircleClose,
+  Plus,
   Refresh,
   RefreshRight,
   Search,
@@ -13,14 +14,19 @@ import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { ApiError, api } from '@/api/client'
 import type {
+  AutomationPackage,
+  Baseline,
+  CaseDefinition,
   Environment,
   Project,
   ProjectMember,
   Run,
+  RunCreate,
   RunStatus,
   Target,
 } from '@/api/types'
 import { auth } from '@/auth'
+import { createClientRequestId } from '@/idempotency'
 import { formatDate, formatUtcDate, runTagType, shortDigest } from '@/presentation'
 
 const TERMINAL_STATUSES = new Set<RunStatus>([
@@ -63,6 +69,13 @@ const targets = ref<Target[]>([])
 const environments = ref<Environment[]>([])
 const members = ref<ProjectMember[]>([])
 const selectedRuns = ref<Run[]>([])
+const createVisible = ref(false)
+const createLoading = ref(false)
+const createEnvironments = ref<Environment[]>([])
+const createBaselines = ref<Baseline[]>([])
+const createPackages = ref<AutomationPackage[]>([])
+const createCases = ref<CaseDefinition[]>([])
+const caseQuery = ref('')
 const offset = ref(0)
 const pageSize = 25
 
@@ -82,6 +95,16 @@ const filters = reactive<{
   created_range: [],
 })
 
+const createForm = reactive<RunCreate>({
+  project_id: '',
+  target_id: '',
+  environment_id: '',
+  baseline_id: '',
+  automation_package_id: '',
+  case_codes: [],
+  headless: true,
+})
+
 const currentMember = computed(() =>
   members.value.find((item) => item.user_id === auth.state.user?.id),
 )
@@ -98,6 +121,24 @@ const terminalOnPage = computed(
 )
 const failedOnPage = computed(
   () => runs.value.filter((item) => ['FAILED', 'INFRA_ERROR', 'TIMED_OUT'].includes(item.status)).length,
+)
+const filteredCreateCases = computed(() => {
+  const query = caseQuery.value.trim().toLocaleLowerCase()
+  if (!query) return createCases.value
+  return createCases.value.filter((item) =>
+    [item.case_code, item.title, item.module_name, item.module_key].some((value) =>
+      value.toLocaleLowerCase().includes(query),
+    ),
+  )
+})
+const selectedCreateEnvironment = computed(() =>
+  createEnvironments.value.find((item) => item.id === createForm.environment_id),
+)
+const selectedCreateBaseline = computed(() =>
+  createBaselines.value.find((item) => item.baseline_id === createForm.baseline_id),
+)
+const selectedCreatePackage = computed(() =>
+  createPackages.value.find((item) => item.id === createForm.automation_package_id),
 )
 
 function report(error: unknown, fallback: string): void {
@@ -154,6 +195,163 @@ async function changeTarget(): Promise<void> {
     environments.value = await api.environments(projectId.value, filters.target_id)
   } catch (error) {
     report(error, '环境列表加载失败')
+  }
+}
+
+function resetCreateForm(): void {
+  createForm.project_id = projectId.value
+  createForm.target_id = ''
+  createForm.environment_id = ''
+  createForm.baseline_id = ''
+  createForm.automation_package_id = ''
+  createForm.case_codes = []
+  createForm.headless = true
+  createEnvironments.value = []
+  createBaselines.value = []
+  createPackages.value = []
+  createCases.value = []
+  caseQuery.value = ''
+}
+
+function syncCreateHeadlessDefault(): void {
+  createForm.headless = selectedCreateEnvironment.value?.web_config?.headless !== false
+}
+
+async function loadCreateTargetResources(): Promise<void> {
+  createForm.environment_id = ''
+  createForm.automation_package_id = ''
+  createEnvironments.value = []
+  createPackages.value = []
+  if (!createForm.target_id) return
+  const [environmentList, packageList] = await Promise.all([
+    api.environments(projectId.value, createForm.target_id),
+    api.packages(projectId.value, createForm.target_id),
+  ])
+  createEnvironments.value = environmentList.filter((item) => item.status === 'ACTIVE')
+  createPackages.value = packageList
+    .filter((item) => item.status === 'ACTIVE')
+    .sort((left, right) => right.created_at.localeCompare(left.created_at))
+  createForm.environment_id = createEnvironments.value[0]?.id ?? ''
+  createForm.automation_package_id = createPackages.value[0]?.id ?? ''
+  syncCreateHeadlessDefault()
+}
+
+async function loadCreateCases(): Promise<void> {
+  createForm.case_codes = []
+  createCases.value = []
+  caseQuery.value = ''
+  if (!createForm.baseline_id) return
+  const baseline = await api.baseline(projectId.value, createForm.baseline_id)
+  createCases.value = baseline.cases.filter((item) => item.enabled)
+}
+
+async function openCreateRun(): Promise<void> {
+  resetCreateForm()
+  createVisible.value = true
+  createLoading.value = true
+  try {
+    createBaselines.value = (await api.baselines(projectId.value))
+      .filter((item) => item.status === 'RELEASED')
+      .sort((left, right) => right.created_at.localeCompare(left.created_at))
+    createForm.target_id = targets.value.find((item) => item.status === 'ACTIVE')?.id ?? ''
+    createForm.baseline_id = createBaselines.value[0]?.baseline_id ?? ''
+    if (!createForm.target_id) {
+      ElMessage.warning('项目尚未配置 ACTIVE 测试目标')
+      createVisible.value = false
+      return
+    }
+    if (!createForm.baseline_id) {
+      ElMessage.warning('项目尚未发布 Released 基线')
+      createVisible.value = false
+      return
+    }
+    await Promise.all([loadCreateTargetResources(), loadCreateCases()])
+  } catch (error) {
+    report(error, '新建运行资源加载失败')
+    createVisible.value = false
+  } finally {
+    createLoading.value = false
+  }
+}
+
+async function changeCreateTarget(): Promise<void> {
+  createLoading.value = true
+  try {
+    await loadCreateTargetResources()
+  } catch (error) {
+    report(error, '运行环境或自动化包加载失败')
+  } finally {
+    createLoading.value = false
+  }
+}
+
+async function changeCreateBaseline(): Promise<void> {
+  createLoading.value = true
+  try {
+    await loadCreateCases()
+  } catch (error) {
+    report(error, '基线用例加载失败')
+  } finally {
+    createLoading.value = false
+  }
+}
+
+function selectVisibleCases(): void {
+  const selected = new Set(createForm.case_codes)
+  for (const testCase of filteredCreateCases.value) selected.add(testCase.case_code)
+  createForm.case_codes = [...selected]
+}
+
+function selectAllCases(): void {
+  createForm.case_codes = createCases.value.map((item) => item.case_code)
+}
+
+function clearSelectedCases(): void {
+  createForm.case_codes = []
+}
+
+async function submitCreateRun(): Promise<void> {
+  if (
+    !createForm.target_id ||
+    !createForm.environment_id ||
+    !createForm.baseline_id ||
+    !createForm.automation_package_id
+  ) {
+    ElMessage.warning('请选择测试目标、运行环境、Released 基线和自动化包')
+    return
+  }
+  if (!createForm.case_codes.length) {
+    ElMessage.warning('请至少选择一条启用用例')
+    return
+  }
+  try {
+    await ElMessageBox.confirm(
+      `将在 ${selectedCreateEnvironment.value?.name ?? '所选环境'} 以${createForm.headless ? '无头' : '有头'}模式执行 ${createForm.case_codes.length} 条用例，任务创建后将由专用 Worker 访问已配置的测试目标。`,
+      '确认开始自动化运行',
+      { type: 'warning', confirmButtonText: '开始运行', cancelButtonText: '返回选择' },
+    )
+  } catch {
+    return
+  }
+  createLoading.value = true
+  try {
+    const created = await api.createRun(
+      {
+        ...createForm,
+        case_codes: [...createForm.case_codes],
+      },
+      createClientRequestId(),
+    )
+    createVisible.value = false
+    ElMessage.success(`Run 已创建：${created.id.slice(0, 8)} · ${created.case_count} 条用例`)
+    await router.push({
+      name: 'run-detail',
+      params: { projectId: projectId.value, runId: created.id },
+    })
+  } catch (error) {
+    report(error, '自动化运行创建失败')
+  } finally {
+    createLoading.value = false
   }
 }
 
@@ -216,7 +414,7 @@ async function batchCancel(): Promise<void> {
 async function rerun(run: Run, mode: 'FULL' | 'FAILED_ONLY'): Promise<void> {
   actionBusy.value = true
   try {
-    const created = await api.rerunRun(run.id, mode, crypto.randomUUID())
+    const created = await api.rerunRun(run.id, mode, createClientRequestId())
     ElMessage.success(mode === 'FULL' ? '完整重跑已创建' : '仅异常用例重跑已创建')
     await router.push({
       name: 'run-detail',
@@ -254,6 +452,7 @@ onMounted(initialize)
         <p>筛选执行历史、批量取消进行中任务，并从不可变 Snapshot 创建可追溯重跑。</p>
       </div>
       <div class="heading-actions">
+        <el-button v-if="canOperate" type="primary" :icon="Plus" @click="openCreateRun">新建运行</el-button>
         <el-button :icon="Refresh" @click="loadRuns">刷新</el-button>
         <el-button
           v-if="canOperate"
@@ -378,6 +577,135 @@ onMounted(initialize)
         @current-change="changePage"
       />
     </section>
+
+    <el-dialog
+      v-model="createVisible"
+      title="新建自动化运行"
+      width="min(920px, 94vw)"
+      destroy-on-close
+      append-to-body
+    >
+      <div v-loading="createLoading" class="create-run-dialog">
+        <el-alert
+          title="脚本、浏览器、Excel 和 Python 依赖均由专用 Worker 镜像提供；这里只需选择运行资源和用例。"
+          type="info"
+          :closable="false"
+          show-icon
+          class="run-dialog-intro"
+        />
+        <el-form label-position="top">
+          <div class="create-form-grid">
+            <el-form-item label="测试目标" required>
+              <el-select v-model="createForm.target_id" placeholder="选择测试目标" @change="changeCreateTarget">
+                <el-option
+                  v-for="target in targets.filter((item) => item.status === 'ACTIVE')"
+                  :key="target.id"
+                  :label="`${target.name} · ${target.target_type}`"
+                  :value="target.id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="运行环境" required>
+              <el-select v-model="createForm.environment_id" placeholder="选择运行环境" @change="syncCreateHeadlessDefault">
+                <el-option
+                  v-for="environment in createEnvironments"
+                  :key="environment.id"
+                  :label="environment.name"
+                  :value="environment.id"
+                />
+              </el-select>
+              <p v-if="selectedCreateEnvironment?.web_config?.base_url" class="resource-hint mono">
+                {{ selectedCreateEnvironment.web_config.base_url }}
+              </p>
+            </el-form-item>
+            <el-form-item label="Released 基线" required>
+              <el-select v-model="createForm.baseline_id" placeholder="选择 Released 基线" @change="changeCreateBaseline">
+                <el-option
+                  v-for="baseline in createBaselines"
+                  :key="baseline.baseline_id"
+                  :label="`${baseline.version} · ${baseline.enabled_case_count} 条启用`"
+                  :value="baseline.baseline_id"
+                />
+              </el-select>
+            </el-form-item>
+            <el-form-item label="ACTIVE 自动化包" required>
+              <el-select v-model="createForm.automation_package_id" placeholder="选择自动化包">
+                <el-option
+                  v-for="automationPackage in createPackages"
+                  :key="automationPackage.id"
+                  :label="`${automationPackage.name}@${automationPackage.version}`"
+                  :value="automationPackage.id"
+                />
+              </el-select>
+              <p v-if="selectedCreatePackage" class="resource-hint mono">
+                {{ selectedCreatePackage.image_repository }}@{{ shortDigest(selectedCreatePackage.digest) }}
+              </p>
+            </el-form-item>
+            <el-form-item label="浏览器运行方式" required class="execution-mode-item">
+              <el-radio-group v-model="createForm.headless" class="execution-mode-options">
+                <el-radio-button :value="true">无头模式</el-radio-button>
+                <el-radio-button :value="false">有头模式</el-radio-button>
+              </el-radio-group>
+              <p class="execution-mode-hint">
+                {{ createForm.headless
+                  ? '后台执行，资源占用更低，适合日常回归。'
+                  : '以可视 Chromium 执行；中央 Worker 使用隔离的虚拟显示，适合兼容性验证和调试。' }}
+              </p>
+            </el-form-item>
+          </div>
+        </el-form>
+
+        <section class="case-picker-panel">
+          <div class="case-picker-heading">
+            <div>
+              <strong>选择运行用例</strong>
+              <span>
+                已选 {{ createForm.case_codes.length }} / {{ createCases.length }} 条
+                <template v-if="selectedCreateBaseline">· {{ selectedCreateBaseline.version }}</template>
+              </span>
+            </div>
+            <el-input
+              v-model="caseQuery"
+              clearable
+              :prefix-icon="Search"
+              placeholder="搜索用例编号、标题或模块"
+              class="case-search"
+            />
+          </div>
+          <div class="case-picker-actions">
+            <el-button size="small" :disabled="!filteredCreateCases.length" @click="selectVisibleCases">
+              选择当前筛选（{{ filteredCreateCases.length }}）
+            </el-button>
+            <el-button size="small" :disabled="!createCases.length" @click="selectAllCases">选择全部启用用例</el-button>
+            <el-button size="small" :disabled="!createForm.case_codes.length" @click="clearSelectedCases">清空选择</el-button>
+          </div>
+          <el-checkbox-group v-if="filteredCreateCases.length" v-model="createForm.case_codes" class="case-picker-list">
+            <el-checkbox
+              v-for="testCase in filteredCreateCases"
+              :key="testCase.case_code"
+              :value="testCase.case_code"
+              class="case-option-checkbox"
+            >
+              <span class="case-option-main">
+                <code>{{ testCase.case_code }}</code>
+                <strong>{{ testCase.title }}</strong>
+              </span>
+              <span class="case-option-module">{{ testCase.module_name || testCase.module_key }}</span>
+            </el-checkbox>
+          </el-checkbox-group>
+          <el-empty v-else :description="createCases.length ? '没有匹配的启用用例' : '所选基线没有可运行的启用用例'" :image-size="72" />
+        </section>
+      </div>
+      <template #footer>
+        <el-button @click="createVisible = false">取消</el-button>
+        <el-button
+          type="primary"
+          :loading="createLoading"
+          :disabled="!createForm.case_codes.length"
+          @click="submitCreateRun"
+        >开始运行（{{ createForm.case_codes.length }}）</el-button>
+      </template>
+    </el-dialog>
   </div>
 </template>
 
@@ -400,6 +728,7 @@ onMounted(initialize)
 
 .heading-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
@@ -494,5 +823,182 @@ onMounted(initialize)
 code {
   color: #4f6478;
   font-size: 11px;
+}
+
+.run-dialog-intro {
+  margin-bottom: 18px;
+}
+
+.create-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 16px;
+}
+
+.create-form-grid :deep(.el-select) {
+  width: 100%;
+}
+
+.execution-mode-item {
+  grid-column: 1 / -1;
+}
+
+.execution-mode-options {
+  width: 100%;
+}
+
+.execution-mode-options :deep(.el-radio-button) {
+  flex: 1;
+}
+
+.execution-mode-options :deep(.el-radio-button__inner) {
+  width: 100%;
+}
+
+.execution-mode-hint {
+  width: 100%;
+  margin: 7px 0 0;
+  color: #718096;
+  font-size: 12px;
+}
+
+.resource-hint {
+  width: 100%;
+  margin: 6px 0 0;
+  overflow: hidden;
+  color: #718096;
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-picker-panel {
+  overflow: hidden;
+  border: 1px solid #dfe7ec;
+  border-radius: 10px;
+  background: #f9fbfc;
+}
+
+.case-picker-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  padding: 16px 18px 12px;
+}
+
+.case-picker-heading > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.case-picker-heading strong {
+  color: #17324d;
+  font-size: 14px;
+}
+
+.case-picker-heading span {
+  color: #718096;
+  font-size: 12px;
+}
+
+.case-search {
+  width: 300px;
+}
+
+.case-picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 18px 12px;
+  border-bottom: 1px solid #e6ecef;
+}
+
+.case-picker-list {
+  display: grid;
+  max-height: 340px;
+  overflow-y: auto;
+  background: #fff;
+}
+
+.case-option-checkbox {
+  width: 100%;
+  height: auto;
+  min-height: 54px;
+  margin: 0;
+  padding: 10px 18px;
+  border-bottom: 1px solid #edf1f3;
+}
+
+.case-option-checkbox:last-child {
+  border-bottom: 0;
+}
+
+.case-option-checkbox:hover {
+  background: #f1f8f6;
+}
+
+.case-option-checkbox :deep(.el-checkbox__label) {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.case-option-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.case-option-main code {
+  flex: 0 0 112px;
+  color: #167d73;
+  font-weight: 700;
+}
+
+.case-option-main strong {
+  overflow: hidden;
+  color: #324a61;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.case-option-module {
+  flex: 0 0 auto;
+  color: #8795a5;
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .create-form-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .case-picker-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .case-search {
+    width: 100%;
+  }
+
+  .case-option-checkbox :deep(.el-checkbox__label),
+  .case-option-main {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .case-option-main code {
+    flex-basis: auto;
+  }
 }
 </style>

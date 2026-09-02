@@ -13,6 +13,7 @@ Username = Annotated[
     str,
     StringConstraints(strip_whitespace=True, to_lower=True, pattern=r"^[a-z0-9][a-z0-9._-]{2,63}$"),
 ]
+InitialPassword = Annotated[str, StringConstraints(min_length=6, max_length=256)]
 Password = Annotated[str, StringConstraints(min_length=12, max_length=256)]
 DisplayName = Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=128)]
 
@@ -47,7 +48,7 @@ class BootstrapAdminRequest(IdentityModel):
 class UserCreate(IdentityModel):
     username: Username
     display_name: DisplayName
-    password: Password
+    password: InitialPassword
     system_role: SystemRole = SystemRole.USER
 
 
@@ -64,7 +65,7 @@ class UserUpdate(IdentityModel):
 
 
 class UserPasswordReset(IdentityModel):
-    password: Password
+    password: InitialPassword
 
 
 class LoginRequest(IdentityModel):

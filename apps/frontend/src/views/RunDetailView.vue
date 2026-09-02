@@ -10,13 +10,22 @@ import {
   Refresh,
   RefreshRight,
   Timer,
+  VideoCamera,
   WarningFilled,
 } from '@element-plus/icons-vue'
 import { ElMessage } from 'element-plus'
 
 import { ApiError, api, streamRunEvents } from '@/api/client'
-import type { Artifact, ProjectMember, RunDetail, RunEvent, RunStatus } from '@/api/types'
+import type {
+  Artifact,
+  ProjectMember,
+  RunDetail,
+  RunEvent,
+  RunLiveViewStatus,
+  RunStatus,
+} from '@/api/types'
 import { auth } from '@/auth'
+import { createClientRequestId } from '@/idempotency'
 import { formatDate, formatUtcDate, runTagType, shortDigest } from '@/presentation'
 
 const TERMINAL_STATUSES = new Set<RunStatus>([
@@ -38,6 +47,27 @@ const DISPATCH_WAIT_LABELS: Record<string, string> = {
   BROKER_PUBLISH_FAILED: '消息队列投递失败，系统正在自动重试',
 }
 
+interface RunProgressSnapshot {
+  current_round: number
+  total_rounds: number
+  round_completed: number
+  round_total: number
+  completed: number
+  total: number
+  passed: number
+  failed: number
+  skipped: number
+  current_case_code: string | null
+}
+
+const FINISHED_CASE_STATUSES = new Set([
+  'PASSED',
+  'FAILED',
+  'SKIPPED',
+  'INFRA_ERROR',
+  'TIMED_OUT',
+])
+
 const route = useRoute()
 const router = useRouter()
 const projectId = computed(() => String(route.params.projectId))
@@ -50,8 +80,13 @@ const streamError = ref('')
 const downloadingArtifact = ref<string | null>(null)
 const actionBusy = ref(false)
 const members = ref<ProjectMember[]>([])
+const liveViewState = ref<RunLiveViewStatus>()
+const liveViewBusy = ref(false)
+const liveViewDialogVisible = ref(false)
+const liveViewUrl = ref('')
 let streamController: AbortController | null = null
 let retryTimer: number | null = null
+let liveViewPollTimer: number | null = null
 let destroyed = false
 
 const failedCases = computed(() =>
@@ -65,6 +100,18 @@ const lastEventSequence = computed(
 const terminal = computed(() =>
   run.value ? TERMINAL_STATUSES.has(run.value.status) : false,
 )
+const headedRun = computed(() => run.value?.snapshot.web_config?.headless === false)
+const liveViewReady = computed(
+  () => headedRun.value && !terminal.value && liveViewState.value?.status === 'READY',
+)
+const liveViewLabel = computed(() => {
+  const status = liveViewState.value?.status
+  if (status === 'READY') return '实时观看'
+  if (status === 'STARTING') return '画面准备中'
+  if (status === 'ENDED') return '观看已结束'
+  if (status === 'UNAVAILABLE') return '观看不可用'
+  return '实时观看'
+})
 const dispatchWaitMessage = computed(() => {
   const detail = run.value
   if (!detail || detail.dispatch_state !== 'WAITING' || !detail.dispatch_wait_reason) return ''
@@ -78,12 +125,83 @@ const canOperate = computed(
     auth.state.user?.system_role === 'SYSTEM_ADMIN' ||
     ['PROJECT_ADMIN', 'TESTER'].includes(currentMember.value?.role ?? ''),
 )
+const visibleEvents = computed(() =>
+  events.value.filter((event) => event.event_type !== 'progress_updated'),
+)
+const testProgress = computed<RunProgressSnapshot>(() => {
+  const detail = run.value
+  const fallbackTotal = detail?.case_count ?? 0
+  const fallbackStatuses = (detail?.cases ?? []).filter((item) =>
+    FINISHED_CASE_STATUSES.has(item.status),
+  )
+  const fallback: RunProgressSnapshot = {
+    current_round: 1,
+    total_rounds:
+      detail?.snapshot.automation_package.name === 'yanjia-web-pytest' ? 3 : 1,
+    round_completed: fallbackStatuses.length,
+    round_total: fallbackTotal,
+    completed: fallbackStatuses.length,
+    total: fallbackTotal,
+    passed: fallbackStatuses.filter((item) => item.status === 'PASSED').length,
+    failed: fallbackStatuses.filter((item) =>
+      ['FAILED', 'INFRA_ERROR', 'TIMED_OUT'].includes(item.status),
+    ).length,
+    skipped: fallbackStatuses.filter((item) => item.status === 'SKIPPED').length,
+    current_case_code: null,
+  }
+  const progressEvent = [...events.value]
+    .reverse()
+    .find((event) => event.event_type === 'progress_updated')
+  if (!progressEvent) return fallback
+  const payload = progressEvent.payload
+  const keys = [
+    'current_round',
+    'total_rounds',
+    'round_completed',
+    'round_total',
+    'completed',
+    'total',
+    'passed',
+    'failed',
+    'skipped',
+  ] as const
+  if (keys.some((key) => !Number.isInteger(payload[key]) || Number(payload[key]) < 0)) {
+    return fallback
+  }
+  const progress: RunProgressSnapshot = {
+    current_round: Number(payload.current_round),
+    total_rounds: Number(payload.total_rounds),
+    round_completed: Number(payload.round_completed),
+    round_total: Number(payload.round_total),
+    completed: Number(payload.completed),
+    total: Number(payload.total),
+    passed: Number(payload.passed),
+    failed: Number(payload.failed),
+    skipped: Number(payload.skipped),
+    current_case_code:
+      typeof payload.current_case_code === 'string' ? payload.current_case_code : null,
+  }
+  if (terminal.value) progress.round_completed = progress.round_total
+  return progress
+})
+const roundLabel = computed(() => {
+  if (testProgress.value.current_round === 1) return '首轮测试'
+  if (testProgress.value.current_round === 2) return '第二轮复跑'
+  return '第三轮复跑'
+})
+const roundProgressPercentage = computed(() => {
+  const progress = testProgress.value
+  if (terminal.value) return 100
+  if (progress.round_total === 0) return 0
+  return Math.min(100, Math.round((progress.round_completed / progress.round_total) * 100))
+})
+const progressBarStatus = computed<'success' | 'exception' | undefined>(() => {
+  if (!terminal.value) return undefined
+  return run.value?.status === 'PASSED' ? 'success' : 'exception'
+})
 const progressLabel = computed(() => {
   if (!run.value) return '读取中'
-  const finished = run.value.cases.filter((item) =>
-    ['PASSED', 'FAILED', 'SKIPPED', 'INFRA_ERROR', 'TIMED_OUT'].includes(item.status),
-  ).length
-  return `${finished} / ${run.value.case_count}`
+  return `${testProgress.value.completed} / ${testProgress.value.total}`
 })
 
 function statusTagType(
@@ -103,9 +221,12 @@ function eventLabel(event: RunEvent): string {
     run_started: 'Runner 开始执行',
     case_started: '用例开始',
     case_finished: '用例结束',
+    progress_updated: '测试进度更新',
     run_finished: 'Runner 执行结束',
     result_recorded: '不可变结果已入库',
     cancel_requested: '已请求取消',
+    live_view_ready: '只读实时画面已就绪',
+    live_view_ended: '只读实时画面已结束',
   }
   return labels[event.event_type] ?? event.event_type
 }
@@ -125,14 +246,72 @@ function formatBytes(bytes: number): string {
 function mergeEvent(event: RunEvent): void {
   if (events.value.some((item) => item.sequence === event.sequence)) return
   events.value = [...events.value, event].sort((left, right) => left.sequence - right.sequence)
-  if (['status_changed', 'run_finished', 'result_recorded'].includes(event.event_type)) {
+  if (
+    ['status_changed', 'run_finished', 'result_recorded', 'live_view_ready', 'live_view_ended'].includes(
+      event.event_type,
+    )
+  ) {
     void refreshDetail()
   }
+}
+
+function clearLiveViewPoll(): void {
+  if (liveViewPollTimer !== null) {
+    window.clearTimeout(liveViewPollTimer)
+    liveViewPollTimer = null
+  }
+}
+
+function scheduleLiveViewPoll(): void {
+  clearLiveViewPoll()
+  if (destroyed || terminal.value || !headedRun.value) return
+  liveViewPollTimer = window.setTimeout(() => {
+    liveViewPollTimer = null
+    void refreshLiveViewStatus()
+  }, 1500)
+}
+
+async function refreshLiveViewStatus(): Promise<void> {
+  clearLiveViewPoll()
+  if (!headedRun.value) {
+    liveViewState.value = { status: 'DISABLED', read_only: true }
+    return
+  }
+  try {
+    liveViewState.value = await api.runLiveViewStatus(runId.value)
+  } catch {
+    liveViewState.value = { status: 'UNAVAILABLE', read_only: true }
+  }
+  if (liveViewState.value.status === 'STARTING') scheduleLiveViewPoll()
+}
+
+async function openLiveView(): Promise<void> {
+  if (!liveViewReady.value) return
+  liveViewBusy.value = true
+  try {
+    const access = await api.createRunLiveViewTicket(runId.value)
+    const fragment = new URLSearchParams({
+      ticket: access.ticket,
+      password: access.password,
+    })
+    liveViewUrl.value = `${access.viewer_path}#${fragment.toString()}`
+    liveViewDialogVisible.value = true
+  } catch (error) {
+    ElMessage.error(error instanceof ApiError ? error.message : '实时观看授权失败')
+    await refreshLiveViewStatus()
+  } finally {
+    liveViewBusy.value = false
+  }
+}
+
+function closeLiveView(): void {
+  liveViewUrl.value = ''
 }
 
 async function refreshDetail(): Promise<void> {
   try {
     run.value = await api.run(runId.value)
+    await refreshLiveViewStatus()
   } catch (error) {
     if (!destroyed) {
       ElMessage.error(error instanceof ApiError ? error.message : 'Run 详情刷新失败')
@@ -199,6 +378,7 @@ async function load(): Promise<void> {
     run.value = detail
     events.value = timeline.sort((left, right) => left.sequence - right.sequence)
     members.value = memberList
+    await refreshLiveViewStatus()
     void startEventStream()
   } catch (error) {
     ElMessage.error(error instanceof ApiError ? error.message : 'Run 详情加载失败')
@@ -225,7 +405,7 @@ async function rerunCurrent(mode: 'FULL' | 'FAILED_ONLY'): Promise<void> {
   if (!run.value) return
   actionBusy.value = true
   try {
-    const created = await api.rerunRun(run.value.id, mode, crypto.randomUUID())
+    const created = await api.rerunRun(run.value.id, mode, createClientRequestId())
     ElMessage.success(mode === 'FULL' ? '完整重跑已创建' : '仅异常用例重跑已创建')
     await router.push({
       name: 'run-detail',
@@ -272,6 +452,8 @@ onBeforeUnmount(() => {
   destroyed = true
   streamController?.abort()
   if (retryTimer !== null) window.clearTimeout(retryTimer)
+  clearLiveViewPoll()
+  closeLiveView()
 })
 </script>
 
@@ -296,6 +478,15 @@ onBeforeUnmount(() => {
         <span v-if="!terminal" class="live-state" :class="{ offline: !streamConnected }">
           <i />{{ streamConnected ? '实时事件已连接' : '正在重连' }}
         </span>
+        <el-button
+          v-if="headedRun"
+          type="primary"
+          plain
+          :icon="VideoCamera"
+          :loading="liveViewBusy"
+          :disabled="!liveViewReady"
+          @click="openLiveView"
+        >{{ liveViewLabel }}</el-button>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
         <el-button
           v-if="canOperate && !terminal"
@@ -363,6 +554,62 @@ onBeforeUnmount(() => {
       class="stream-alert"
     />
 
+    <section
+      v-if="run"
+      class="surface run-progress-card"
+      :class="{ 'progress-failed': terminal && run.status !== 'PASSED' }"
+    >
+      <div class="progress-heading">
+        <div>
+          <span class="progress-eyebrow">实时测试进度</span>
+          <h2>{{ terminal ? '执行已结束' : roundLabel }}</h2>
+        </div>
+        <el-tag :type="terminal ? runTagType(run.status) : 'warning'" effect="light">
+          第 {{ testProgress.current_round }} / {{ testProgress.total_rounds }} 轮
+        </el-tag>
+      </div>
+      <div class="round-progress-label">
+        <span>{{ roundLabel }}</span>
+        <strong>{{ testProgress.round_completed }} / {{ testProgress.round_total }} 条</strong>
+      </div>
+      <el-progress
+        :percentage="roundProgressPercentage"
+        :status="progressBarStatus"
+        :stroke-width="14"
+        :show-text="false"
+      />
+      <div class="progress-stat-grid">
+        <div>
+          <span>当前轮次</span>
+          <strong>{{ roundLabel }}</strong>
+          <small>最多 {{ testProgress.total_rounds }} 轮</small>
+        </div>
+        <div>
+          <span>已测用例</span>
+          <strong>{{ testProgress.completed }} / {{ testProgress.total }}</strong>
+          <small>按唯一用例计数</small>
+        </div>
+        <div class="success-stat">
+          <span>当前成功</span>
+          <strong>{{ testProgress.passed }}</strong>
+          <small>复跑通过会转为成功</small>
+        </div>
+        <div class="failure-stat">
+          <span>当前失败</span>
+          <strong>{{ testProgress.failed }}</strong>
+          <small>含基础设施异常</small>
+        </div>
+      </div>
+      <div class="progress-footnote">
+        <span v-if="testProgress.current_case_code">
+          最近完成：<code>{{ testProgress.current_case_code }}</code>
+        </span>
+        <span v-else>{{ terminal ? '没有可显示的用例进度事件' : '等待首条用例结果…' }}</span>
+        <span v-if="testProgress.skipped">跳过 {{ testProgress.skipped }} 条</span>
+        <span v-if="!terminal && testProgress.current_round > 1">仅复跑上一轮仍失败的用例</span>
+      </div>
+    </section>
+
     <section v-if="run" class="metric-grid run-metrics">
       <article class="metric-card status-card">
         <span class="metric-icon teal"><Connection /></span>
@@ -372,7 +619,7 @@ onBeforeUnmount(() => {
       <article class="metric-card">
         <span class="metric-icon blue"><Files /></span>
         <div><strong>{{ progressLabel }}</strong><span>完成用例</span></div>
-        <small>{{ failedCases.length }} 条异常</small>
+        <small>{{ testProgress.failed }} 条异常</small>
       </article>
       <article class="metric-card">
         <span class="metric-icon amber"><Timer /></span>
@@ -501,6 +748,20 @@ onBeforeUnmount(() => {
               <dd class="mono">{{ run.snapshot.automation_package.supply_chain.source_revision.slice(0, 12) }}</dd>
             </div>
             <div><dt>浏览器</dt><dd>{{ run.snapshot.browser || '—' }}</dd></div>
+            <div>
+              <dt>运行方式</dt>
+              <dd>{{ run.snapshot.web_config?.headless === false ? '有头模式' : '无头模式' }}</dd>
+            </div>
+            <div v-if="headedRun">
+              <dt>实时观看</dt>
+              <dd>
+                <el-tag
+                  :type="liveViewState?.status === 'READY' ? 'success' : liveViewState?.status === 'UNAVAILABLE' ? 'danger' : 'info'"
+                  size="small"
+                  effect="plain"
+                >{{ liveViewLabel }} · 只读</el-tag>
+              </dd>
+            </div>
             <div><dt>快照摘要</dt><dd class="mono">{{ shortDigest(run.snapshot_digest) }}</dd></div>
             <div><dt>配置摘要</dt><dd class="mono">{{ shortDigest(run.snapshot.config_hash) }}</dd></div>
             <div><dt>创建时间</dt><dd>{{ formatDate(run.created_at) }}</dd></div>
@@ -561,12 +822,12 @@ onBeforeUnmount(() => {
 
         <section class="surface timeline-card">
           <div class="timeline-heading">
-            <div><h2>事件时间线</h2><span>{{ events.length }} 条</span></div>
+            <div><h2>事件时间线</h2><span>{{ visibleEvents.length }} 条</span></div>
             <span v-if="streamConnected" class="pulse" />
           </div>
-          <el-timeline v-if="events.length">
+          <el-timeline v-if="visibleEvents.length">
             <el-timeline-item
-              v-for="event in events"
+              v-for="event in visibleEvents"
               :key="event.id"
               :timestamp="formatDate(event.occurred_at)"
               :type="event.status ? statusTagType(event.status) : 'primary'"
@@ -584,6 +845,34 @@ onBeforeUnmount(() => {
         </section>
       </aside>
     </div>
+
+    <el-dialog
+      v-model="liveViewDialogVisible"
+      title="实时观看 · 只读模式"
+      width="96vw"
+      top="3vh"
+      append-to-body
+      destroy-on-close
+      class="live-view-dialog"
+      @closed="closeLiveView"
+    >
+      <el-alert
+        title="画面来自当前 Run 的隔离浏览器；只允许观看，不能点击或输入。执行结束后连接会自动失效。"
+        type="info"
+        :closable="false"
+        show-icon
+        class="live-view-alert"
+      />
+      <iframe
+        v-if="liveViewUrl"
+        :src="liveViewUrl"
+        class="live-view-frame"
+        title="Run 自动化执行实时画面"
+        sandbox="allow-scripts allow-same-origin"
+        referrerpolicy="no-referrer"
+        allow="fullscreen"
+      />
+    </el-dialog>
   </div>
 </template>
 
@@ -651,6 +940,107 @@ onBeforeUnmount(() => {
 .stream-alert,
 .diagnostic-alert {
   margin-bottom: 18px;
+}
+
+.run-progress-card {
+  margin-bottom: 18px;
+  padding: 22px 24px;
+  border: 1px solid #dce8e6;
+  background: linear-gradient(135deg, #fff 0%, #f4fbf9 100%);
+}
+
+.progress-heading,
+.round-progress-label,
+.progress-footnote {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progress-heading {
+  margin-bottom: 18px;
+}
+
+.progress-heading h2 {
+  margin: 3px 0 0;
+  color: #17324d;
+  font-size: 20px;
+}
+
+.progress-eyebrow {
+  color: #168579;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.12em;
+}
+
+.round-progress-label {
+  margin-bottom: 8px;
+  color: #617589;
+  font-size: 12px;
+}
+
+.round-progress-label strong {
+  color: #29465f;
+  font-size: 13px;
+}
+
+.run-progress-card :deep(.el-progress-bar__outer) {
+  background: #e4eeec;
+}
+
+.run-progress-card :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #138b7e, #37b99a);
+}
+
+.run-progress-card.progress-failed :deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #d04a52, #ef777d);
+}
+
+.progress-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.progress-stat-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px 16px;
+  border: 1px solid #e2eae9;
+  border-radius: 9px;
+  background: rgb(255 255 255 / 82%);
+}
+
+.progress-stat-grid span,
+.progress-stat-grid small,
+.progress-footnote {
+  color: #7b8d9d;
+  font-size: 11px;
+}
+
+.progress-stat-grid strong {
+  color: #24445d;
+  font-size: 20px;
+}
+
+.progress-stat-grid .success-stat strong {
+  color: #168250;
+}
+
+.progress-stat-grid .failure-stat strong {
+  color: #b63d46;
+}
+
+.progress-footnote {
+  gap: 18px;
+  justify-content: flex-start;
+  margin-top: 14px;
+}
+
+.progress-footnote span:last-child {
+  margin-left: auto;
 }
 
 .run-metrics {
@@ -849,5 +1239,42 @@ onBeforeUnmount(() => {
 code {
   color: #4f6478;
   font-size: 11px;
+}
+
+.live-view-alert {
+  margin-bottom: 12px;
+}
+
+.live-view-frame {
+  display: block;
+  width: 100%;
+  height: 78vh;
+  border: 1px solid #dfe7ec;
+  border-radius: 10px;
+  background: #091c2c;
+}
+
+:deep(.live-view-dialog) {
+  max-width: 1500px;
+}
+
+:deep(.live-view-dialog .el-dialog__body) {
+  padding-top: 8px;
+}
+
+@media (max-width: 900px) {
+  .progress-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .progress-footnote {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .progress-footnote span:last-child {
+    margin-left: 0;
+  }
 }
 </style>

@@ -8,6 +8,13 @@ from .capabilities import (
     get_operation_spec,
 )
 from .json_tools import canonical_json_bytes, canonical_sha256
+from .live_view import (
+    LIVE_VIEW_RFB_PORT,
+    LiveViewRegistration,
+    LiveViewTicketRecord,
+    live_view_session_key,
+    live_view_ticket_key,
+)
 from .models import (
     Artifact,
     ArtifactKind,
@@ -50,6 +57,7 @@ __all__ = [
     "ASYMMETRIC_ENVELOPE_PROFILE",
     "JWS_TYPE",
     "LEGACY_ENVELOPE_PROFILE",
+    "LIVE_VIEW_RFB_PORT",
     "OPERATIONS",
     "Artifact",
     "ArtifactKind",
@@ -66,6 +74,8 @@ __all__ = [
     "CaseResultStatus",
     "CaseSourceTrace",
     "DerivedCaseBaselineSource",
+    "LiveViewRegistration",
+    "LiveViewTicketRecord",
     "RunExecutionIsolationEvidence",
     "RunResult",
     "RunSnapshot",
@@ -81,6 +91,8 @@ __all__ = [
     "canonical_sha256",
     "get_assertion_spec",
     "get_operation_spec",
+    "live_view_session_key",
+    "live_view_ticket_key",
     "supply_chain_asymmetric_envelope_payload",
     "supply_chain_detached_jws_signing_input",
     "supply_chain_envelope_signature_base",

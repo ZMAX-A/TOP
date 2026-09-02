@@ -17,7 +17,7 @@ from testops.api.persistence import AuthSessionRecord, SystemSettingRecord, User
 ROOT = Path(__file__).resolve().parents[2]
 BOOTSTRAP_TOKEN = "governance-bootstrap-token"
 ADMIN_PASSWORD = "governance-admin-password"
-USER_PASSWORD = "governance-user-password"
+USER_PASSWORD = "user06"
 RUNNER_HEADERS = {"X-Runner-Token": "governance-runner-token"}
 PACKAGE_DIGEST = "sha256:" + "e" * 64
 
@@ -348,11 +348,37 @@ class IdentityAndGovernanceTests(unittest.TestCase):
         self.assertEqual(expired.status_code, 401, expired.text)
 
     def test_system_user_session_and_audit_management(self) -> None:
+        too_short = self.client.post(
+            "/api/v1/users",
+            headers=self.admin_headers,
+            json={
+                "username": "short-password-user",
+                "display_name": "Short Password User",
+                "password": "12345",
+            },
+        )
+        self.assertEqual(too_short.status_code, 422, too_short.text)
+
         managed_user = self._create_user("managed-user", "Managed User")
         managed_headers, _ = self._login("managed-user", USER_PASSWORD)
 
         denied = self.client.get("/api/v1/admin/users", headers=managed_headers)
         self.assertEqual(denied.status_code, 403, denied.text)
+        denied_key_readiness = self.client.get(
+            "/api/v1/admin/supply-chain/verifier-keys",
+            headers=managed_headers,
+        )
+        self.assertEqual(denied_key_readiness.status_code, 403, denied_key_readiness.text)
+        key_readiness = self.client.get(
+            "/api/v1/admin/supply-chain/verifier-keys",
+            headers=self.admin_headers,
+        )
+        self.assertEqual(key_readiness.status_code, 200, key_readiness.text)
+        self.assertEqual(key_readiness.json()["status"], "BLOCKED")
+        self.assertRegex(
+            key_readiness.json()["configuration_digest"],
+            r"^sha256:[0-9a-f]{64}$",
+        )
         users = self.client.get(
             "/api/v1/admin/users?query=managed&status=ACTIVE&limit=10",
             headers=self.admin_headers,
@@ -413,7 +439,24 @@ class IdentityAndGovernanceTests(unittest.TestCase):
         )
         self.assertEqual(enabled.status_code, 200, enabled.text)
         before_reset_headers, _ = self._login("managed-user", USER_PASSWORD)
-        replacement_password = "replacement-user-password"
+        too_short_reset = self.client.post(
+            f"/api/v1/admin/users/{managed_user['id']}/password-reset",
+            headers=self.admin_headers,
+            json={"password": "12345"},
+        )
+        self.assertEqual(too_short_reset.status_code, 422, too_short_reset.text)
+        self.assertEqual(
+            self.client.get("/api/v1/auth/me", headers=before_reset_headers).status_code,
+            200,
+        )
+        short_admin_reset = self.client.post(
+            f"/api/v1/admin/users/{self.admin['id']}/password-reset",
+            headers=self.admin_headers,
+            json={"password": "123456"},
+        )
+        self.assertEqual(short_admin_reset.status_code, 422, short_admin_reset.text)
+
+        replacement_password = "reset6"
         reset = self.client.post(
             f"/api/v1/admin/users/{managed_user['id']}/password-reset",
             headers=self.admin_headers,
