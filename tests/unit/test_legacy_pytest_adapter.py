@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from testops.contracts import ArtifactKind, RunSnapshot, RunStatus, SecretBinding
+from testops.contracts import ArtifactKind, RunSnapshot, RunStatus, RuntimeVariable, SecretBinding
 from testops.runners.legacy_pytest import LEGACY_PACKAGE_NAME, LegacyPytestAdapter
 from testops.runners.legacy_pytest.adapter import (
     CommandResult,
@@ -110,7 +110,7 @@ def legacy_job() -> RunSnapshot:
 
 
 def create_project(root: Path) -> None:
-    for directory in ("pages", "tests", "utils", "test_cases"):
+    for directory in ("pages", "tests", "utils", "test_assets", "test_cases"):
         (root / directory).mkdir()
     for relative in (
         "tests/conftest.py",
@@ -368,6 +368,34 @@ def test_legacy_adapter_accepts_headed_mode_and_passes_pytest_flag() -> None:
 
     assert "--headed" in command
     assert command[command.index("-k") + 1] == "TC-LOGIN-001"
+
+
+def test_legacy_adapter_accepts_governed_visual_model_configuration() -> None:
+    base_job = legacy_job()
+    job = base_job.model_copy(
+        update={
+            "variables": (
+                RuntimeVariable(name="VISION_BASE_URL", value="https://vision.example/api"),
+                RuntimeVariable(name="VISION_MODEL", value="qwen-vl"),
+                RuntimeVariable(name="VISION_BASELINE_DIR", value="test_assets/vision_baselines"),
+            ),
+            "secret_bindings": (
+                *base_job.secret_bindings,
+                SecretBinding(name="VISION_API_KEY", ref="secret://yanjia/staging/vision_api_key"),
+            ),
+        }
+    )
+    with tempfile.TemporaryDirectory() as temporary:
+        project_root = Path(temporary) / "project"
+        project_root.mkdir()
+        create_project(project_root)
+        adapter = LegacyPytestAdapter(
+            workspace_root=Path(temporary) / "runs",
+            project_root=project_root,
+            secret_provider=MappingSecretProvider({}),
+        )
+
+        adapter.validate(job)
 
 
 def test_adapter_factory_dispatches_by_immutable_package_name() -> None:

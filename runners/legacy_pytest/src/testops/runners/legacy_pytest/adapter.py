@@ -57,6 +57,7 @@ RERUN_ERROR_PATTERN = re.compile(
 )
 REQUIRED_PROJECT_PATHS = (
     "pages",
+    "test_assets",
     "tests/conftest.py",
     "tests/test_core_cases.py",
     "utils",
@@ -65,11 +66,32 @@ REQUIRED_PROJECT_PATHS = (
     "run_parallel_tests.py",
 )
 ALLOWED_RUNTIME_VARIABLES = frozenset(
-    {"ENV", "STORE_NAME", "STORE_NAME_A", "STORE_NAME_B", "TESTER", "TEST_SERIAL_ACCOUNT_SLOT"}
+    {
+        "ENV",
+        "STORE_NAME",
+        "STORE_NAME_A",
+        "STORE_NAME_B",
+        "TESTER",
+        "TEST_SERIAL_ACCOUNT_SLOT",
+        "VISION_BASE_URL",
+        "VISION_MODEL",
+        "VISION_TIMEOUT",
+        "VISION_THINKING_BUDGET",
+        "VISION_ENABLE_THINKING",
+        "VISION_SYSTEM_PROMPT",
+        "VISION_CACHE_ENABLED",
+        "VISION_CACHE_MAX_ITEMS",
+        "VISION_ATTACH_SCREENSHOT",
+        "VISION_MIN_SCREENSHOT_BYTES",
+        "VISION_BASELINE_DIR",
+        "VISION_REQUIRE_BASELINE_METADATA",
+        "VISION_RERUN_FAILURES",
+    }
 )
 REQUIRED_SECRET_BINDINGS = frozenset(
     {"TEST_USERNAME_A", "TEST_PASSWORD_A", "TEST_USERNAME_B", "TEST_PASSWORD_B"}
 )
+OPTIONAL_SECRET_BINDINGS = frozenset({"VISION_API_KEY"})
 SAFE_PARENT_ENVIRONMENT = frozenset(
     {
         "COMSPEC",
@@ -369,7 +391,9 @@ class LegacyPytestAdapter(AutomationAdapter):
             raise LegacyPytestValidationError(
                 f"legacy Pytest package requires secret bindings: {', '.join(missing)}"
             )
-        unsupported_bindings = sorted(binding_names - REQUIRED_SECRET_BINDINGS)
+        unsupported_bindings = sorted(
+            binding_names - REQUIRED_SECRET_BINDINGS - OPTIONAL_SECRET_BINDINGS
+        )
         if unsupported_bindings:
             raise LegacyPytestValidationError(
                 "legacy Pytest package received unsupported secret bindings: "

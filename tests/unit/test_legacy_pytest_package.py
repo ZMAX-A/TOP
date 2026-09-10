@@ -9,13 +9,15 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 def create_source(root: Path) -> None:
-    for directory in ("pages", "tests", "utils", "test_cases"):
+    for directory in ("pages", "tests", "utils", "test_assets", "test_cases"):
         (root / directory).mkdir()
+    (root / "test_assets/vision_baselines").mkdir()
     for relative, payload in (
         ("pages/login.py", b"login"),
         ("tests/conftest.py", b"fixtures"),
         ("tests/test_core_cases.py", b"cases"),
         ("utils/excel_handler.py", b"excel"),
+        ("test_assets/vision_baselines/reference.png", b"visual-reference"),
         ("test_cases/test_case.xlsx", b"workbook"),
         ("pytest.ini", b"[pytest]"),
         ("requirements.txt", b"pytest==9.1.1"),
@@ -42,6 +44,7 @@ def test_package_export_is_allowlisted_and_digest_stable() -> None:
         assert package_source_digest(export) == original_digest
         assert not (export / ".env").exists()
         assert not (export / "reports").exists()
+        assert (export / "test_assets/vision_baselines/reference.png").read_bytes() == b"visual-reference"
 
 
 def test_central_pytest_compose_uses_a_dedicated_immutable_package_image() -> None:
@@ -62,5 +65,6 @@ def test_central_pytest_compose_uses_a_dedicated_immutable_package_image() -> No
     assert "COPY --from=yanjia_web" in dockerfile
     assert "COPY --from=yanjia_web ." not in dockerfile
     assert "test_cases/test_case.xlsx" in dockerfile
+    assert "test_assets /opt/yanjia-web/test_assets" in dockerfile
     assert "run_parallel_tests.py" in dockerfile
     assert "chmod -R a-w /opt/yanjia-web" in dockerfile

@@ -35,6 +35,7 @@ COPY --chown=pwuser:pwuser services/worker services/worker
 COPY --from=yanjia_web --chown=pwuser:pwuser pages /opt/yanjia-web/pages
 COPY --from=yanjia_web --chown=pwuser:pwuser tests /opt/yanjia-web/tests
 COPY --from=yanjia_web --chown=pwuser:pwuser utils /opt/yanjia-web/utils
+COPY --from=yanjia_web --chown=pwuser:pwuser test_assets /opt/yanjia-web/test_assets
 COPY --from=yanjia_web --chown=pwuser:pwuser test_cases/test_case.xlsx /opt/yanjia-web/test_cases/test_case.xlsx
 COPY --from=yanjia_web --chown=pwuser:pwuser pytest.ini /opt/yanjia-web/pytest.ini
 COPY --from=yanjia_web --chown=pwuser:pwuser run_parallel_tests.py /opt/yanjia-web/run_parallel_tests.py
