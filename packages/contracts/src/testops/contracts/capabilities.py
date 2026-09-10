@@ -75,6 +75,16 @@ OPERATIONS: tuple[CapabilitySpec, ...] = (
     ),
     CapabilitySpec("switch_tab", "operation", "切换或打开标签页"),
     CapabilitySpec("retry_report", "operation", "重试报告生成", requires_locator=True),
+    CapabilitySpec("set_viewport", "operation", "固定浏览器视口尺寸", requires_locator=True),
+    CapabilitySpec("wait_hidden", "operation", "等待元素或遮罩消失", requires_locator=True),
+    CapabilitySpec(
+        "vision_compare_step",
+        "operation",
+        "按步骤视觉标准图比较当前界面",
+        requires_locator=True,
+        consumes_input=True,
+        requires_input=True,
+    ),
 )
 
 
@@ -105,6 +115,17 @@ ASSERTIONS: tuple[CapabilitySpec, ...] = (
     CapabilitySpec("age_in_range", "assertion", "年龄处于范围内"),
     CapabilitySpec("date_format", "assertion", "日期格式正确", requires_locator=True),
     CapabilitySpec("text_optional", "assertion", "文本可为空或有值", requires_locator=True),
+    CapabilitySpec("vision_contains", "assertion", "视觉区域包含目标内容", requires_locator=True),
+    CapabilitySpec("vision_count", "assertion", "视觉区域中的目标数量符合预期", requires_locator=True),
+    CapabilitySpec("vision_page_state", "assertion", "页面视觉状态符合预期", requires_locator=True),
+    CapabilitySpec("vision_canvas_ready", "assertion", "画布视觉内容已就绪", requires_locator=True),
+    CapabilitySpec(
+        "vision_compare_reference",
+        "assertion",
+        "当前界面与人工审核视觉标准图一致",
+        requires_locator=True,
+    ),
+    CapabilitySpec("vision_step_sequence", "assertion", "步骤视觉比较次数完整"),
 )
 
 

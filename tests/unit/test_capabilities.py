@@ -27,9 +27,36 @@ class CapabilityRegistryTests(unittest.TestCase):
                 "daterange",
                 "switch_tab",
                 "retry_report",
+                "set_viewport",
+                "wait_hidden",
+                "vision_compare_step",
             },
         )
-        self.assertTrue({"value_equals", "text_hidden", "element_disabled"}.issubset(assertions))
+        self.assertTrue(
+            {
+                "value_equals",
+                "text_hidden",
+                "element_disabled",
+                "vision_contains",
+                "vision_count",
+                "vision_page_state",
+                "vision_canvas_ready",
+                "vision_compare_reference",
+                "vision_step_sequence",
+            }.issubset(assertions)
+        )
+
+    def test_visual_capabilities_keep_excel_argument_contracts(self) -> None:
+        viewport = get_operation_spec("set_viewport")
+        hidden = get_operation_spec("wait_hidden")
+        compare_step = get_operation_spec("vision_compare_step")
+
+        self.assertTrue(viewport.requires_locator)
+        self.assertTrue(hidden.requires_locator)
+        self.assertTrue(compare_step.requires_locator)
+        self.assertTrue(compare_step.consumes_input)
+        self.assertTrue(compare_step.requires_input)
+        self.assertFalse(get_assertion_spec("vision_step_sequence").requires_locator)
 
     def test_aliases_resolve_to_canonical_key(self) -> None:
         self.assertEqual(get_operation_spec("date_range").key, "daterange")
