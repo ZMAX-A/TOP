@@ -34,6 +34,10 @@ class LegacyExcelMigrationTests(unittest.TestCase):
 
     def test_checked_in_baseline_matches_manifest_and_expected_counts(self) -> None:
         self.assertEqual(self.manifest["baseline"]["digest"], _sha256(self.baseline_bytes))
+        self.assertEqual(
+            self.manifest["audit"]["digest"],
+            _sha256((BASELINE_DIR / "migration-audit.json").read_bytes()),
+        )
         self.assertEqual(self.manifest["baseline"]["case_count"], 92)
         self.assertEqual(self.manifest["baseline"]["enabled_case_count"], 89)
         self.assertEqual(self.audit["counts"]["disabled_cases"], 3)
@@ -64,6 +68,10 @@ class LegacyExcelMigrationTests(unittest.TestCase):
         hardened = CaseBaseline.model_validate_json(hardened_bytes)
         hardened_manifest = json.loads((HARDENED_BASELINE_DIR / "manifest.json").read_text("utf-8"))
         self.assertEqual(hardened_manifest["baseline"]["digest"], _sha256(hardened_bytes))
+        self.assertEqual(
+            hardened_manifest["audit"]["digest"],
+            _sha256((HARDENED_BASELINE_DIR / "migration-audit.json").read_bytes()),
+        )
         self.assertEqual(hardened.source.kind, "derived_baseline")
         self.assertEqual(hardened.source.parent_baseline_id, self.baseline.baseline_id)
 
