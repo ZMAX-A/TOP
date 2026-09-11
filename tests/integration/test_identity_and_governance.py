@@ -609,7 +609,11 @@ class IdentityAndGovernanceTests(unittest.TestCase):
         changed_case = next(
             case for case in base.json()["cases"] if case["case_code"] == "TC-LOGIN-007"
         )
-        changed_case = {**changed_case, "title": "登录成功后离开登录页（治理验证）"}
+        changed_case = {
+            **changed_case,
+            "title": "登录成功后离开登录页（治理验证）",
+            "assertion": {**changed_case["assertion"], "expected": "/dashboard"},
+        }
         draft = self.client.post(
             f"/api/v1/projects/{resources['project_id']}/change-requests",
             headers=tester_headers,
@@ -632,7 +636,10 @@ class IdentityAndGovernanceTests(unittest.TestCase):
         request_id = draft_document["id"]
         self.assertEqual(draft_document["status"], "DRAFT")
         self.assertEqual(draft_document["validation_status"], "PENDING_EXECUTION")
-        self.assertEqual(draft_document["changes"][0]["changed_fields"], ["title"])
+        self.assertEqual(
+            draft_document["changes"][0]["changed_fields"],
+            ["assertion", "title"],
+        )
 
         premature = self.client.post(
             f"/api/v1/projects/{resources['project_id']}/change-requests/{request_id}/submit",

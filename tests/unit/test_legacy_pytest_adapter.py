@@ -7,6 +7,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+from openpyxl import Workbook
 
 from testops.contracts import ArtifactKind, RunSnapshot, RunStatus, RuntimeVariable, SecretBinding
 from testops.runners.legacy_pytest import LEGACY_PACKAGE_NAME, LegacyPytestAdapter
@@ -115,11 +116,61 @@ def create_project(root: Path) -> None:
     for relative in (
         "tests/conftest.py",
         "tests/test_core_cases.py",
-        "test_cases/test_case.xlsx",
         "pytest.ini",
         "run_parallel_tests.py",
     ):
         (root / relative).write_bytes(b"placeholder")
+    workbook = Workbook()
+    worksheet = workbook.active
+    worksheet.title = "自动化测试用例"
+    worksheet.append(
+        [
+            "用例ID",
+            "模块",
+            "测试场景",
+            "测试点",
+            "优先级",
+            "前置条件",
+            "操作步骤",
+            "元素定位器",
+            "操作类型",
+            "输入数据",
+            "数据类型",
+            "期望结果",
+            "验证点",
+            "断言类型",
+            "超时(秒)",
+            "备注",
+            "实际结果",
+            "是否执行",
+            "执行分组",
+        ]
+    )
+    worksheet.append(
+        [
+            "TC-LOGIN-001",
+            "旧模块",
+            "旧场景",
+            "旧测试点",
+            "P3",
+            "",
+            "",
+            "#stale",
+            "click",
+            "",
+            "",
+            "旧预期",
+            "旧验证点",
+            "text_visible",
+            5,
+            "",
+            "",
+            "是",
+            "B",
+        ]
+    )
+    workbook.save(root / "test_cases/test_case.xlsx")
+    workbook.close()
 
 
 def test_legacy_adapter_runs_exact_cases_with_minimized_environment() -> None:
@@ -131,6 +182,7 @@ def test_legacy_adapter_runs_exact_cases_with_minimized_environment() -> None:
         workspace_root = root / "runs"
         project_root.mkdir()
         create_project(project_root)
+        source_workbook_before = (project_root / "test_cases/test_case.xlsx").read_bytes()
         adapter = LegacyPytestAdapter(
             workspace_root=workspace_root,
             project_root=project_root,
@@ -157,7 +209,7 @@ def test_legacy_adapter_runs_exact_cases_with_minimized_environment() -> None:
         log = (workspace_root / str(job.run_id) / "parallel-runner.log").read_text("utf-8")
         runtime_home = workspace_root / str(job.run_id) / "home"
         runtime_temp = Path(command_runner.environment["TMPDIR"])
-        source_workbook = (project_root / "test_cases/test_case.xlsx").read_bytes()
+        source_workbook_after = (project_root / "test_cases/test_case.xlsx").read_bytes()
 
     assert result.status == RunStatus.PASSED
     assert result.case_results[0].case_code == "TC-LOGIN-001"
@@ -190,7 +242,7 @@ def test_legacy_adapter_runs_exact_cases_with_minimized_environment() -> None:
     assert not runtime_home.exists()
     assert not runtime_temp.exists()
     assert "browser.cache" not in {artifact.name for artifact in result.artifacts}
-    assert source_workbook == b"placeholder"
+    assert source_workbook_after == source_workbook_before
     assert ArtifactKind.ALLURE in {artifact.kind for artifact in result.artifacts}
     assert "auth_state.json" not in {artifact.name for artifact in result.artifacts}
     assert [event["event"] for event in events] == [

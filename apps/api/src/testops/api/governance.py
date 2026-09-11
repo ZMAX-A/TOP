@@ -17,6 +17,7 @@ from testops.contracts import (
     canonical_sha256,
 )
 
+from .case_change_policy import changed_fields, requires_execution_validation
 from .governance_schemas import (
     CandidateRunCreate,
     ChangeOperation,
@@ -54,15 +55,6 @@ def _operation_case_id(operation: ChangeOperation) -> UUID:
         return operation.case.case_id
     assert operation.case_id is not None
     return operation.case_id
-
-
-def _changed_fields(
-    before: dict[str, object] | None,
-    after: dict[str, object] | None,
-) -> list[str]:
-    if before is None or after is None:
-        return ["$case"]
-    return sorted(key for key in before.keys() | after.keys() if before.get(key) != after.get(key))
 
 
 def _compose_candidate(
@@ -117,7 +109,7 @@ def _compose_candidate(
                 "case_code": (after_case or before_case).case_code,
                 "before_document": before,
                 "after_document": after,
-                "changed_fields": _changed_fields(before, after),
+                "changed_fields": changed_fields(before, after),
             }
         )
 
@@ -212,9 +204,11 @@ async def create_change_request(
         operations=payload.changes,
     )
     validation_required = any(
-        document["change_type"] in {ChangeType.ADD.value, ChangeType.MODIFY.value}
-        and document["after_document"] is not None
-        and bool(document["after_document"].get("enabled", True))
+        requires_execution_validation(
+            change_type=str(document["change_type"]),
+            after_document=document["after_document"],
+            fields=document["changed_fields"],
+        )
         for document in documents
     )
     record = ChangeRequestRecord(
@@ -396,9 +390,11 @@ async def update_change_request(
     record.validation_status = (
         "PENDING_EXECUTION"
         if any(
-            document["change_type"] in {ChangeType.ADD.value, ChangeType.MODIFY.value}
-            and document["after_document"] is not None
-            and bool(document["after_document"].get("enabled", True))
+            requires_execution_validation(
+                change_type=str(document["change_type"]),
+                after_document=document["after_document"],
+                fields=document["changed_fields"],
+            )
             for document in documents
         )
         else "NOT_REQUIRED"
@@ -559,9 +555,11 @@ async def create_validation_run(
     case_codes = tuple(
         item.case_code
         for item in items
-        if item.change_type in {ChangeType.ADD.value, ChangeType.MODIFY.value}
-        and item.after_document is not None
-        and bool(item.after_document.get("enabled", True))
+        if requires_execution_validation(
+            change_type=item.change_type,
+            after_document=item.after_document,
+            fields=item.changed_fields,
+        )
     )
     if not case_codes:
         record.validation_status = "NOT_REQUIRED"

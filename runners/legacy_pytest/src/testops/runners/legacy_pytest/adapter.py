@@ -33,6 +33,8 @@ from testops.runners.web.adapter import AutomationAdapter, ProgressReporter
 from testops.runners.web.variables import SecretProvider
 from testops.runners.web.workspace import RunWorkspace
 
+from .runtime_workbook import materialize_runtime_workbook
+
 LEGACY_PACKAGE_NAME = "yanjia-web-pytest"
 LEGACY_RUNNER_VERSION = "1.0.0"
 MAX_RESULT_BYTES = 5 * 1024 * 1024
@@ -424,7 +426,13 @@ class LegacyPytestAdapter(AutomationAdapter):
             if job.run_id in self._workspaces:
                 raise RuntimeError(f"run is already prepared: {job.run_id}")
             workspace = RunWorkspace(self._workspace_root, job.run_id)
-            self._copy_runtime_project(workspace)
+            runtime_project = self._copy_runtime_project(workspace)
+            materialize_runtime_workbook(
+                runtime_project / "test_cases" / "test_case.xlsx",
+                job.cases,
+                job.case_baseline,
+                evidence_path=workspace.path / "runtime-workbook.json",
+            )
             self._workspaces[job.run_id] = workspace
 
     def execute(self, job: RunSnapshot, reporter: ProgressReporter) -> RunResult:

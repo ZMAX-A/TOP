@@ -142,6 +142,7 @@ class CaseDefinition(FrozenModel):
     timeout_seconds: Annotated[float, Field(gt=0, le=600)] | None = None
     source_trace: CaseSourceTrace | None = None
     notes: str | None = None
+    execution_group: Literal["A", "B", "SERIAL", "AUTO"] | None = None
 
 
 class CaseBaselineSource(FrozenModel):

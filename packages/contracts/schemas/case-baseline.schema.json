@@ -255,6 +255,24 @@
           ],
           "default": null,
           "title": "Notes"
+        },
+        "execution_group": {
+          "anyOf": [
+            {
+              "enum": [
+                "A",
+                "B",
+                "SERIAL",
+                "AUTO"
+              ],
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Group"
         }
       },
       "required": [

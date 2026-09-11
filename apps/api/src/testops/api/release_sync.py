@@ -11,6 +11,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from testops.contracts import CaseBaseline, CaseDefinition, TargetType, canonical_sha256
 
+from .case_change_policy import (
+    changed_fields,
+    comparable_case_document,
+    requires_execution_validation,
+)
 from .github_release import FetchedGitRelease
 from .persistence import (
     AutomationPackageRecord,
@@ -36,16 +41,7 @@ class _CaseDiff:
 
 
 def _case_document(case: CaseDefinition) -> dict[str, object]:
-    return case.model_dump(mode="json", exclude_none=True)
-
-
-def _changed_fields(
-    before: dict[str, object] | None,
-    after: dict[str, object] | None,
-) -> list[str]:
-    if before is None or after is None:
-        return ["$case"]
-    return sorted(key for key in before.keys() | after.keys() if before.get(key) != after.get(key))
+    return comparable_case_document(case)
 
 
 def _diff_cases(base: CaseBaseline, candidate: CaseBaseline) -> _CaseDiff:
@@ -79,7 +75,7 @@ def _diff_cases(base: CaseBaseline, candidate: CaseBaseline) -> _CaseDiff:
                 "case_code": case.case_code,
                 "before_document": before,
                 "after_document": after,
-                "changed_fields": _changed_fields(before, after),
+                "changed_fields": changed_fields(before, after),
             }
         )
 
@@ -285,9 +281,11 @@ async def apply_git_release(
                 validation_status=(
                     "PENDING_EXECUTION"
                     if any(
-                        item["change_type"] in {"ADD", "MODIFY"}
-                        and item["after_document"] is not None
-                        and bool(item["after_document"].get("enabled", True))
+                        requires_execution_validation(
+                            change_type=str(item["change_type"]),
+                            after_document=item["after_document"],
+                            fields=item["changed_fields"],
+                        )
                         for item in diff.documents
                     )
                     else "NOT_REQUIRED"

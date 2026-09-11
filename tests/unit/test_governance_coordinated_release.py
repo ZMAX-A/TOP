@@ -62,6 +62,7 @@ class CoordinatedReleaseRunTests(unittest.IsolatedAsyncioTestCase):
             change_type="MODIFY",
             case_code="TC-LOGIN-001",
             after_document={"enabled": True},
+            changed_fields=["assertion"],
         )
 
         with (

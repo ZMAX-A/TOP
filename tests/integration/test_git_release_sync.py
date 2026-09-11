@@ -228,3 +228,56 @@ class GitReleaseSyncTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 409, response.text)
         self.assertIn("baseline digest changed", response.json()["detail"])
+
+    def test_baseline_only_release_reuses_existing_immutable_package(self) -> None:
+        manifest = self.fetcher.fetched.manifest.model_copy(
+            update={
+                "automation_package": self.fetcher.fetched.manifest.automation_package.model_copy(
+                    update={
+                        "version": "1.0.1",
+                        "digest": "sha256:" + "1" * 64,
+                    }
+                )
+            }
+        )
+        self.fetcher.fetched = FetchedGitRelease(
+            repository_url=self.fetcher.fetched.repository_url,
+            tag=self.fetcher.fetched.tag,
+            revision=self.fetcher.fetched.revision,
+            manifest=manifest,
+        )
+        source = {
+            "repository_url": "https://github.com/ZMAX-A/web",
+            "tag": "v1.0.2",
+        }
+        preview_response = self.client.post(
+            f"{self.release_url}/preview",
+            headers=self.headers,
+            json=source,
+        )
+        self.assertEqual(preview_response.status_code, 200, preview_response.text)
+        preview = preview_response.json()
+
+        applied_response = self.client.post(
+            f"{self.release_url}/apply",
+            headers=self.headers,
+            json={
+                **source,
+                "expected_revision": preview["revision"],
+                "expected_baseline_digest": preview["candidate_baseline_digest"],
+                "expected_package_digest": preview["automation_package"]["digest"],
+            },
+        )
+        self.assertEqual(applied_response.status_code, 201, applied_response.text)
+        applied = applied_response.json()
+        self.assertEqual(applied["automation_package"]["id"], self.previous_package_id)
+        self.assertEqual(applied["automation_package"]["status"], "ACTIVE")
+        self.assertEqual(applied["automation_package"]["supply_chain_status"], "LEGACY")
+
+        change = self.client.get(
+            f"/api/v1/projects/{self.project_id}/change-requests/"
+            f"{applied['change_request_id']}",
+            headers=self.headers,
+        )
+        self.assertEqual(change.status_code, 200, change.text)
+        self.assertEqual(change.json()["validation_status"], "NOT_REQUIRED")

@@ -76,6 +76,12 @@ _PRIORITY_ALIASES: Mapping[str, CasePriority] = {
 }
 _ENABLED_VALUES = {"是", "1", "Y", "TRUE"}
 _DISABLED_VALUES = {"否", "0", "N", "FALSE"}
+_EXECUTION_GROUP_ALIASES = {
+    "自动": "AUTO",
+    "串行": "SERIAL",
+    "WORKER_A": "A",
+    "WORKER_B": "B",
+}
 
 
 class LegacyExcelMigrationError(ValueError):
@@ -175,6 +181,16 @@ def _timeout(raw_value: object) -> float | None:
     if not 0 < value <= 600:
         raise LegacyExcelMigrationError(f"超时(秒)超出范围「{raw}」")
     return value
+
+
+def _execution_group(raw_value: object) -> str | None:
+    raw = _cell_text(raw_value)
+    if not raw:
+        return None
+    normalized = _EXECUTION_GROUP_ALIASES.get(raw.upper(), raw.upper())
+    if normalized not in {"A", "B", "SERIAL", "AUTO"}:
+        raise LegacyExcelMigrationError(f"不支持的执行分组「{raw}」")
+    return normalized
 
 
 def _safe_validation_message(exc: ValidationError) -> str:
@@ -377,6 +393,7 @@ def _convert_case(
         timeout_seconds=_timeout(row.get("超时(秒)")),
         source_trace=CaseSourceTrace(worksheet=worksheet, row_number=row_number),
         notes=_cell_text(row.get("备注")),
+        execution_group=_execution_group(row.get("执行分组")),
     )
 
 
