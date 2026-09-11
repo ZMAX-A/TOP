@@ -46,6 +46,8 @@ from .services import (
     create_run,
 )
 
+GOVERNED_RUN_PACKAGE_STATUSES = frozenset({"ACTIVE", "DRAFT"})
+
 
 def _operation_case_id(operation: ChangeOperation) -> UUID:
     if operation.case is not None:
@@ -534,6 +536,7 @@ async def create_candidate_run(
         idempotency_key=idempotency_key,
         actor_id=actor_id,
         allowed_baseline_statuses=frozenset({"CANDIDATE"}),
+        allowed_package_statuses=GOVERNED_RUN_PACKAGE_STATUSES,
     )
 
 
@@ -593,6 +596,7 @@ async def create_validation_run(
         idempotency_key=idempotency_key,
         actor_id=actor_id,
         allowed_baseline_statuses=frozenset({"DRAFT"}),
+        allowed_package_statuses=GOVERNED_RUN_PACKAGE_STATUSES,
     )
     record = await get_change_request(session, project_id, request_id, for_update=True)
     record.validation_run_id = run.id

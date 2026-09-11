@@ -120,7 +120,11 @@ async function loadTargetResources(targetId: string): Promise<void> {
     api.packages(projectId.value, targetId),
   ])
   environments.value = environmentList
-  packages.value = packageList.filter((item) => item.status === 'ACTIVE')
+  const verifiedDrafts = packageList.filter(
+    (item) => item.status === 'DRAFT' && item.supply_chain_status === 'VERIFIED',
+  )
+  const activePackages = packageList.filter((item) => item.status === 'ACTIVE')
+  packages.value = [...verifiedDrafts, ...activePackages]
   runForm.environment_id = environmentList[0]?.id ?? ''
   runForm.automation_package_id = packages.value[0]?.id ?? ''
 }
@@ -383,8 +387,8 @@ onMounted(load)
       <el-alert
         :title="
           runKind === 'validation'
-            ? '仅执行 ADD / MODIFY 中已启用的受影响用例。'
-            : '执行候选基线全部启用用例；通过后才能发布。'
+            ? '仅执行 ADD / MODIFY 中已启用的受影响用例；可选择已验签候选包做联合验证。'
+            : '执行候选基线全部启用用例；可选择已验签候选包，联合通过后才能发布。'
         "
         type="info"
         :closable="false"
@@ -406,7 +410,7 @@ onMounted(load)
             <el-option
               v-for="item in packages"
               :key="item.id"
-              :label="`${item.name}@${item.version}`"
+              :label="`${item.name}@${item.version} · ${item.status === 'DRAFT' ? '候选/已验签' : '正式'}`"
               :value="item.id"
             />
           </el-select>
