@@ -26,6 +26,13 @@ class CapabilitySpec:
 
 OPERATIONS: tuple[CapabilitySpec, ...] = (
     CapabilitySpec(
+        "execute_excel_case",
+        "operation",
+        "由受管自动化包按用例编号执行 Excel/Appium 用例",
+        consumes_input=True,
+        requires_input=True,
+    ),
+    CapabilitySpec(
         "input",
         "operation",
         "输入文本",
@@ -89,6 +96,7 @@ OPERATIONS: tuple[CapabilitySpec, ...] = (
 
 
 ASSERTIONS: tuple[CapabilitySpec, ...] = (
+    CapabilitySpec("excel_case_passed", "assertion", "受管 Excel/Appium 用例执行通过"),
     CapabilitySpec("text_equals", "assertion", "文本完全相等"),
     CapabilitySpec("text_contains", "assertion", "文本包含指定内容"),
     CapabilitySpec(
@@ -116,7 +124,12 @@ ASSERTIONS: tuple[CapabilitySpec, ...] = (
     CapabilitySpec("date_format", "assertion", "日期格式正确", requires_locator=True),
     CapabilitySpec("text_optional", "assertion", "文本可为空或有值", requires_locator=True),
     CapabilitySpec("vision_contains", "assertion", "视觉区域包含目标内容", requires_locator=True),
-    CapabilitySpec("vision_count", "assertion", "视觉区域中的目标数量符合预期", requires_locator=True),
+    CapabilitySpec(
+        "vision_count",
+        "assertion",
+        "视觉区域中的目标数量符合预期",
+        requires_locator=True,
+    ),
     CapabilitySpec("vision_page_state", "assertion", "页面视觉状态符合预期", requires_locator=True),
     CapabilitySpec("vision_canvas_ready", "assertion", "画布视觉内容已就绪", requires_locator=True),
     CapabilitySpec(

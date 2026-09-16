@@ -48,6 +48,319 @@ class ApiModel(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
 
+class AiStatusResponse(ApiModel):
+    enabled: bool
+    configured: bool
+    model: str | None = None
+    transport_security: Literal["UNCONFIGURED", "HTTPS", "LOCAL_HTTP", "INSECURE_HTTP"]
+
+
+class AiProbeResponse(ApiModel):
+    status: Literal["READY"]
+    model: NonEmptyText
+    latency_ms: Annotated[int, Field(ge=0)]
+
+
+AiProviderName = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+]
+AiProviderModel = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=200),
+]
+AiProviderBaseUrl = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000),
+]
+AiProviderSecret = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=4_096),
+]
+
+
+class AiModelProviderCreate(ApiModel):
+    name: AiProviderName
+    base_url: AiProviderBaseUrl
+    model: AiProviderModel
+    api_key: AiProviderSecret | None = None
+    status: Literal["ACTIVE", "DISABLED"] = "ACTIVE"
+    is_default: bool = False
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str) -> str:
+        parsed = urlsplit(value)
+        if (
+            parsed.scheme not in {"http", "https"}
+            or not parsed.hostname
+            or parsed.username
+            or parsed.password
+            or parsed.query
+            or parsed.fragment
+        ):
+            raise ValueError(
+                "Base URL must be HTTP(S) without credentials, query or fragment"
+            )
+        return value.rstrip("/")
+
+    @model_validator(mode="after")
+    def validate_default_status(self) -> AiModelProviderCreate:
+        if self.is_default and self.status != "ACTIVE":
+            raise ValueError("the default AI model provider must be active")
+        return self
+
+
+class AiModelProviderUpdate(ApiModel):
+    name: AiProviderName | None = None
+    base_url: AiProviderBaseUrl | None = None
+    model: AiProviderModel | None = None
+    api_key: AiProviderSecret | None = None
+    clear_api_key: bool = False
+    status: Literal["ACTIVE", "DISABLED"] | None = None
+    is_default: bool | None = None
+
+    @field_validator("base_url")
+    @classmethod
+    def validate_base_url(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        return AiModelProviderCreate.validate_base_url(value)
+
+    @model_validator(mode="after")
+    def validate_update(self) -> AiModelProviderUpdate:
+        meaningful_fields = self.model_fields_set - {"clear_api_key"}
+        if not meaningful_fields and not self.clear_api_key:
+            raise ValueError("at least one AI model provider field must be provided")
+        if self.api_key is not None and self.clear_api_key:
+            raise ValueError("api_key and clear_api_key cannot be used together")
+        if self.is_default and self.status == "DISABLED":
+            raise ValueError("the default AI model provider must be active")
+        return self
+
+
+class AiModelProviderResponse(ApiModel):
+    id: UUID
+    name: str
+    provider_type: Literal["OPENAI_COMPATIBLE"]
+    base_url: str
+    model: str
+    status: Literal["ACTIVE", "DISABLED"]
+    is_default: bool
+    api_key_configured: bool
+    transport_security: Literal["HTTPS", "LOCAL_HTTP", "INSECURE_HTTP"]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiModelOption(ApiModel):
+    key: str
+    name: str
+    model: str
+    source: Literal["ENVIRONMENT", "CUSTOM"]
+    is_default: bool
+
+
+class AiModelCatalogResponse(ApiModel):
+    items: tuple[AiModelOption, ...]
+
+
+class AiModelProviderProbeResponse(ApiModel):
+    status: Literal["READY"]
+    provider_id: UUID
+    model: NonEmptyText
+    latency_ms: Annotated[int, Field(ge=0)]
+
+
+AiFailureCategory = Literal[
+    "PRODUCT_DEFECT",
+    "AUTOMATION_SCRIPT",
+    "ASSERTION",
+    "ENVIRONMENT",
+    "TEST_DATA",
+    "FLAKY_TIMING",
+    "PLATFORM_RESOURCE",
+    "UNKNOWN",
+]
+AiEvidenceRef = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, max_length=160),
+]
+
+
+class AiProbableCause(ApiModel):
+    title: Annotated[str, StringConstraints(strip_whitespace=True, min_length=1, max_length=120)]
+    detail: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=1_000),
+    ]
+    category: AiFailureCategory
+    confidence: Annotated[float, Field(ge=0, le=1)]
+    evidence_refs: Annotated[tuple[AiEvidenceRef, ...], Field(max_length=8)] = ()
+
+
+class AiRunAnalysisContent(ApiModel):
+    summary: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000),
+    ]
+    classification: AiFailureCategory
+    confidence: Annotated[float, Field(ge=0, le=1)]
+    probable_causes: Annotated[tuple[AiProbableCause, ...], Field(max_length=8)] = ()
+    recommendations: Annotated[
+        tuple[
+            Annotated[
+                str,
+                StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+            ],
+            ...,
+        ],
+        Field(max_length=8),
+    ] = ()
+    missing_evidence: Annotated[
+        tuple[
+            Annotated[
+                str,
+                StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+            ],
+            ...,
+        ],
+        Field(max_length=8),
+    ] = ()
+
+
+class AiRunAnalysisResponse(AiRunAnalysisContent):
+    run_id: UUID
+    run_status: RunStatus
+    model: NonEmptyText
+    generated_at: datetime
+    latency_ms: Annotated[int, Field(ge=0)]
+    analyzed_case_count: Annotated[int, Field(ge=0)]
+    evidence_truncated: bool
+
+
+class AiChatTurn(ApiModel):
+    role: Literal["user", "assistant"]
+    content: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000),
+    ]
+
+
+class AiProjectChatRequest(ApiModel):
+    message: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000),
+    ]
+    run_id: UUID | None = None
+    conversation_id: UUID | None = None
+    question_message_id: UUID | None = None
+    model_provider_key: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
+    ] | None = None
+    history: Annotated[tuple[AiChatTurn, ...], Field(max_length=8)] = ()
+
+
+class AiChatQuestionRequest(ApiModel):
+    message: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=2_000),
+    ]
+    run_id: UUID | None = None
+    conversation_id: UUID | None = None
+    model_provider_key: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=64),
+    ] | None = None
+
+
+class AiChatQuestionResponse(ApiModel):
+    conversation_id: UUID
+    message_id: UUID
+    created_at: datetime
+
+
+class AiProjectChatSection(ApiModel):
+    title: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=120),
+    ]
+    items: Annotated[
+        tuple[
+            Annotated[
+                str,
+                StringConstraints(strip_whitespace=True, min_length=1, max_length=4_000),
+            ],
+            ...,
+        ],
+        Field(min_length=1, max_length=20),
+    ]
+
+
+class AiProjectChatContent(ApiModel):
+    answer: Annotated[
+        str,
+        StringConstraints(strip_whitespace=True, min_length=1, max_length=4_000),
+    ]
+    sections: Annotated[tuple[AiProjectChatSection, ...], Field(min_length=1, max_length=12)]
+    evidence_refs: Annotated[tuple[AiEvidenceRef, ...], Field(max_length=128)] = ()
+    suggested_questions: Annotated[
+        tuple[
+            Annotated[
+                str,
+                StringConstraints(strip_whitespace=True, min_length=1, max_length=500),
+            ],
+            ...,
+        ],
+        Field(max_length=12),
+    ] = ()
+
+
+class AiProjectChatResponse(AiProjectChatContent):
+    conversation_id: UUID
+    project_id: UUID
+    run_id: UUID | None = None
+    model: NonEmptyText
+    generated_at: datetime
+    latency_ms: Annotated[int, Field(ge=0)]
+    evidence_truncated: bool
+
+
+class AiConversationSummary(ApiModel):
+    id: UUID
+    project_id: UUID
+    run_id: UUID | None = None
+    title: NonEmptyText
+    message_count: Annotated[int, Field(ge=0)]
+    created_at: datetime
+    updated_at: datetime
+
+
+class AiConversationListResponse(ApiModel):
+    items: tuple[AiConversationSummary, ...]
+
+
+class AiConversationMessageResponse(ApiModel):
+    id: UUID
+    role: Literal["user", "assistant"]
+    content: NonEmptyText
+    sections: tuple[AiProjectChatSection, ...] = ()
+    evidence_refs: tuple[AiEvidenceRef, ...] = ()
+    suggested_questions: tuple[str, ...] = ()
+    model: str | None = None
+    latency_ms: Annotated[int | None, Field(ge=0)] = None
+    generated_at: datetime | None = None
+    evidence_truncated: bool = False
+    status: Literal["PENDING", "COMPLETED", "FAILED"] | None = None
+    created_at: datetime
+
+
+class AiConversationDetailResponse(ApiModel):
+    conversation: AiConversationSummary
+    messages: tuple[AiConversationMessageResponse, ...]
+
+
 class ProjectCreate(ApiModel):
     key: ResourceKey
     name: NonEmptyText
@@ -861,7 +1174,7 @@ class AutomationPackageCreate(ApiModel):
     name: Annotated[str, StringConstraints(pattern=r"^[a-z0-9][a-z0-9._-]*$")]
     version: NonEmptyText
     digest: Digest
-    runner_type: Literal["WEB_PLAYWRIGHT"] = "WEB_PLAYWRIGHT"
+    runner_type: Literal["WEB_PLAYWRIGHT", "ANDROID_APPIUM"] = "WEB_PLAYWRIGHT"
     image_repository: NonEmptyText = "testops-worker"
 
     @field_validator("image_repository")

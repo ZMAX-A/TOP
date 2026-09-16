@@ -1088,8 +1088,14 @@ async def create_automation_package(
     target = await session.get(TestTargetRecord, target_id)
     if target is None or target.project_id != project_id:
         raise ResourceNotFound("target not found in project")
-    if target.target_type != TargetType.WEB.value or payload.runner_type != "WEB_PLAYWRIGHT":
-        raise InvalidRequest("WEB_PLAYWRIGHT packages require a WEB target")
+    expected_runner = {
+        TargetType.WEB.value: "WEB_PLAYWRIGHT",
+        TargetType.APP.value: "ANDROID_APPIUM",
+    }.get(target.target_type)
+    if expected_runner is None or payload.runner_type != expected_runner:
+        raise InvalidRequest(
+            f"{target.target_type} targets require a {expected_runner or 'supported'} package"
+        )
     supersedes_id = (
         payload.supersedes_id if isinstance(payload, AutomationPackageDraftCreate) else None
     )
@@ -1856,18 +1862,21 @@ async def create_run(
             "automation package supply-chain status "
             f"{package.supply_chain_status} cannot be scheduled through this endpoint"
         )
-    if target.target_type != TargetType.WEB.value:
-        raise InvalidRequest("M2 Runner dispatch currently supports WEB targets only")
+    if target.target_type not in {TargetType.WEB.value, TargetType.APP.value}:
+        raise InvalidRequest("Runner dispatch supports WEB and APP targets only")
 
     baseline = CaseBaseline.model_validate(baseline_record.document)
     cases = _select_cases(baseline, payload.case_codes)
     if not cases:
         raise InvalidRequest("Run must contain at least one enabled case")
     web_config, variables, secret_bindings = _environment_contract(environment)
-    if web_config is None:
-        raise InvalidRequest("WEB environment has no web_config")
-    if payload.headless is not None:
-        web_config = web_config.model_copy(update={"headless": payload.headless})
+    if target.target_type == TargetType.WEB.value:
+        if web_config is None:
+            raise InvalidRequest("WEB environment has no web_config")
+        if payload.headless is not None:
+            web_config = web_config.model_copy(update={"headless": payload.headless})
+    elif payload.headless is not None:
+        raise InvalidRequest("headless is only valid for WEB runs")
     await _enforce_execution_policy(session, project)
     runner_pool_id = environment.runner_pool_id or target.runner_pool_id
     supply_chain = await _automation_package_supply_chain_ref(session, package)
@@ -2484,6 +2493,9 @@ async def record_run_result(
             },
         )
     )
+    from .run_email_services import enqueue_run_result_email
+
+    await enqueue_run_result_email(session, record)
     try:
         await session.commit()
     except IntegrityError as exc:
@@ -2561,6 +2573,9 @@ async def _request_cancel(
         record.status = RunStatus.CANCELED.value
         record.finished_at = utc_now()
         await _release_runner_slot(session, record.id)
+        from .run_email_services import enqueue_run_result_email
+
+        await enqueue_run_result_email(session, record)
     await _append_run_event(
         session,
         record,

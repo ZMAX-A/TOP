@@ -12,7 +12,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1 \
     PIP_DEFAULT_TIMEOUT=60 \
     PIP_RETRIES=8 \
-    PYTHONPATH=/app/packages/contracts/src:/app/runners/web_playwright/src:/app/runners/legacy_pytest/src:/app/services/worker/src \
+    PYTHONPATH=/app/packages/contracts/src:/app/runners/web_playwright/src:/app/runners/legacy_pytest/src:/app/runners/android_appium/src:/app/services/worker/src \
     TESTOPS_LEGACY_PYTEST_PROJECT_ROOT=/opt/yanjia-web
 
 WORKDIR /app
@@ -30,6 +30,7 @@ RUN test -n "${RUNNER_PACKAGE_DIGEST}" \
 COPY --chown=pwuser:pwuser packages/contracts packages/contracts
 COPY --chown=pwuser:pwuser runners/web_playwright runners/web_playwright
 COPY --chown=pwuser:pwuser runners/legacy_pytest runners/legacy_pytest
+COPY --chown=pwuser:pwuser runners/android_appium runners/android_appium
 COPY --chown=pwuser:pwuser services/worker services/worker
 
 COPY --from=yanjia_web --chown=pwuser:pwuser pages /opt/yanjia-web/pages

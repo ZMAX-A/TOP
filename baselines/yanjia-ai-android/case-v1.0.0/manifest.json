@@ -1,0 +1,22 @@
+{
+  "audit": {
+    "digest": "sha256:3010e4d8482d69556ca96ecb49e4fbbd6c8f39fc3bb63dbe517dc9746bbc7070",
+    "file": "migration-audit.json"
+  },
+  "baseline": {
+    "baseline_id": "971ff222-0fd7-5d53-9bfa-30415c38cb11",
+    "case_count": 121,
+    "digest": "sha256:c99937be78b36472930ad231c39d84bf5f31fec95b1f52d478fa53473aad267e",
+    "enabled_case_count": 84,
+    "file": "case-baseline.json",
+    "project_key": "yanjia-ai-android",
+    "version": "case-v1.0.0"
+  },
+  "schema_version": "1.0",
+  "source": {
+    "file_digest": "sha256:4c63e6980816d10ea771ca34d9aeb0b9e66b6dbfc6e0cf33e5cd630e9160bc95",
+    "file_name": "test_case.xlsx",
+    "kind": "legacy_excel",
+    "worksheet": "自动化测试用例"
+  }
+}

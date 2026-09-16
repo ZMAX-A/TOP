@@ -261,7 +261,13 @@ def test_legacy_adapter_runs_exact_cases_with_minimized_environment() -> None:
 def test_legacy_adapter_timeout_covers_two_delayed_rerun_rounds() -> None:
     short_case = legacy_job().cases[0].model_copy(update={"timeout_seconds": 3})
 
-    assert LegacyPytestAdapter._execution_timeout((short_case,)) == 129
+    assert LegacyPytestAdapter._execution_timeout((short_case,)) == 159
+
+
+def test_legacy_adapter_timeout_scales_orchestration_grace_with_case_count() -> None:
+    short_case = legacy_job().cases[0].model_copy(update={"timeout_seconds": 3})
+
+    assert LegacyPytestAdapter._execution_timeout((short_case,) * 93) == 3747
 
 
 def test_legacy_progress_tracks_initial_and_two_failed_case_rerun_rounds() -> None:

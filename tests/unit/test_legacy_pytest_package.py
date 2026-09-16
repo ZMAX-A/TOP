@@ -44,7 +44,8 @@ def test_package_export_is_allowlisted_and_digest_stable() -> None:
         assert package_source_digest(export) == original_digest
         assert not (export / ".env").exists()
         assert not (export / "reports").exists()
-        assert (export / "test_assets/vision_baselines/reference.png").read_bytes() == b"visual-reference"
+        reference = export / "test_assets/vision_baselines/reference.png"
+        assert reference.read_bytes() == b"visual-reference"
 
 
 def test_central_pytest_compose_uses_a_dedicated_immutable_package_image() -> None:

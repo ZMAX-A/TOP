@@ -78,8 +78,11 @@
       "additionalProperties": false,
       "properties": {
         "runner_type": {
-          "const": "WEB_PLAYWRIGHT",
           "default": "WEB_PLAYWRIGHT",
+          "enum": [
+            "WEB_PLAYWRIGHT",
+            "ANDROID_APPIUM"
+          ],
           "title": "Runner Type",
           "type": "string"
         },

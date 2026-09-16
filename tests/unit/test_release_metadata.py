@@ -41,7 +41,7 @@ def test_release_version_is_coherent_across_runtime_and_packaging() -> None:
 def test_release_has_one_migration_head_and_required_operations_evidence() -> None:
     config = Config(str(ROOT / "alembic.ini"))
     config.set_main_option("script_location", str(ROOT / "infra/alembic"))
-    assert ScriptDirectory.from_config(config).get_heads() == ["20260821_0019"]
+    assert ScriptDirectory.from_config(config).get_heads() == ["20260916_0025"]
 
     required = (
         ROOT / ".github/workflows/ci.yml",
@@ -79,6 +79,7 @@ def test_release_has_one_migration_head_and_required_operations_evidence() -> No
         ROOT / "docs/milestones/M9.8-verifier-key-observability.md",
         ROOT / "docs/milestones/M9.9-verifier-keyring-preflight.md",
         ROOT / "docs/milestones/M10.1-keyring-fleet-rollout-gate.md",
+        ROOT / "docs/milestones/M10.4-run-email-notifications.md",
         ROOT / "infra/kubernetes/m9.5.3-runner.yaml",
         ROOT / "scripts/check_supply_chain_key_readiness.py",
         ROOT / "scripts/check_supply_chain_keyring_fleet.py",

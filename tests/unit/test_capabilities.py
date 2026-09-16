@@ -13,6 +13,7 @@ class CapabilityRegistryTests(unittest.TestCase):
         self.assertEqual(
             operations,
             {
+                "execute_excel_case",
                 "input",
                 "input_enter",
                 "click",

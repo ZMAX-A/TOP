@@ -1,0 +1,5436 @@
+{
+  "baseline_id": "971ff222-0fd7-5d53-9bfa-30415c38cb11",
+  "cases": [
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-001",
+      "case_id": "77010e0f-9424-5ae2-bbf8-5b8d1f7e48a8",
+      "data_type": "提示：该账号不存在，请重新登录！",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "提示：登录失败，请重试！",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "错误账号测试",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.在账号输入框输入错误账号\n2.点击登录按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 2,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "login",
+        "tablet",
+        "readonly",
+        "auth_negative",
+        "no_retry",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证错误账号登录提示",
+      "timeout_seconds": 5.0,
+      "title": "登录失败-错误账号"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-002",
+      "case_id": "45f7945e-8b44-58e8-944b-5cc0da77f4f4",
+      "data_type": "提示：登录失败，请重试！",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "提示：登录失败，请重试！",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "错误密码测试",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入正确账号\n2.输入错误密码\n3.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 3,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "login",
+        "tablet",
+        "readonly",
+        "auth_negative",
+        "no_retry",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证错误密码登录提示",
+      "timeout_seconds": 5.0,
+      "title": "登录失败-错误密码"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-003",
+      "case_id": "21e412c6-a3cb-5e90-9649-626ac7663640",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "红色提示：请输入账号、请输入密码、请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "必填校验",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.不输入账号和密码\n2.点击登录按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 4,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "login",
+        "tablet",
+        "readonly",
+        "auth_negative",
+        "no_retry",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证必填校验",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-账号密码为空"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-004",
+      "case_id": "ae9a5581-4a6a-5afb-b5d1-5f5332ce9779",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "红色提示：请输入密码、请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入账号\n2.不输入密码\n3.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 5,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "login",
+        "tablet",
+        "readonly",
+        "auth_negative",
+        "no_retry",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证密码必填",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-密码为空"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-005",
+      "case_id": "1ab4abb8-e83f-50ea-9d7c-7232ebdf1a6f",
+      "data_type": "string|string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "红色提示：请选择门店",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入账号\n2.输入密码\n3.不选择门店\n4.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 6,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-005",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "login",
+        "tablet",
+        "readonly",
+        "auth_negative",
+        "no_retry",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证门店必选",
+      "timeout_seconds": 3.0,
+      "title": "登录失败-未选择门店"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-006",
+      "case_id": "7ce04af0-29dd-5f52-82a5-f8ea33e9f48f",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "跳转进入用户协议界面",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.不输入账号和密码\n2.直接点击页面最下方'《用户协议》'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 7,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-006",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "login",
+        "tablet",
+        "readonly",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "查看用户协议",
+      "timeout_seconds": 3.0,
+      "title": "查看用户协议"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-LOGIN-007",
+      "case_id": "67316bd5-f4b1-5ed8-acd7-14e1d0473c0a",
+      "data_type": "登录成功，跳转到首页",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "登录成功，跳转到首页",
+      "module_key": "login",
+      "module_name": "账号登录",
+      "notes": "正常登录流程",
+      "preconditions": [
+        "打开登录页面"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入正确账号\n2.输入正确密码\n3.选择门店\n4.点击登录",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 8,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-LOGIN-007",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "login",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证正常登录流程",
+      "timeout_seconds": 10.0,
+      "title": "登录成功"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-001",
+      "case_id": "f3e15fc9-4198-58fc-8b1c-08b932f5cdd1",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "展示：顾客档案、美际学院、案例管理、设置",
+      "module_key": "home",
+      "module_name": "首页",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "查看首页模块展示",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 9,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证首页模块正确展示",
+      "timeout_seconds": 5.0,
+      "title": "首页模块展示"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-002",
+      "case_id": "322ae272-b5b8-550e-b4cb-69724e03bce6",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "展示：暂无内容",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 10,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 5.0,
+      "title": "搜索-不存在的用户"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-003",
+      "case_id": "aa880d2a-8b80-523d-a0ba-b295945da777",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "展示：暂无内容",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 11,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 5.0,
+      "title": "搜索-不存在的手机号"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-004",
+      "case_id": "2e6dfd2f-ab1a-5122-a2bb-bc83c5b8e2ad",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "可搜索到对应顾客：tw",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入存在的用户姓名部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 12,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-姓名部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-005",
+      "case_id": "264327fc-76f8-5a65-812c-fb1fc9bec901",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "可搜索到对应顾客：余婷",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入完整的用户姓名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 13,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-005",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-姓名精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-006",
+      "case_id": "3860de2c-f068-571a-a16a-7136acb5f2e5",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "可搜索到对应手机号：含186",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入存在的手机号部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 14,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-006",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-手机号部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-007",
+      "case_id": "8a7a9f57-4b49-5ccb-a9d9-1fffc136ce66",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "可搜索到对应手机号：${SEEDED_CUSTOMER_PHONE}",
+      "module_key": "home-search",
+      "module_name": "首页搜索",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P3",
+      "schema_version": "1.0",
+      "source_instructions": "1.输入完整的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 15,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-007",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p3",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 5.0,
+      "title": "搜索-手机号精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-008",
+      "case_id": "282776db-ca65-585d-9d09-1384a07bfdc9",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "跳转到顾客档案列表页",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击顾客档案菜单",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 16,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-008",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转顾客档案"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-009",
+      "case_id": "64e3192c-cc43-5ece-ad64-e4aa537204a5",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "搜索结果",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 17,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-009",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转顾客档案"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-010",
+      "case_id": "bc72938d-aaed-5bd3-a219-7336f5b94f11",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "跳转到案例管理页面",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击案例管理菜单",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 18,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-010",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转案例管理"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-011",
+      "case_id": "e8bdadd3-106a-5ee7-bb44-891138fbce4d",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "跳转到设置页面",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击设置菜单",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 19,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-011",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "跳转设置页"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-HOME-012",
+      "case_id": "05f5fcce-18ea-54bf-b91b-6b10288cad02",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "跳转到美际学院页面",
+      "module_key": "home-navigation",
+      "module_name": "首页跳转",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "点击美际学院",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 20,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-HOME-012",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "home",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 15.0,
+      "title": "跳转美际学院"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-001",
+      "case_id": "24353103-5e34-5995-ad89-d520cbc75c07",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "展示：暂无内容",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 21,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 10.0,
+      "title": "搜索-不存在的用户"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-002",
+      "case_id": "47982c14-db4b-5061-b86f-3539ab0e5e1d",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "可搜索到对应顾客：tw",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的用户名部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 22,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-姓名部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-003",
+      "case_id": "c770f9eb-5321-59e8-938b-2b3794bdab51",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "可搜索到对应顾客：余婷",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的用户名\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 23,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-姓名精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-004",
+      "case_id": "70674276-2075-5fc8-942c-a130f6561846",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "展示：暂无内容",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入不存在的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 24,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证无结果提示",
+      "timeout_seconds": 10.0,
+      "title": "搜索-不存在的手机号"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-005",
+      "case_id": "266f0ba0-6abb-5f66-80f4-bb69b2b7319c",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "可搜索到对应手机号：含186",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的手机号部分\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 25,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-005",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证模糊搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-手机号部分匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-006",
+      "case_id": "638f0fba-4939-5bcb-a985-042853b8699d",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "可搜索到对应手机号：${SEEDED_CUSTOMER_PHONE}",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.在搜索框输入存在的手机号\n2.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 26,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-006",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证精确搜索",
+      "timeout_seconds": 10.0,
+      "title": "搜索-手机号精确匹配"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-007",
+      "case_id": "5feb8f02-59b7-5ab0-8edb-5ca3a2a41a3e",
+      "data_type": "daterange",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "日期范围显示为 2015-02-04~2015-02-13，且筛选结果为空",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "只读日期筛选；使用真实 Android 双组日期滚轮，不修改顾客数据",
+      "preconditions": [
+        "已登录并准备可控顾客种子数据"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.打开日期范围筛选\n3.通过双组日期滚轮选择 2015-02-04~2015-02-13\n4.确认筛选\n5.校验日期文本和空结果",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 27,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-007",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证时间筛选空结果",
+      "timeout_seconds": 30.0,
+      "title": "时间筛选-无结果"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-008",
+      "case_id": "ee88f60f-8262-5423-a069-8882bc76b261",
+      "data_type": "daterange",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "日期范围显示为2026-01-01~2026-06-28，且顾客卡片数量不少于1",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面改写：日期弹层为双组滚轮；使用 resource-id，不使用 Web CSS/daterange。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击日期范围\n3.按起始/结束滚轮选择日期\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 28,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-008",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证时间筛选功能",
+      "timeout_seconds": 30.0,
+      "title": "时间筛选-有结果"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-009",
+      "case_id": "2d950277-cd55-5b23-98bd-efe9df419d19",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "筛选结果展示性别为男的顾客卡片",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面树改写：使用 customer_records_other_sex_man_tv，不使用 Web CSS 文本定位。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“男”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 29,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-009",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证性别筛选",
+      "timeout_seconds": 15.0,
+      "title": "性别筛选-男"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-010",
+      "case_id": "b186d277-872a-5c14-b10b-047f8d23e2f7",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "筛选结果展示性别为女的顾客卡片",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面树改写：使用 customer_records_other_sex_female_tv，不使用 Web CSS 文本定位。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“女”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 30,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-010",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证性别筛选",
+      "timeout_seconds": 15.0,
+      "title": "性别筛选-女"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-011",
+      "case_id": "0de969d5-acb6-5783-849f-c22ffff1cfa8",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "B",
+      "expected_result": "真实 Android 页面无“未知”或“保密”性别选项，暂不执行",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "根据真实 Android 页面树确认：仅存在 customer_records_other_sex_man_tv 和 customer_records_other_sex_female_tv；已关闭执行。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.打开其他筛选\n2.核对性别选项",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 31,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-011",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证 Android 性别选项差异",
+      "timeout_seconds": 10.0,
+      "title": "性别筛选-未知（Android不支持）"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-012",
+      "case_id": "2e2ec5fb-f1f7-5c45-86c0-932f84a6321c",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "顾客档案页显示筛选后的顾客，年龄符合18-25岁",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面树改写：使用 customer_records_other_age_1_tv，不使用 Web CSS 文本定位。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“18-25岁”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 32,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-012",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证真实 Android 年龄段筛选结果",
+      "timeout_seconds": 15.0,
+      "title": "年龄段筛选-18-25岁"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-013",
+      "case_id": "47822d19-d5e7-5ee3-9d38-4589a4606909",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "顾客档案页显示筛选后的顾客，年龄符合26-35岁",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面树改写：使用 customer_records_other_age_2_tv，不使用 Web CSS 文本定位。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“26-35岁”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 33,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-013",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证真实 Android 年龄段筛选结果",
+      "timeout_seconds": 15.0,
+      "title": "年龄段筛选-26-35岁"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-014",
+      "case_id": "ae45473e-7efe-574f-915a-61180dc5ff25",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "顾客档案页显示筛选后的顾客，年龄符合36-45岁",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面树改写：使用 customer_records_other_age_3_tv，不使用 Web CSS 文本定位。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“36-45岁”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 34,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-014",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证真实 Android 年龄段筛选结果",
+      "timeout_seconds": 15.0,
+      "title": "年龄段筛选-36-45岁"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-015",
+      "case_id": "892bfe99-f9bc-5b74-a515-43eab33f0276",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "真实 Android 页面筛选45岁以上后显示暂无内容",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 真机回归结果改写：45岁以上筛选后无顾客卡片，页面显示暂无内容。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“45岁以上”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 35,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-015",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证真实 Android 年龄段筛选空结果",
+      "timeout_seconds": 15.0,
+      "title": "年龄段筛选-45岁以上"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-016",
+      "case_id": "aed4dc09-38d6-50c0-982e-94ca3d976d28",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "顾客档案页显示筛选后的顾客，年龄符合18岁以下",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面树改写：使用 customer_records_other_age_0_tv，不使用 Web CSS 文本定位。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.选择“18岁以下”\n4.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 36,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-016",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证真实 Android 年龄段筛选结果",
+      "timeout_seconds": 15.0,
+      "title": "年龄段筛选-18岁以下"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-017",
+      "case_id": "a16e76b9-3d48-5c3e-a4f4-47f954fb2fdd",
+      "data_type": "daterange",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "日期范围、性别男、年龄18-25岁联合筛选后无顾客卡片",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "真机回归已确认：Android 最小可选日期范围为 2015-02-04~2015-02-28，联合男/18-25岁筛选后显示暂无内容。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.选择日期范围2015-02-04~2015-02-28\n2.点击其他筛选\n3.选择“男”\n4.选择“18-25岁”\n5.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 37,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-017",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证日期、性别和年龄联合筛选",
+      "timeout_seconds": 30.0,
+      "title": "联合查询-无结果组合"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-018",
+      "case_id": "7e47eb99-0443-53f1-9916-d5f9d9cbb800",
+      "data_type": "daterange",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "日期范围、性别男、年龄18-25岁联合筛选后展示顾客卡片",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已按真实 Android 页面改写：日期双滚轮与其他筛选弹层可联合使用；性别/年龄使用原生 resource-id。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.选择日期范围2026-01-01~2026-07-30\n2.点击其他筛选\n3.选择“男”\n4.选择“18-25岁”\n5.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 38,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-018",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证日期、性别和年龄联合筛选",
+      "timeout_seconds": 30.0,
+      "title": "联合查询-有结果组合"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-019",
+      "case_id": "5b589e1c-b621-548b-a47d-04bac86cb6be",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "B",
+      "expected_result": "真实 Android 备注筛选流程待受控数据验证后执行",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "已确认真实 Android 输入控件为 customer_records_other_remark_et；备注结果需补充受控种子数据，暂不执行。",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案\n2.点击其他筛选\n3.在备注输入框输入“123”\n4.点击确定\n5.打开详情并核对备注",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 39,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-019",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证备注筛选",
+      "timeout_seconds": 30.0,
+      "title": "备注筛选"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-020",
+      "case_id": "9d8d8a9a-964a-5c74-aa9e-56149295a998",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "卡片包含：姓名、年龄、性别图标♂、手机号、上次检测时间、检测次数、详情按钮",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "notes": "卡片为自定义结构（非ant-list）；性别图标为图片形式无法文本断言；字段验证：姓名/年龄/手机号/上次检测时间/检测次数/详情",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案列表\n2.查看顾客卡片字段信息",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 40,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-020",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证卡片展示姓名、年龄、性别图标、手机号、上次检测时间、检测次数、详情按钮",
+      "timeout_seconds": 15.0,
+      "title": "顾客卡片字段验证"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-021",
+      "case_id": "7f8c94b0-cf0f-5101-ba03-ad2fb32d3f2d",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "URL 包含 /customer/U，跳转成功",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击用户卡片或详情按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 41,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-021",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证详情页跳转",
+      "timeout_seconds": 5.0,
+      "title": "进入顾客详情"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CUSTOMER-022",
+      "case_id": "d681fb34-26f0-59c2-9024-010f6207b751",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "已选择筛选条件全部取消选中",
+      "module_key": "customer-list",
+      "module_name": "顾客列表",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击其他筛选\n1.选择性别、年龄，输入备注内容筛选\n2.点击重置按钮",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 42,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CUSTOMER-022",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "中",
+        "customer",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证重置按钮清空筛选条件",
+      "timeout_seconds": 10.0,
+      "title": "筛选重置功能"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-001",
+      "case_id": "30fd046d-f36b-54c6-bef4-2e14f367ce51",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "提示：姓名不能为空",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击编辑资料\n2.清空姓名\n3.点击保存\n验证：提示'姓名不能为空'",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 43,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证姓名必填校验",
+      "timeout_seconds": 3.0,
+      "title": "编辑资料-姓名必填"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-002",
+      "case_id": "6aec30c7-0216-537e-8d72-c6795d0c060f",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "保存成功，页面姓名更新为「自动化&&*……*&测试」",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.姓名改为testname并保存\n4.再次编辑资料\n5.姓名改为特殊字符并保存\n6.验证特殊字符姓名已显示",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 44,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证特殊字符输入",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-003",
+      "case_id": "b79013ad-0812-52df-9fd9-80a79408a3bf",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "33字符姓名显示“客户名称长度不合法”；测试结束后姓名和手机号恢复为运行前原值并重新打开编辑页精确比对",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.更改姓名\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 45,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证边界值-超长姓名",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-姓名超长字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-004",
+      "case_id": "a94cb0be-a5d7-550c-931b-2a5334e9dead",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "保存成功，重新打开编辑页后性别显示“男”；测试结束后姓名、手机号和性别恢复为运行前原值并逐字段比对",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.选择性别'男'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 46,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证性别修改",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-性别男"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-005",
+      "case_id": "7246cf0d-c186-56b8-b767-a466b7960bb9",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "保存成功，重新打开编辑页后性别显示“女”；测试结束后姓名、手机号和性别恢复为运行前原值并逐字段比对",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.选择性别'女'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 47,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-005",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证性别修改",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-性别女"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-006",
+      "case_id": "28c97084-5cd0-5591-b311-580e42321a18",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "B",
+      "expected_result": "保存成功，性别显示'保密'",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页\n2.点击编辑资料\n3.选择性别'保密'\n4.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 48,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-006",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "blocked_product",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证性别修改",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-性别保密"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-007",
+      "case_id": "05f8c098-ae20-540b-bc1f-67b16a7c8715",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "生日显示为2022-08-04；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.选择生日2022-08-04 3.保存 4.重新打开编辑页",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 49,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-007",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证生日修改",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-生日修改"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-008",
+      "case_id": "2940ff72-9a43-5e40-a754-b6db32fc975b",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "地址字段为空；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "清空家庭住址后保存",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.清空地址 3.保存 4.重新打开编辑页",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 50,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-008",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "家庭住址非必填",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-家庭住址非必填"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-009",
+      "case_id": "7dcb22fc-5f5b-5f25-b976-10613f100386",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "地址精确显示……&&*……*&；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "家庭住址输入特殊字符后保存",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.输入特殊字符地址 3.保存 4.重新打开编辑页",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 51,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-009",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证家庭住址特殊字符",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-家庭住址特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-010",
+      "case_id": "b36ab602-1feb-520d-b07b-8b08f0c3e91b",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "单空格地址保存后归一为空；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "家庭住址输入空格后保存",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.输入单个空格地址 3.保存 4.重新打开编辑页",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 52,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-010",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证家庭住址空格处理",
+      "timeout_seconds": 15.0,
+      "title": "编辑资料-家庭住址空格"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-011",
+      "case_id": "7327d54f-e40c-51f4-9b45-affa50473eac",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "提示：手机号不能为空",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客详情页"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击编辑资料\n2.清空手机号\n3.点击保存",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 53,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-011",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证手机号校验",
+      "timeout_seconds": 3.0,
+      "title": "编辑资料-手机号必填"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-012",
+      "case_id": "ca2e58b4-d7dd-5000-8c0d-099611bac15f",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增备注测试备注${RUN_TOKEN}显示成功，测试结束后原备注集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "仅用于本地专用顾客；运行器强制恢复，不记录查询或原资料",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.记录原备注集合 3.新增本轮唯一备注测试备注${RUN_TOKEN}并提交 4.校验显示 5.会话退出时仅删除本轮差集备注并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 54,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-012",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证备注添加",
+      "timeout_seconds": 15.0,
+      "title": "影像-添加备注"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-013",
+      "case_id": "18d64d16-909e-551c-8e03-e0a97a801b20",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "个人备注字段为空；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "清空备注后保存，备注非必填",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.滚动到个人备注 3.清空个人备注并保存 4.重新打开编辑页并滚动到个人备注",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 55,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-013",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "mutating",
+        "serial",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证备注非必填",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-备注非必填"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-014",
+      "case_id": "feb3c2a5-af4d-5f6d-a686-ebea01e5f63a",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "个人备注精确显示……&&*……*&；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "备注输入特殊字符后保存",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.滚动到个人备注 3.输入特殊字符个人备注并保存 4.重新打开编辑页并滚动到个人备注",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 56,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-014",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "mutating",
+        "serial",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证备注特殊字符",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-备注特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-015",
+      "case_id": "4c4bc621-9242-57d6-abf6-072e30436af8",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "婚姻状态显示为保密；测试结束后八项资料恢复为运行前原值",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客资料编辑页 2.选择婚姻状态保密 3.保存 4.重新打开编辑页",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 57,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-015",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "mutating",
+        "serial",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证婚姻状况修改",
+      "timeout_seconds": 10.0,
+      "title": "编辑资料-婚姻状况修改"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-016",
+      "case_id": "b2cb0025-647c-5fee-a1b3-c647917fedcc",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增标签自动化标签${RUN_TOKEN}显示成功，测试结束后原标签集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "nav进入顾客列表，影像编辑图标易缺失，因此改为更稳妥的div",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.记录原标签集合 3.新增标签自动化标签${RUN_TOKEN}并保存 4.校验显示 5.删除本轮差集标签并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 58,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-016",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-添加标签"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-017",
+      "case_id": "d63b77d1-6be6-51eb-b4ec-9347066fc6ea",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "显示请输入标签内容，弹窗保持打开且未创建标签",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配且至少存在一张历史影像；仅执行空值校验"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.打开新增标签弹窗 3.不输入内容点击保存 4.校验提示后取消并返回",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 59,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-017",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "readonly",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签必填",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-标签为空"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-018",
+      "case_id": "28034e76-630d-58c7-99db-7ede9ec0a661",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增标签%……&*${RUN_TOKEN}显示成功，测试结束后原标签集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "nav改为div,输入注意去掉占位符，否则读取不到",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.记录原标签集合 3.新增标签%……&*${RUN_TOKEN}并保存 4.校验显示 5.删除本轮差集标签并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 60,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-018",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签特殊字符",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-标签特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-019",
+      "case_id": "301ef35a-0db3-5b29-8c0d-3f77e01b695d",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "显示请输入标签内容，弹窗保持打开且标签集合不变",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配且至少存在一张历史影像；仅执行空格校验"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.打开新增标签弹窗 3.输入单个空格后点击保存 4.校验提示后取消并返回",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 61,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-019",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "readonly",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签空格处理",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-标签空格"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-020",
+      "case_id": "54235ac3-b302-5c67-a9f8-91fd80fb3780",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "本轮唯一标签自动化删除标签${RUN_TOKEN}创建成功且仅该标签被删除，原标签集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "自包含：运行时先创建唯一标签，仅删除该标签并验证原集合恢复",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在历史影像备注；已授权写入、删除并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.记录原标签集合 3.创建唯一标签自动化删除标签${RUN_TOKEN}并校验 4.仅删除本轮唯一标签并确认 5.验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 62,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-020",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "destructive",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证仅删除本轮创建的本地标签",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-本地标签可删除"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-021",
+      "case_id": "4e85224d-0250-5fd9-97e1-2f105311404d",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增备注影像备注${RUN_TOKEN}显示成功，测试结束后原备注集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "自包含恢复：仅创建并删除本轮唯一备注，不依赖其他用例",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.记录原备注集合 3.新增本轮唯一备注影像备注${RUN_TOKEN}并提交 4.校验显示 5.会话退出时仅删除本轮差集备注并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 63,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-021",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证影像备注内容提交与恢复",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-备注内容"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-022",
+      "case_id": "fcbfdd0e-0447-5605-9082-f4a6d6c3b69c",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增备注……&&*……*&${RUN_TOKEN}显示成功，测试结束后原备注集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "自包含恢复：仅创建并删除本轮唯一备注，不依赖其他用例",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一张影像备注 2.记录原备注集合 3.新增本轮唯一备注……&&*……*&${RUN_TOKEN}并提交 4.校验显示 5.会话退出时仅删除本轮差集备注并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 64,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-022",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证影像备注特殊字符提交与恢复",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-备注特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-023",
+      "case_id": "4d914554-05c3-53ba-85dd-23883a641118",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "点击提交后未新增空格备注，且仍停留在备注编辑页",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "按钮视觉状态和原生 enabled 属性不作为成败依据",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客详情页 2.进入第一张影像备注 3.输入单个空格 4.点击提交 5.持续观察备注记录数量不增加",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 65,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-023",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证空格备注无法提交",
+      "timeout_seconds": 15.0,
+      "title": "影像备注-备注空格"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-024",
+      "case_id": "d7e9c56b-36d2-5aff-8fd8-5ce12b4e5754",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "按钮可以正确切换",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需要有历史影像；验证管理/完成按钮来回切换",
+      "preconditions": [
+        "已登录并进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.查找有检测记录顾客\n3.进入详情页\n4.点击管理\n5.再点击完成",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 66,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-024",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证按钮切换",
+      "timeout_seconds": 15.0,
+      "title": "删除影像-完成按钮切换"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-025",
+      "case_id": "150e23dd-31f1-54b6-b260-9219d60f3a6e",
+      "data_type": "none",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "数据删除成功",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "严格找共检测1次的顾客，删除后验证卡片显示共检测0次",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.查找有检测记录顾客\n3.进入详情页\n4.点击管理\n5.勾选最近影像\n6.点击删除",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 67,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-025",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "destructive",
+        "serial",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证删除最后影像后的状态",
+      "timeout_seconds": 15.0,
+      "title": "删除影像-最后一张"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-026",
+      "case_id": "21cad72f-a369-502d-9e37-6ac92f9cd545",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "顾客卡片姓名精确显示本轮值；测试结束后八项资料恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "仅用于本地专用顾客；运行器强制恢复，不记录查询或原资料",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客编辑页 2.修改姓名为本轮唯一值 3.保存并返回列表 4.校验顾客卡片姓名同步 5.恢复八项资料",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 68,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-026",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证姓名修改后卡片更新",
+      "timeout_seconds": 15.0,
+      "title": "卡片-修改姓名后同步"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-027",
+      "case_id": "11561bd9-9b98-546f-a9cc-5b512fc19b70",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "顾客卡片手机号精确显示本轮值；测试结束后八项资料恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "仅用于本地专用顾客；运行器强制恢复，不记录查询或原资料",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；已授权写入与八字段恢复"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客编辑页 2.修改手机号为本轮唯一值 3.保存并返回列表 4.校验顾客卡片手机号同步 5.恢复八项资料",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 69,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-027",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证手机号修改后卡片更新",
+      "timeout_seconds": 15.0,
+      "title": "卡片-修改手机号后同步"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-028",
+      "case_id": "fef4b816-3fad-5164-ac56-dfe2b13e1a7b",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "该顾客的卡片右下角显示共检测n次,n=详情页中所有历史影像个数",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击右下角显示'共检测N次',N>1的卡片的详情按钮\n2.点击管理\n3.勾选影像\n4.点击删除\n5.返回顾客列表\n7.查看该用户卡片",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 70,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-028",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "destructive",
+        "serial",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证删除非最后影像后卡片状态",
+      "timeout_seconds": 15.0,
+      "title": "卡片-删除非最后影像后状态"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-029",
+      "case_id": "c0ba7e87-e0fc-5b0a-8620-0cc790e59608",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "页面中心显示“请选择需要删除的影像”，未选择任何影像",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "只读；不勾选影像，不触发删除确认，不修改业务数据",
+      "preconditions": [
+        "已登录；“咨询单特定”种子顾客唯一匹配且存在历史影像"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客档案并唯一搜索“咨询单特定”\n2.进入顾客详情并确认存在历史影像\n3.点击管理，不选择任何影像\n4.点击删除\n5.断言页面中心提示\n6.退出管理态",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 71,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-029",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证未选择影像删除提示",
+      "timeout_seconds": 15.0,
+      "title": "删除影像-未选择影像点击删除"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-030",
+      "case_id": "f3557289-bc73-59f7-b65e-9af6ba2ec2c2",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "返回顾客详情页，新增咨询单保留，且咨询单卡片显示所选影像的检测时间",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "新增咨询单按用户要求保留，不执行删除或回滚",
+      "preconditions": [
+        "已登录；“咨询单特定”种子顾客唯一匹配；至少一张历史影像尚未关联咨询单；已授权保留新增咨询单"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.搜索并打开唯一种子顾客\n2.按检测时间动态打开首张未关联咨询单的历史影像\n3.返回并选择保存并退出\n4.校验所选检测时间出现在咨询单卡片中",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 72,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-030",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "persistent",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证咨询单添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-添加咨询单"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-031",
+      "case_id": "6e421d1b-0477-5515-8a45-e3aac8202cae",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增标签咨询单标签${RUN_TOKEN}显示成功，测试结束后原标签集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单；咨询单记录在诊断结果标签页",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一条咨询单备注 2.记录原标签集合 3.新增标签咨询单标签${RUN_TOKEN}并保存 4.校验显示 5.删除本轮差集标签并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 73,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-031",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证咨询单的备注标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签添加"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-032",
+      "case_id": "ed28e916-141e-5511-8931-33b4aa6a0b95",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "显示请输入标签内容，弹窗保持打开且标签集合不变",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录；咨询单种子顾客可匹配且至少存在一条咨询单；仅执行空格校验"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.搜索咨询单种子顾客并进入第一条咨询单备注 2.打开新增标签弹窗 3.输入单个空格后点击保存 4.校验提示后取消并返回",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 74,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-032",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "readonly",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证咨询单的备注标签添加功能",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签为空格"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-033",
+      "case_id": "fe1b75bc-0806-5017-9398-98dd12605b65",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增标签%……&*${RUN_TOKEN}显示成功，测试结束后原标签集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "使用${YANJIA_MUTATION_CUSTOMER_QUERY}在搜索栏精确匹配卡片手机号，并等待咨询单备注入口加载",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一条咨询单备注 2.记录原标签集合 3.新增标签%……&*${RUN_TOKEN}并保存 4.校验显示 5.删除本轮差集标签并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 75,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-033",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证咨询单的备注标签特殊字符",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签特殊字符"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-034",
+      "case_id": "59759bae-10ab-5b1b-b55c-5b7db44acd97",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "显示请输入标签内容，弹窗保持打开且标签集合不变",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "需先执行 TC-DETAIL-030 创建咨询单",
+      "preconditions": [
+        "已登录；咨询单种子顾客可匹配且至少存在一条咨询单；仅执行空值校验"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.搜索咨询单种子顾客并进入第一条咨询单备注 2.打开新增标签弹窗 3.不输入内容点击保存 4.校验提示后取消并返回",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 76,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-034",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "requires_auth",
+        "readonly",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签非空校验",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注标签为空"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-035",
+      "case_id": "3ae20089-d981-5c84-a9a8-87155a435ea3",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "新增备注咨询单备注${RUN_TOKEN}显示成功，测试结束后原备注集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "自包含恢复：仅创建并删除本轮唯一备注，不依赖其他用例",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在目标备注入口；已授权写入并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一条咨询单备注 2.记录原备注集合 3.新增本轮唯一备注咨询单备注${RUN_TOKEN}并提交 4.校验显示 5.会话退出时仅删除本轮差集备注并验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 77,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-035",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "mutating",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证咨询单备注内容提交与恢复",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注输入"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-036",
+      "case_id": "8793dc47-3965-525c-9847-35737fb60dcc",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "点击提交后未新增空格备注，且仍停留在备注编辑页",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "按钮视觉状态和原生 enabled 属性不作为成败依据",
+      "preconditions": [
+        "已登录，进入顾客列表页"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.搜索咨询单种子顾客 2.进入第一条咨询单备注 3.输入单个空格 4.点击提交 5.持续观察备注记录数量不增加",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 78,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-036",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证空格备注无法提交",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-备注空格"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-DETAIL-037",
+      "case_id": "c89368e5-463f-5d49-979b-949764e7576f",
+      "enabled": true,
+      "execution_group": "SERIAL",
+      "expected_result": "本轮唯一备注自动化删除备注${RUN_TOKEN}创建成功且仅该备注被删除，原备注集合完全恢复",
+      "module_key": "customer-detail",
+      "module_name": "顾客详情",
+      "notes": "自包含：运行时先创建唯一备注，仅删除该备注并验证原集合恢复",
+      "preconditions": [
+        "已登录；专用顾客唯一匹配；存在咨询单备注入口；已授权写入、删除并完成本次只读预检"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入专用顾客第一条咨询单备注 2.记录原备注集合 3.创建唯一备注自动化删除备注${RUN_TOKEN}并校验 4.仅删除本轮唯一备注并确认 5.验证原集合恢复",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 79,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-DETAIL-037",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "detail",
+        "tablet",
+        "destructive",
+        "serial",
+        "requires_auth",
+        "requires_seed",
+        "restorable",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证仅删除本轮创建的咨询备注",
+      "timeout_seconds": 15.0,
+      "title": "咨询单-删除备注"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-001",
+      "case_id": "c0612403-fe61-5f78-a2d1-0468f16800ac",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "进入影像阅览/皮肤分析页",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表，选择有检测记录的顾客 2.点击历史影像条目进入影像阅览",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 80,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "extended",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 10.0,
+      "title": "进入影像阅览"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-002",
+      "case_id": "b7817551-c461-5ef0-a2e6-8e449e2ab7f8",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "影像展示分屏对比模式",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击模式对比中的分屏对比",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 81,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证模式图切换",
+      "timeout_seconds": 10.0,
+      "title": "分屏对比"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-003",
+      "case_id": "a3163978-536c-599e-9386-c46d9a29c820",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "影像展示镜像对比模式",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击模式对比中的镜像对比",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 82,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证分屏对比功能",
+      "timeout_seconds": 10.0,
+      "title": "镜像对比"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-004",
+      "case_id": "86275600-800f-53ff-966d-65bebe52c99d",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "左侧历史影像，右侧当前影像，各有独立模式图",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击历史对比中的分屏对比 2.在弹窗中选择一张历史影像 3.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 83,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证镜像对比功能",
+      "timeout_seconds": 10.0,
+      "title": "历史分屏对比"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-005",
+      "case_id": "a72c0cb1-3e12-50a7-af1d-723b35ee1555",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "展示历史镜像对比模式",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.点击历史对比中的镜像对比 2.在弹窗中选择一张历史影像 3.点击确定",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 84,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-005",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证历史对比功能",
+      "timeout_seconds": 10.0,
+      "title": "历史镜像对比"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CASE-001",
+      "case_id": "0e5f0a5a-34c3-5127-a997-ccf2171a7437",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "进入案例库页面，URL包含/case",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "进入案例库",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 85,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CASE-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "case",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证页面跳转",
+      "timeout_seconds": 5.0,
+      "title": "进入案例管理"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CASE-002",
+      "case_id": "e0961a52-c550-5806-8c35-2adf1f56e9a2",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "显示空结果提示，且不存在案例卡片",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "notes": "只读负向搜索；不存在标签由每次运行的变量生成",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库\n2.输入运行时生成的不存在标签\n3.点击搜索\n4.校验空结果提示且不存在案例卡片",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 86,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CASE-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "case",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签搜索",
+      "timeout_seconds": 15.0,
+      "title": "标签搜索-无结果"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CASE-003",
+      "case_id": "21556c7b-a16d-5e3a-ae9a-d73597c3bbce",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "搜索结果列表中含有包含\"火\"标签的案例",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.输入已存在的标签（火） 3.点击搜索",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 87,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CASE-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "case",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签搜索",
+      "timeout_seconds": 5.0,
+      "title": "标签搜索-有结果"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CASE-004",
+      "case_id": "9de902eb-0184-5ad3-9314-967b121ad65f",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "页面展示含有\"火\"标签的案例",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.点击标签\"火\"筛选",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 88,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CASE-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "case",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证标签筛选",
+      "timeout_seconds": 5.0,
+      "title": "标签筛选-单选"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-CASE-005",
+      "case_id": "9c8283aa-1d52-5030-bc3c-a3278564d668",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "B",
+      "expected_result": "删除成功，案例列表中不显示该案例",
+      "module_key": "case-library",
+      "module_name": "案例库",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入案例库 2.点击管理 3.勾选最新案例的复选框 4.点击删除 5.确认删除",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 89,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-CASE-005",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "case",
+        "tablet",
+        "destructive",
+        "serial",
+        "requires_auth",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证删除功能",
+      "timeout_seconds": 5.0,
+      "title": "删除案例"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-PROFILE-001",
+      "case_id": "407b3390-db6c-5c06-9fc1-60f442039f5b",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "显示登录的账号",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n2.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 90,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-PROFILE-001",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "profile",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证账号信息展示",
+      "timeout_seconds": 3.0,
+      "title": "查看账号"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-PROFILE-002",
+      "case_id": "45badd45-d46d-5400-bd60-ed2fd1528604",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "显示账号对应的姓名",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n3.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 91,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-PROFILE-002",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "profile",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证姓名展示",
+      "timeout_seconds": 3.0,
+      "title": "查看姓名"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-PROFILE-003",
+      "case_id": "80de55cf-e59b-55b3-a075-0cb35287c582",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "显示机构后台创建账号的时间",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n4.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 92,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-PROFILE-003",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "profile",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证注册时间展示",
+      "timeout_seconds": 3.0,
+      "title": "查看注册时间"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-PROFILE-004",
+      "case_id": "1f38b8cc-435c-548b-b6e5-28faf78105ad",
+      "data_type": "none",
+      "enabled": true,
+      "execution_group": "B",
+      "expected_result": "手机号不为空时显示对应手机号",
+      "module_key": "profile",
+      "module_name": "个人中心",
+      "preconditions": [
+        "已登录成功"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入设置页面\n5.点击个人中心",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 93,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-PROFILE-004",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "profile",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "smoke",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证手机号展示",
+      "timeout_seconds": 3.0,
+      "title": "查看手机号"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-006",
+      "case_id": "7edce6f3-e610-5cc2-83e9-642172df662c",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "阅览页正常加载，查看案例/查看报告/返回按钮可见",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P0",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.阅览页加载冒烟",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 95,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-006",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p0",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证阅览页加载冒烟",
+      "timeout_seconds": 15.0,
+      "title": "阅览页加载冒烟"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-007",
+      "case_id": "fa3f3122-201b-56c8-8101-370f49238c66",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "点击「视角回正」视角切换成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.视角切换-视角回正",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 96,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-007",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证视角切换-视角回正",
+      "timeout_seconds": 15.0,
+      "title": "视角切换-视角回正"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-008",
+      "case_id": "c4caf91b-27ab-5f79-9c8e-c50d9ce5c060",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "点击「0°」视角切换成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.视角切换-正面0度",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 97,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-008",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证视角切换-正面0度",
+      "timeout_seconds": 15.0,
+      "title": "视角切换-正面0度"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-009",
+      "case_id": "af1a22b5-98fe-5e5b-b5e7-63ab1071ca62",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "点击「R45°」视角切换成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.视角切换-右45度",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 98,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-009",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证视角切换-右45度",
+      "timeout_seconds": 15.0,
+      "title": "视角切换-右45度"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-010",
+      "case_id": "e4fb7d31-b663-5318-bd4c-6e66a9788f57",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "点击「L45°」视角切换成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.视角切换-左45度",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 99,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-010",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证视角切换-左45度",
+      "timeout_seconds": 15.0,
+      "title": "视角切换-左45度"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-011",
+      "case_id": "3d3ef3c7-0e40-5c84-ba5a-b711fcee92a0",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "点击「R90°」视角切换成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.视角切换-右90度",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 100,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-011",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证视角切换-右90度",
+      "timeout_seconds": 15.0,
+      "title": "视角切换-右90度"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-012",
+      "case_id": "e5944dbc-a968-565c-9642-a68aa1b37726",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "点击「L90°」视角切换成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.视角切换-左90度",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 101,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-012",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证视角切换-左90度",
+      "timeout_seconds": 15.0,
+      "title": "视角切换-左90度"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-013",
+      "case_id": "8bb21368-d223-5eed-9c24-d3a65fda1c39",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「冷光」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-冷光模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 102,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-013",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-冷光模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-冷光模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-014",
+      "case_id": "6e22f04c-d92c-5f9f-a9a1-09272a8a5c1d",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「自然光」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-自然光模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 103,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-014",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-自然光模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-自然光模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-015",
+      "case_id": "a5576308-a26a-5796-8663-95f18ef21b61",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「红血丝」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-红血丝模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 104,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-015",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-红血丝模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-红血丝模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-016",
+      "case_id": "457595d1-5291-5133-b528-73c81f92a67d",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「标准红区」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-标准红区模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 105,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-016",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-标准红区模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-标准红区模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-017",
+      "case_id": "fee77d2b-090c-5c23-88e5-c97cdf52aaa9",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「增强红区」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-增强红区模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 106,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-017",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-增强红区模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-增强红区模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-018",
+      "case_id": "a2541139-5c69-5da4-931b-2d58d528f3af",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「红区热力」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-红区热力模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 107,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-018",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-红区热力模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-红区热力模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-019",
+      "case_id": "547843ef-346e-5a5a-848f-9536b6c658cd",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「标准棕区」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-标准棕区模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 108,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-019",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-标准棕区模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-标准棕区模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-020",
+      "case_id": "82407899-982b-5045-8d6a-48c22f44c0b9",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「增强棕区」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-增强棕区模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 109,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-020",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-增强棕区模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-增强棕区模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-021",
+      "case_id": "4ddb7d3c-c454-5ff6-b077-5b639bb9ec03",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「深层棕区」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-深层棕区模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 110,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-021",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-深层棕区模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-深层棕区模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-022",
+      "case_id": "09492a5e-be72-5024-82d4-086749288514",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「浅层棕区」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-浅层棕区模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 111,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-022",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-浅层棕区模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-浅层棕区模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-023",
+      "case_id": "efcf9cad-518b-522f-80da-5d9312a577e2",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「棕区热力」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-棕区热力模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 112,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-023",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-棕区热力模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-棕区热力模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-024",
+      "case_id": "ecd93688-31a0-5468-a4e4-4b08e3dc99dd",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「紫外线」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-紫外线模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 113,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-024",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-紫外线模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-紫外线模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-025",
+      "case_id": "ad9bc031-61bf-57c5-bbaa-af994b707d4b",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「紫外线斑」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-紫外线斑模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 114,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-025",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-紫外线斑模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-紫外线斑模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-026",
+      "case_id": "5dbb430f-c0fd-58f8-b8c8-92ea9be7c06d",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「平行偏振」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-平行偏振模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 115,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-026",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-平行偏振模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-平行偏振模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-027",
+      "case_id": "7cf8b363-7d36-5eb1-83fc-db1c5f8ba5e5",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「交叉偏振」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-交叉偏振模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 116,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-027",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-交叉偏振模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-交叉偏振模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-028",
+      "case_id": "c1235e1d-32cd-525b-a4e4-2340e08d1865",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "切换到「灰度」图谱模式成功",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.光影增强-灰度模式",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 117,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-028",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证光影增强-灰度模式",
+      "timeout_seconds": 15.0,
+      "title": "光影增强-灰度模式"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-029",
+      "case_id": "53f8f84a-5397-553c-be0e-2cdb373e8f92",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "默认无对比模式正常",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.模式对比-无对比",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 118,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-029",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证模式对比-无对比",
+      "timeout_seconds": 15.0,
+      "title": "模式对比-无对比"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-030",
+      "case_id": "12cda721-e0dc-56d8-9e8f-504040d2410a",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "AI综合分析评分区可见，炎敏/肤色/色素/亮度/红区五项评分均非空；不记录具体评分值",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.AI综合分析-评分显示",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 119,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-030",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证AI综合分析-评分显示",
+      "timeout_seconds": 15.0,
+      "title": "AI综合分析-评分显示"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-031",
+      "case_id": "6ae207e6-50a1-53f9-a34c-0eabcd5ee84e",
+      "data_type": "string",
+      "enabled": false,
+      "execution_group": "A",
+      "expected_result": "图谱说明面板正常打开",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P2",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.AI综合分析-图谱说明",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 120,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-031",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p2",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证AI综合分析-图谱说明",
+      "timeout_seconds": 15.0,
+      "title": "AI综合分析-图谱说明"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-032",
+      "case_id": "50865ba8-41ac-54e6-9018-97f5b5bab34b",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "点击查看案例后进入原生 .CaseActivity，案例列表可见",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.查看案例跳转",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 121,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-032",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证查看案例跳转",
+      "timeout_seconds": 15.0,
+      "title": "查看案例跳转"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-033",
+      "case_id": "1f757564-fcc3-5bb3-9de4-79b2ca03ecd6",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "点击查看报告后进入原生 .SkinReportActivity，报告预览和分享入口可见",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.查看报告跳转",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 122,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-033",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证查看报告跳转",
+      "timeout_seconds": 15.0,
+      "title": "查看报告跳转"
+    },
+    {
+      "assertion": {
+        "expected": "PASS",
+        "type": "excel_case_passed"
+      },
+      "case_code": "TC-IMAGE-034",
+      "case_id": "e27f2ff7-d77e-5202-91e4-5b96ead56fd3",
+      "data_type": "string",
+      "enabled": true,
+      "execution_group": "A",
+      "expected_result": "点击返回并选择不保存直接退出后回到原生 .CustomerDetailActivity，详情控件可见",
+      "module_key": "image-viewer",
+      "module_name": "影像阅览",
+      "notes": "需要「咨询单特定」测试用户且有历史影像",
+      "preconditions": [
+        "已登录"
+      ],
+      "priority": "P1",
+      "schema_version": "1.0",
+      "source_instructions": "1.进入顾客列表\n2.搜索「咨询单特定」\n3.进入详情页\n4.点击右侧历史影像下方的影像进入阅览页\n5.点返回，弹框中点「不保存直接退出」回到顾客详情页",
+      "source_trace": {
+        "kind": "legacy_excel",
+        "row_number": 123,
+        "worksheet": "自动化测试用例"
+      },
+      "steps": [
+        {
+          "input": "TC-IMAGE-034",
+          "operation": "execute_excel_case"
+        }
+      ],
+      "tags": [
+        "p1",
+        "image",
+        "tablet",
+        "readonly",
+        "requires_auth",
+        "requires_seed",
+        "android",
+        "excel-driven"
+      ],
+      "test_point": "验证返回顾客详情",
+      "timeout_seconds": 15.0,
+      "title": "返回顾客详情"
+    }
+  ],
+  "project_key": "yanjia-ai-android",
+  "schema_version": "1.0",
+  "source": {
+    "file_digest": "sha256:4c63e6980816d10ea771ca34d9aeb0b9e66b6dbfc6e0cf33e5cd630e9160bc95",
+    "file_name": "test_case.xlsx",
+    "kind": "legacy_excel",
+    "worksheet": "自动化测试用例"
+  },
+  "version": "case-v1.0.0"
+}

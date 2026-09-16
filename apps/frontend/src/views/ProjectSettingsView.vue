@@ -597,18 +597,20 @@ onMounted(load)
 
 <template>
   <div class="page-container" v-loading="loading">
-    <el-button text class="back-link" @click="router.push({ name: 'project', params: { projectId } })">
-      <el-icon><ArrowLeft /></el-icon>
-      返回项目
-    </el-button>
-    <header class="page-heading settings-heading">
-      <div>
-        <div class="project-key">{{ project?.key }}</div>
-        <h1>{{ project?.name || '项目' }} · 设置</h1>
-        <p>管理成员角色、测试资源、Runner Pool、定时回归、Secret 引用和项目执行策略。</p>
-      </div>
-      <el-button :icon="Refresh" @click="load">刷新</el-button>
-    </header>
+    <div class="page-sticky-header">
+      <el-button text class="back-link" @click="router.push({ name: 'project', params: { projectId } })">
+        <el-icon><ArrowLeft /></el-icon>
+        返回项目
+      </el-button>
+      <header class="page-heading settings-heading">
+        <div>
+          <div class="project-key">{{ project?.key }}</div>
+          <h1>{{ project?.name || '项目' }} · 设置</h1>
+          <p>管理成员角色、测试资源、Runner Pool、定时回归、Secret 引用和项目执行策略。</p>
+        </div>
+        <el-button :icon="Refresh" @click="load">刷新</el-button>
+      </header>
+    </div>
 
     <div class="metric-grid">
       <article class="metric-card"><el-icon><User /></el-icon><strong>{{ members.length }}</strong><span>项目成员</span></article>

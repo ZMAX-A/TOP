@@ -7,6 +7,7 @@ import {
   Connection,
   Download,
   Files,
+  MagicStick,
   Refresh,
   RefreshRight,
   Timer,
@@ -17,6 +18,8 @@ import { ElMessage } from 'element-plus'
 
 import { ApiError, api, streamRunEvents } from '@/api/client'
 import type {
+  AiFailureCategory,
+  AiRunAnalysis,
   Artifact,
   ProjectMember,
   RunDetail,
@@ -35,6 +38,22 @@ const TERMINAL_STATUSES = new Set<RunStatus>([
   'TIMED_OUT',
   'INFRA_ERROR',
 ])
+const AI_ANALYZABLE_STATUSES = new Set<RunStatus>([
+  'FAILED',
+  'CANCELED',
+  'TIMED_OUT',
+  'INFRA_ERROR',
+])
+const AI_CATEGORY_LABELS: Record<AiFailureCategory, string> = {
+  PRODUCT_DEFECT: '产品缺陷',
+  AUTOMATION_SCRIPT: '自动化脚本',
+  ASSERTION: '断言问题',
+  ENVIRONMENT: '环境问题',
+  TEST_DATA: '测试数据',
+  FLAKY_TIMING: '时序不稳定',
+  PLATFORM_RESOURCE: '平台资源',
+  UNKNOWN: '证据不足',
+}
 const DISPATCH_WAIT_LABELS: Record<string, string> = {
   RUNNER_POOL_NOT_FOUND: '绑定的 Runner Pool 不存在',
   RUNNER_POOL_DRAINING: 'Runner Pool 正在排空，暂不接收新任务',
@@ -79,6 +98,9 @@ const streamConnected = ref(false)
 const streamError = ref('')
 const downloadingArtifact = ref<string | null>(null)
 const actionBusy = ref(false)
+const aiAnalysis = ref<AiRunAnalysis>()
+const aiAnalysisBusy = ref(false)
+const aiAnalysisError = ref('')
 const members = ref<ProjectMember[]>([])
 const liveViewState = ref<RunLiveViewStatus>()
 const liveViewBusy = ref(false)
@@ -99,6 +121,9 @@ const lastEventSequence = computed(
 )
 const terminal = computed(() =>
   run.value ? TERMINAL_STATUSES.has(run.value.status) : false,
+)
+const aiAnalyzable = computed(() =>
+  run.value ? AI_ANALYZABLE_STATUSES.has(run.value.status) : false,
 )
 const headedRun = computed(() => run.value?.snapshot.web_config?.headless === false)
 const liveViewReady = computed(
@@ -187,8 +212,40 @@ const testProgress = computed<RunProgressSnapshot>(() => {
 const roundLabel = computed(() => {
   if (testProgress.value.current_round === 1) return '首轮测试'
   if (testProgress.value.current_round === 2) return '第二轮复跑'
-  return '第三轮复跑'
+  if (testProgress.value.current_round === 3) return '第三轮复跑'
+  return `第 ${testProgress.value.current_round} 轮复跑`
 })
+const roundSteps = computed(() =>
+  Array.from(
+    { length: Math.max(1, testProgress.value.total_rounds) },
+    (_, index) => {
+      const round = index + 1
+      let state: 'complete' | 'active' | 'error' | 'skipped' | 'pending' = 'pending'
+      if (round < testProgress.value.current_round) state = 'complete'
+      if (round === testProgress.value.current_round) {
+        state = terminal.value
+          ? run.value?.status === 'PASSED'
+            ? 'complete'
+            : 'error'
+          : 'active'
+      }
+      if (terminal.value && round > testProgress.value.current_round) state = 'skipped'
+      const label =
+        round === 1 ? '首轮测试' : round === 2 ? '第二轮复跑' : round === 3 ? '第三轮复跑' : `第 ${round} 轮复跑`
+      const detail =
+        state === 'complete'
+          ? '已完成'
+          : state === 'active'
+            ? `${testProgress.value.round_completed} / ${testProgress.value.round_total} 条`
+            : state === 'error'
+              ? run.value?.status ?? '执行异常'
+              : state === 'skipped'
+                ? '无需复跑'
+                : '等待执行'
+      return { round, label, detail, state }
+    },
+  ),
+)
 const roundProgressPercentage = computed(() => {
   const progress = testProgress.value
   if (terminal.value) return 100
@@ -212,6 +269,19 @@ function statusTagType(
   if (['RUNNING', 'PREPARING'].includes(status)) return 'warning'
   if (status === 'QUEUED') return 'primary'
   return 'info'
+}
+
+function aiCategoryTagType(
+  category: AiFailureCategory,
+): 'success' | 'warning' | 'danger' | 'info' | 'primary' {
+  if (category === 'PRODUCT_DEFECT') return 'danger'
+  if (['PLATFORM_RESOURCE', 'ENVIRONMENT'].includes(category)) return 'warning'
+  if (category === 'UNKNOWN') return 'info'
+  return 'primary'
+}
+
+function confidencePercent(confidence: number): number {
+  return Math.round(confidence * 100)
 }
 
 function eventLabel(event: RunEvent): string {
@@ -375,6 +445,10 @@ async function load(): Promise<void> {
     if (detail.project_id !== projectId.value) {
       throw new ApiError(404, 'Run 不属于当前项目')
     }
+    if (aiAnalysis.value?.run_id !== detail.id) {
+      aiAnalysis.value = undefined
+      aiAnalysisError.value = ''
+    }
     run.value = detail
     events.value = timeline.sort((left, right) => left.sequence - right.sequence)
     members.value = memberList
@@ -384,6 +458,20 @@ async function load(): Promise<void> {
     ElMessage.error(error instanceof ApiError ? error.message : 'Run 详情加载失败')
   } finally {
     loading.value = false
+  }
+}
+
+async function analyzeFailure(): Promise<void> {
+  if (!run.value || !aiAnalyzable.value) return
+  aiAnalysisBusy.value = true
+  aiAnalysisError.value = ''
+  try {
+    aiAnalysis.value = await api.analyzeRun(run.value.id)
+    ElMessage.success('AI 失败分析已生成')
+  } catch (error) {
+    aiAnalysisError.value = error instanceof ApiError ? error.message : 'AI 失败分析生成失败'
+  } finally {
+    aiAnalysisBusy.value = false
   }
 }
 
@@ -459,16 +547,17 @@ onBeforeUnmount(() => {
 
 <template>
   <div v-loading="loading || actionBusy" class="page-container run-page">
-    <el-button
-      text
-      class="back-link"
-      @click="router.push({ name: 'project-runs', params: { projectId } })"
-    >
-      <el-icon><ArrowLeft /></el-icon>
-      返回运行记录
-    </el-button>
+    <div class="page-sticky-header">
+      <el-button
+        text
+        class="back-link"
+        @click="router.push({ name: 'project-runs', params: { projectId } })"
+      >
+        <el-icon><ArrowLeft /></el-icon>
+        返回运行记录
+      </el-button>
 
-    <header class="page-heading run-heading">
+      <header class="page-heading run-heading">
       <div>
         <div class="run-kicker">Immutable execution</div>
         <h1>Run 执行详情</h1>
@@ -487,6 +576,13 @@ onBeforeUnmount(() => {
           :disabled="!liveViewReady"
           @click="openLiveView"
         >{{ liveViewLabel }}</el-button>
+        <el-button
+          v-if="aiAnalyzable"
+          type="primary"
+          :icon="MagicStick"
+          :loading="aiAnalysisBusy"
+          @click="analyzeFailure"
+        >{{ aiAnalysis ? '重新生成 AI 分析' : 'AI 分析失败' }}</el-button>
         <el-button :icon="Refresh" @click="load">刷新</el-button>
         <el-button
           v-if="canOperate && !terminal"
@@ -507,7 +603,8 @@ onBeforeUnmount(() => {
           @click="rerunCurrent('FAILED_ONLY')"
         >仅重跑异常</el-button>
       </div>
-    </header>
+      </header>
+    </div>
 
     <el-alert
       v-if="run?.source_run_id"
@@ -567,6 +664,20 @@ onBeforeUnmount(() => {
         <el-tag :type="terminal ? runTagType(run.status) : 'warning'" effect="light">
           第 {{ testProgress.current_round }} / {{ testProgress.total_rounds }} 轮
         </el-tag>
+      </div>
+      <div class="round-stage-track" :style="{ '--round-count': roundSteps.length }">
+        <div
+          v-for="step in roundSteps"
+          :key="step.round"
+          class="round-stage"
+          :class="`stage-${step.state}`"
+        >
+          <span class="round-stage-node">{{ step.round }}</span>
+          <div>
+            <strong>{{ step.label }}</strong>
+            <small>{{ step.detail }}</small>
+          </div>
+        </div>
       </div>
       <div class="round-progress-label">
         <span>{{ roundLabel }}</span>
@@ -642,6 +753,83 @@ onBeforeUnmount(() => {
       :closable="false"
       class="diagnostic-alert"
     />
+
+    <section
+      v-if="aiAnalysis || aiAnalysisBusy || aiAnalysisError"
+      class="surface ai-analysis-section"
+    >
+      <div class="ai-analysis-heading">
+        <div>
+          <span class="ai-kicker"><el-icon><MagicStick /></el-icon> AI 只读分析</span>
+          <h2>失败原因研判</h2>
+        </div>
+        <div v-if="aiAnalysis" class="ai-analysis-tags">
+          <el-tag :type="aiCategoryTagType(aiAnalysis.classification)" effect="light">
+            {{ AI_CATEGORY_LABELS[aiAnalysis.classification] }}
+          </el-tag>
+          <el-tag type="info" effect="plain">
+            置信度 {{ confidencePercent(aiAnalysis.confidence) }}%
+          </el-tag>
+        </div>
+      </div>
+
+      <el-alert
+        v-if="aiAnalysisError"
+        title="AI 分析未生成"
+        :description="aiAnalysisError"
+        type="error"
+        show-icon
+        :closable="false"
+      />
+      <el-skeleton v-else-if="aiAnalysisBusy" :rows="5" animated />
+      <div v-else-if="aiAnalysis" class="ai-analysis-content">
+        <p class="ai-summary">{{ aiAnalysis.summary }}</p>
+
+        <div v-if="aiAnalysis.probable_causes.length" class="ai-cause-list">
+          <article
+            v-for="(cause, index) in aiAnalysis.probable_causes"
+            :key="`${cause.title}-${index}`"
+            class="ai-cause-card"
+          >
+            <div>
+              <strong>{{ index + 1 }}. {{ cause.title }}</strong>
+              <span>{{ confidencePercent(cause.confidence) }}%</span>
+            </div>
+            <p>{{ cause.detail }}</p>
+            <div class="ai-evidence-refs">
+              <code v-for="evidenceRef in cause.evidence_refs" :key="evidenceRef">
+                {{ evidenceRef }}
+              </code>
+            </div>
+          </article>
+        </div>
+
+        <div class="ai-guidance-grid">
+          <div>
+            <strong>建议下一步</strong>
+            <ol v-if="aiAnalysis.recommendations.length">
+              <li v-for="item in aiAnalysis.recommendations" :key="item">{{ item }}</li>
+            </ol>
+            <p v-else class="empty-guidance">暂无明确建议</p>
+          </div>
+          <div>
+            <strong>仍缺少的证据</strong>
+            <ul v-if="aiAnalysis.missing_evidence.length">
+              <li v-for="item in aiAnalysis.missing_evidence" :key="item">{{ item }}</li>
+            </ul>
+            <p v-else class="empty-guidance">当前证据未标记明显缺口</p>
+          </div>
+        </div>
+
+        <footer class="ai-analysis-meta">
+          <span>{{ aiAnalysis.model }} · {{ aiAnalysis.latency_ms }} ms</span>
+          <span>分析 {{ aiAnalysis.analyzed_case_count }} 条异常用例</span>
+          <span v-if="aiAnalysis.evidence_truncated">证据已按安全上限截断</span>
+          <span>{{ formatDate(aiAnalysis.generated_at) }}</span>
+          <strong>AI 内容仅供研判，不改变平台测试结果</strong>
+        </footer>
+      </div>
+    </section>
 
     <div v-if="run" class="detail-grid">
       <main>
@@ -750,7 +938,11 @@ onBeforeUnmount(() => {
             <div><dt>浏览器</dt><dd>{{ run.snapshot.browser || '—' }}</dd></div>
             <div>
               <dt>运行方式</dt>
-              <dd>{{ run.snapshot.web_config?.headless === false ? '有头模式' : '无头模式' }}</dd>
+              <dd>{{
+                run.snapshot.automation_package.runner_type === 'ANDROID_APPIUM'
+                  ? 'Android 真机'
+                  : run.snapshot.web_config?.headless === false ? '有头模式' : '无头模式'
+              }}</dd>
             </div>
             <div v-if="headedRun">
               <dt>实时观看</dt>
@@ -891,7 +1083,7 @@ onBeforeUnmount(() => {
 }
 
 .run-kicker {
-  color: #168579;
+  color: var(--top-accent-600);
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.15em;
@@ -942,11 +1134,162 @@ onBeforeUnmount(() => {
   margin-bottom: 18px;
 }
 
+.ai-analysis-section {
+  margin-bottom: 20px;
+  padding: 22px 24px;
+  border: 1px solid #d8e5f5;
+  background: linear-gradient(135deg, #fff 0%, #f4f8ff 100%);
+}
+
+.ai-analysis-heading,
+.ai-analysis-tags,
+.ai-cause-card > div:first-child,
+.ai-analysis-meta {
+  display: flex;
+  align-items: center;
+}
+
+.ai-analysis-heading {
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.ai-analysis-heading h2 {
+  margin: 4px 0 0;
+  color: #17324d;
+  font-size: 20px;
+}
+
+.ai-kicker {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: #476aa8;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.1em;
+}
+
+.ai-analysis-tags {
+  gap: 8px;
+}
+
+.ai-summary {
+  margin: 0;
+  color: #34495e;
+  font-size: 14px;
+  line-height: 1.75;
+}
+
+.ai-cause-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.ai-cause-card {
+  padding: 16px;
+  border: 1px solid #e1e8f2;
+  border-radius: 10px;
+  background: rgb(255 255 255 / 82%);
+}
+
+.ai-cause-card > div:first-child {
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.ai-cause-card strong {
+  color: #27415b;
+  font-size: 13px;
+}
+
+.ai-cause-card > div:first-child span {
+  color: #607ca5;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.ai-cause-card p {
+  margin: 10px 0;
+  color: #5e7083;
+  font-size: 12px;
+  line-height: 1.65;
+}
+
+.ai-evidence-refs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.ai-evidence-refs code {
+  padding: 3px 7px;
+  border-radius: 5px;
+  background: #edf3fb;
+  color: #4e6b91;
+}
+
+.ai-guidance-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 20px;
+  padding-top: 18px;
+  border-top: 1px solid #e2e9f2;
+}
+
+.ai-guidance-grid strong {
+  color: #27415b;
+  font-size: 13px;
+}
+
+.ai-guidance-grid ol,
+.ai-guidance-grid ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  color: #52677b;
+  font-size: 12px;
+  line-height: 1.75;
+}
+
+.empty-guidance {
+  margin: 10px 0 0;
+  color: #8b9aaa;
+  font-size: 12px;
+}
+
+.ai-analysis-meta {
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 18px;
+  color: #8392a2;
+  font-size: 10px;
+}
+
+.ai-analysis-meta strong {
+  margin-left: auto;
+  color: #5b7191;
+}
+
 .run-progress-card {
   margin-bottom: 18px;
   padding: 22px 24px;
-  border: 1px solid #dce8e6;
-  background: linear-gradient(135deg, #fff 0%, #f4fbf9 100%);
+  overflow: hidden;
+  border: 1px solid rgb(15 130 119 / 18%);
+  background:
+    radial-gradient(circle at 100% 0%, rgb(24 163 148 / 10%), transparent 22rem),
+    linear-gradient(145deg, #fff 0%, #f6fbfa 100%);
+  box-shadow: var(--top-shadow-1);
+}
+
+.run-progress-card.progress-failed {
+  border-color: rgb(210 75 86 / 19%);
+  background:
+    radial-gradient(circle at 100% 0%, rgb(210 75 86 / 8%), transparent 22rem),
+    linear-gradient(145deg, #fff 0%, #fff9f9 100%);
 }
 
 .progress-heading,
@@ -963,15 +1306,118 @@ onBeforeUnmount(() => {
 
 .progress-heading h2 {
   margin: 3px 0 0;
-  color: #17324d;
+  color: var(--top-text-strong);
   font-size: 20px;
 }
 
 .progress-eyebrow {
-  color: #168579;
+  color: var(--top-accent-600);
   font-size: 11px;
   font-weight: 750;
   letter-spacing: 0.12em;
+}
+
+.round-stage-track {
+  --round-count: 3;
+
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(var(--round-count), minmax(0, 1fr));
+  gap: 12px;
+  margin: 2px 0 22px;
+  padding: 14px 16px;
+  border: 1px solid rgb(205 216 227 / 78%);
+  border-radius: var(--top-radius-md);
+  background: rgb(255 255 255 / 72%);
+}
+
+.round-stage-track::before {
+  position: absolute;
+  top: 30px;
+  right: calc(16px + (100% - 32px) / (var(--round-count) * 2));
+  left: calc(16px + (100% - 32px) / (var(--round-count) * 2));
+  height: 1px;
+  background: var(--top-border-strong);
+  content: "";
+}
+
+.round-stage {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.round-stage-node {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  place-items: center;
+  border: 1px solid var(--top-border-strong);
+  border-radius: 50%;
+  color: var(--top-text-faint);
+  background: var(--top-surface);
+  font-size: 11px;
+  font-weight: 800;
+  box-shadow: 0 0 0 4px rgb(255 255 255 / 78%);
+}
+
+.round-stage > div {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.round-stage strong,
+.round-stage small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.round-stage strong {
+  color: var(--top-text);
+  font-size: 11px;
+}
+
+.round-stage small {
+  color: var(--top-text-faint);
+  font-size: 9px;
+}
+
+.round-stage.stage-complete .round-stage-node {
+  border-color: var(--top-accent-600);
+  color: #fff;
+  background: var(--top-accent-600);
+}
+
+.round-stage.stage-active .round-stage-node {
+  border-color: var(--top-info);
+  color: #fff;
+  background: var(--top-info);
+  box-shadow: 0 0 0 5px rgb(63 115 184 / 12%);
+}
+
+.round-stage.stage-active strong {
+  color: var(--top-info);
+}
+
+.round-stage.stage-error .round-stage-node {
+  border-color: var(--top-danger);
+  color: #fff;
+  background: var(--top-danger);
+  box-shadow: 0 0 0 5px rgb(210 75 86 / 11%);
+}
+
+.round-stage.stage-error strong {
+  color: var(--top-danger);
+}
+
+.round-stage.stage-skipped {
+  opacity: 0.62;
 }
 
 .round-progress-label {
@@ -990,7 +1436,7 @@ onBeforeUnmount(() => {
 }
 
 .run-progress-card :deep(.el-progress-bar__inner) {
-  background: linear-gradient(90deg, #138b7e, #37b99a);
+  background: linear-gradient(90deg, var(--top-accent-700), #37b99a);
 }
 
 .run-progress-card.progress-failed :deep(.el-progress-bar__inner) {
@@ -1008,8 +1454,8 @@ onBeforeUnmount(() => {
   display: grid;
   gap: 4px;
   padding: 14px 16px;
-  border: 1px solid #e2eae9;
-  border-radius: 9px;
+  border: 1px solid var(--top-border);
+  border-radius: var(--top-radius-md);
   background: rgb(255 255 255 / 82%);
 }
 
@@ -1045,8 +1491,8 @@ onBeforeUnmount(() => {
 
 .run-metrics {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 16px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
   margin-bottom: 20px;
 }
 
@@ -1056,9 +1502,10 @@ onBeforeUnmount(() => {
   gap: 15px;
   align-items: center;
   padding: 22px;
-  border: 1px solid #e5eaee;
-  border-radius: 11px;
-  background: #fff;
+  border: 1px solid var(--top-border);
+  border-radius: var(--top-radius-lg);
+  background: var(--top-surface);
+  box-shadow: var(--top-shadow-1);
 }
 
 .metric-icon {
@@ -1262,7 +1709,27 @@ code {
   padding-top: 8px;
 }
 
+@media (max-width: 1240px) {
+  .run-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 @media (max-width: 900px) {
+  .ai-analysis-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .ai-guidance-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .ai-analysis-meta strong {
+    width: 100%;
+    margin-left: 0;
+  }
+
   .progress-stat-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }

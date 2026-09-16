@@ -15,6 +15,7 @@ from testops.contracts import (
     RunSnapshot,
     RunStatus,
 )
+from testops.runners.android_appium import AndroidAppiumAdapter
 from testops.runners.legacy_pytest import LegacyPytestAdapter
 from testops.runners.web import EnvironmentSecretProvider, PlaywrightWebAdapter
 
@@ -248,9 +249,16 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
             worker_key=settings.runner_worker_key,
         )
         runtime = settings.runner_package_catalog.require(job.automation_package)
-        if runtime.runner_type != "WEB_PLAYWRIGHT":
+        if runtime.runner_type not in {"WEB_PLAYWRIGHT", "ANDROID_APPIUM"}:
             raise PackageRuntimeUnavailable(
                 f"worker has no adapter for automation package runner type {runtime.runner_type}"
+            )
+        if (
+            runtime.runner_type == "ANDROID_APPIUM"
+            and settings.runner_execution_mode != "IN_PROCESS"
+        ):
+            raise PackageRuntimeUnavailable(
+                "ANDROID_APPIUM requires an IN_PROCESS Windows device Worker"
             )
         control_plane.report_status(
             job.run_id,
@@ -270,6 +278,7 @@ def execute_run(snapshot_payload: dict[str, object]) -> dict[str, object]:
                 secret_provider=EnvironmentSecretProvider(),
                 playwright_adapter_type=PlaywrightWebAdapter,
                 legacy_adapter_type=LegacyPytestAdapter,
+                android_adapter_type=AndroidAppiumAdapter,
             )
             adapter.prepare(job)
 

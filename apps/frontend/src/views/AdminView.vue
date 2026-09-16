@@ -2,10 +2,12 @@
 import { computed, onMounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { Key, Monitor, Plus, Refresh, Tickets, User, VideoPause } from '@element-plus/icons-vue'
-import { ElMessage } from 'element-plus'
+import { ElMessage, ElMessageBox } from 'element-plus'
 
 import { ApiError, api } from '@/api/client'
 import type {
+  AiModelOption,
+  AiModelProvider,
   AuditLog,
   ManagedSession,
   Project,
@@ -23,7 +25,15 @@ import { formatDate } from '@/presentation'
 
 const route = useRoute()
 const router = useRouter()
-const allowedTabs = new Set(['users', 'projects', 'runners', 'supply-chain', 'sessions', 'audit'])
+const allowedTabs = new Set([
+  'users',
+  'projects',
+  'runners',
+  'ai-models',
+  'supply-chain',
+  'sessions',
+  'audit',
+])
 const requestedTab = typeof route.query.view === 'string' ? route.query.view : 'users'
 const activeTab = ref(allowedTabs.has(requestedTab) ? requestedTab : 'users')
 const loading = ref(false)
@@ -50,6 +60,8 @@ const auditAction = ref('')
 const runnerPools = ref<RunnerPool[]>([])
 const runnerWorkers = ref<RunnerWorker[]>([])
 const verifierKeyReadiness = ref<SupplyChainVerifierKeyReadiness>()
+const aiModelProviders = ref<AiModelProvider[]>([])
+const aiModelOptions = ref<AiModelOption[]>([])
 
 const userCreateVisible = ref(false)
 const userCreateBusy = ref(false)
@@ -78,10 +90,25 @@ const runnerPoolForm = reactive({
   target_types: ['WEB'] as Array<'WEB' | 'APP' | 'API'>,
   max_concurrency: 1,
 })
+const aiProviderVisible = ref(false)
+const aiProviderBusy = ref(false)
+const probingProviderId = ref('')
+const aiProviderForm = reactive({
+  id: '',
+  name: '',
+  base_url: '',
+  model: '',
+  api_key: '',
+  status: 'ACTIVE' as AiModelProvider['status'],
+  is_default: false,
+})
 
 const activeSessionCount = computed(() => sessions.value.filter((item) => item.active).length)
 const healthyRunnerCount = computed(
   () => runnerWorkers.value.filter((item) => item.health === 'ONLINE' && item.status === 'ACTIVE').length,
+)
+const environmentModel = computed(() =>
+  aiModelOptions.value.find((item) => item.source === 'ENVIRONMENT'),
 )
 
 function report(error: unknown, fallback: string): void {
@@ -179,10 +206,27 @@ async function loadVerifierKeys(): Promise<void> {
   }
 }
 
+async function loadAiModelProviders(): Promise<void> {
+  loading.value = true
+  try {
+    const [providers, catalog] = await Promise.all([
+      api.aiModelProviders(),
+      api.aiModels(),
+    ])
+    aiModelProviders.value = providers
+    aiModelOptions.value = catalog.items
+  } catch (error) {
+    report(error, 'AI 模型配置加载失败')
+  } finally {
+    loading.value = false
+  }
+}
+
 async function loadActiveTab(): Promise<void> {
   if (activeTab.value === 'users') await loadUsers()
   else if (activeTab.value === 'projects') await loadProjects()
   else if (activeTab.value === 'runners') await loadRunners()
+  else if (activeTab.value === 'ai-models') await loadAiModelProviders()
   else if (activeTab.value === 'supply-chain') await loadVerifierKeys()
   else if (activeTab.value === 'sessions') await loadSessions()
   else await loadAudit()
@@ -334,6 +378,113 @@ async function updateRunnerWorker(worker: RunnerWorker, status: RunnerWorker['st
     await loadRunners()
   } catch (error) {
     report(error, 'Runner Worker 更新失败')
+  }
+}
+
+function openAiProvider(provider?: AiModelProvider): void {
+  Object.assign(aiProviderForm, {
+    id: provider?.id ?? '',
+    name: provider?.name ?? '',
+    base_url: provider?.base_url ?? '',
+    model: provider?.model ?? '',
+    api_key: '',
+    status: provider?.status ?? 'ACTIVE',
+    is_default: provider?.is_default ?? false,
+  })
+  aiProviderVisible.value = true
+}
+
+async function saveAiProvider(): Promise<void> {
+  if (!aiProviderForm.name.trim() || !aiProviderForm.base_url.trim() || !aiProviderForm.model.trim()) {
+    ElMessage.warning('请完整填写配置名称、Base URL 和模型名称')
+    return
+  }
+  aiProviderBusy.value = true
+  try {
+    const payload: Record<string, unknown> = {
+      name: aiProviderForm.name,
+      base_url: aiProviderForm.base_url,
+      model: aiProviderForm.model,
+      status: aiProviderForm.status,
+      is_default: aiProviderForm.is_default,
+    }
+    if (aiProviderForm.api_key.trim()) payload.api_key = aiProviderForm.api_key
+    if (aiProviderForm.id) {
+      await api.updateAiModelProvider(aiProviderForm.id, payload)
+      ElMessage.success('AI 模型配置已更新')
+    } else {
+      await api.createAiModelProvider(payload)
+      ElMessage.success('AI 模型配置已创建')
+    }
+    aiProviderVisible.value = false
+    await loadAiModelProviders()
+  } catch (error) {
+    report(error, 'AI 模型配置保存失败')
+  } finally {
+    aiProviderBusy.value = false
+  }
+}
+
+async function setDefaultAiProvider(provider: AiModelProvider): Promise<void> {
+  try {
+    await api.updateAiModelProvider(provider.id, { is_default: true, status: 'ACTIVE' })
+    ElMessage.success(`已将 ${provider.name} 设为默认模型`)
+    await loadAiModelProviders()
+  } catch (error) {
+    report(error, '默认模型切换失败')
+  }
+}
+
+async function useEnvironmentAiProvider(): Promise<void> {
+  const currentDefault = aiModelProviders.value.find((item) => item.is_default)
+  if (!currentDefault) return
+  try {
+    await api.updateAiModelProvider(currentDefault.id, { is_default: false })
+    ElMessage.success('已恢复环境变量模型为默认模型')
+    await loadAiModelProviders()
+  } catch (error) {
+    report(error, '默认模型切换失败')
+  }
+}
+
+async function updateAiProviderStatus(
+  provider: AiModelProvider,
+  status: AiModelProvider['status'],
+): Promise<void> {
+  try {
+    await api.updateAiModelProvider(provider.id, { status })
+    ElMessage.success(status === 'ACTIVE' ? 'AI 模型已启用' : 'AI 模型已停用')
+    await loadAiModelProviders()
+  } catch (error) {
+    report(error, 'AI 模型状态更新失败')
+  }
+}
+
+async function probeAiProvider(provider: AiModelProvider): Promise<void> {
+  probingProviderId.value = provider.id
+  try {
+    const result = await api.probeAiModelProvider(provider.id)
+    ElMessage.success(`连接正常：${result.model} · ${result.latency_ms} ms`)
+  } catch (error) {
+    report(error, 'AI 模型连接测试失败')
+  } finally {
+    probingProviderId.value = ''
+  }
+}
+
+async function removeAiProvider(provider: AiModelProvider): Promise<void> {
+  try {
+    await ElMessageBox.confirm(
+      `确定删除 AI 模型配置“${provider.name}”吗？现有对话记录不会被删除。`,
+      '删除模型配置',
+      { type: 'warning', confirmButtonText: '删除', cancelButtonText: '取消' },
+    )
+    await api.deleteAiModelProvider(provider.id)
+    ElMessage.success('AI 模型配置已删除')
+    await loadAiModelProviders()
+  } catch (error) {
+    if (error === 'cancel' || error === 'close') return
+    report(error, 'AI 模型配置删除失败')
   }
 }
 
@@ -541,6 +692,105 @@ onMounted(loadActiveTab)
                 >管理</el-button>
                 <el-button link @click="toggleProject(scope.row as Project)">
                   {{ scope.row.status === 'ACTIVE' ? '归档' : '恢复' }}
+                </el-button>
+              </template>
+            </el-table-column>
+          </el-table>
+        </el-tab-pane>
+
+        <el-tab-pane label="AI 模型" name="ai-models">
+          <div class="toolbar">
+            <div>
+              <strong>模型接入配置</strong>
+              <span class="section-note">保留现有 AI 体系，并扩展 OpenAI-compatible Chat Completions 接口</span>
+            </div>
+            <el-button type="primary" :icon="Plus" @click="openAiProvider()">新增模型</el-button>
+          </div>
+
+          <el-alert
+            class="ai-provider-alert"
+            type="info"
+            :closable="false"
+            title="API Key 仅在保存时提交，服务端加密存储且不会通过接口返回；编辑时留空表示保留原密钥。"
+          />
+
+          <article v-if="environmentModel" class="environment-model-card">
+            <div>
+              <span class="environment-model-badge">内置配置</span>
+              <strong>{{ environmentModel.name }}</strong>
+              <p>{{ environmentModel.model }} · 来自服务端环境变量</p>
+            </div>
+            <div class="environment-model-actions">
+              <el-tag :type="environmentModel.is_default ? 'success' : 'info'">
+                {{ environmentModel.is_default ? '当前默认' : '可用' }}
+              </el-tag>
+              <el-button
+                v-if="!environmentModel.is_default"
+                type="primary"
+                plain
+                @click="useEnvironmentAiProvider"
+              >恢复为默认</el-button>
+            </div>
+          </article>
+
+          <el-table :data="aiModelProviders" empty-text="尚未添加自定义 AI 模型">
+            <el-table-column label="配置 / 模型" min-width="230">
+              <template #default="scope">
+                <div class="provider-title-row">
+                  <strong>{{ scope.row.name }}</strong>
+                  <el-tag v-if="scope.row.is_default" size="small" type="success">默认</el-tag>
+                </div>
+                <div class="muted mono">{{ scope.row.model }}</div>
+              </template>
+            </el-table-column>
+            <el-table-column label="接口地址" min-width="310">
+              <template #default="scope">
+                <code class="provider-endpoint">{{ scope.row.base_url }}</code>
+              </template>
+            </el-table-column>
+            <el-table-column label="凭据 / 传输" width="165">
+              <template #default="scope">
+                <div class="provider-tags">
+                  <el-tag size="small" :type="scope.row.api_key_configured ? 'success' : 'info'">
+                    {{ scope.row.api_key_configured ? '密钥已配置' : '无密钥' }}
+                  </el-tag>
+                  <el-tag
+                    size="small"
+                    :type="scope.row.transport_security === 'INSECURE_HTTP' ? 'warning' : 'info'"
+                  >{{ scope.row.transport_security }}</el-tag>
+                </div>
+              </template>
+            </el-table-column>
+            <el-table-column label="状态" width="135">
+              <template #default="scope">
+                <el-select
+                  :model-value="scope.row.status"
+                  @change="updateAiProviderStatus(scope.row as AiModelProvider, $event)"
+                >
+                  <el-option label="启用" value="ACTIVE" />
+                  <el-option label="停用" value="DISABLED" />
+                </el-select>
+              </template>
+            </el-table-column>
+            <el-table-column label="操作" width="285" fixed="right">
+              <template #default="scope">
+                <el-button
+                  link
+                  type="primary"
+                  :loading="probingProviderId === scope.row.id"
+                  :disabled="scope.row.status !== 'ACTIVE'"
+                  @click="probeAiProvider(scope.row as AiModelProvider)"
+                >测试连接</el-button>
+                <el-button
+                  v-if="!scope.row.is_default"
+                  link
+                  type="success"
+                  :disabled="scope.row.status !== 'ACTIVE'"
+                  @click="setDefaultAiProvider(scope.row as AiModelProvider)"
+                >设为默认</el-button>
+                <el-button link @click="openAiProvider(scope.row as AiModelProvider)">编辑</el-button>
+                <el-button link type="danger" @click="removeAiProvider(scope.row as AiModelProvider)">
+                  删除
                 </el-button>
               </template>
             </el-table-column>
@@ -912,6 +1162,63 @@ onMounted(loadActiveTab)
       </template>
     </el-dialog>
 
+    <el-dialog
+      v-model="aiProviderVisible"
+      :title="aiProviderForm.id ? '编辑 AI 模型' : '新增 AI 模型'"
+      width="620px"
+      destroy-on-close
+    >
+      <el-form label-position="top">
+        <el-form-item label="配置名称" required>
+          <el-input v-model="aiProviderForm.name" maxlength="120" placeholder="例如：本地 Qwen 主模型" />
+        </el-form-item>
+        <el-form-item label="Base URL" required>
+          <el-input
+            v-model="aiProviderForm.base_url"
+            maxlength="2000"
+            placeholder="https://model.example.com/v1"
+          />
+          <p class="form-field-hint">
+            支持填写 API 根路径或完整 /chat/completions 地址；非本机明文 HTTP 需由服务端显式允许。
+          </p>
+        </el-form-item>
+        <el-form-item label="模型名称" required>
+          <el-input v-model="aiProviderForm.model" maxlength="200" placeholder="例如：qwen3.5-27b" />
+        </el-form-item>
+        <el-form-item :label="aiProviderForm.id ? '替换 API Key（可选）' : 'API Key（可选）'">
+          <el-input
+            v-model="aiProviderForm.api_key"
+            type="password"
+            show-password
+            maxlength="4096"
+            autocomplete="new-password"
+            :placeholder="aiProviderForm.id ? '留空则保留原密钥' : '无需认证的本地模型可留空'"
+          />
+        </el-form-item>
+        <div class="dialog-grid">
+          <el-form-item label="状态">
+            <el-select v-model="aiProviderForm.status" style="width: 100%">
+              <el-option label="启用" value="ACTIVE" />
+              <el-option label="停用" value="DISABLED" />
+            </el-select>
+          </el-form-item>
+          <el-form-item label="默认模型">
+            <el-switch
+              v-model="aiProviderForm.is_default"
+              :disabled="aiProviderForm.status !== 'ACTIVE'"
+              active-text="设为平台默认"
+            />
+          </el-form-item>
+        </div>
+      </el-form>
+      <template #footer>
+        <el-button @click="aiProviderVisible = false">取消</el-button>
+        <el-button type="primary" :loading="aiProviderBusy" @click="saveAiProvider">
+          保存配置
+        </el-button>
+      </template>
+    </el-dialog>
+
     <el-dialog v-model="runnerPoolVisible" title="创建 Runner Pool" width="560px" destroy-on-close>
       <el-form label-position="top">
         <div class="dialog-grid">
@@ -1029,6 +1336,68 @@ onMounted(loadActiveTab)
 
 .key-warning {
   margin-bottom: 10px;
+}
+
+.ai-provider-alert {
+  margin: 0 20px 14px;
+}
+
+.environment-model-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 20px 16px;
+  padding: 16px 18px;
+  border: 1px solid rgb(15 130 119 / 20%);
+  border-radius: 11px;
+  background: linear-gradient(135deg, rgb(232 247 244 / 88%), #fff);
+}
+
+.environment-model-card > div:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.environment-model-card strong {
+  color: var(--top-text-strong);
+  font-size: 14px;
+}
+
+.environment-model-card p {
+  margin: 0;
+  color: var(--top-text-muted);
+  font-size: 11px;
+}
+
+.environment-model-badge {
+  color: var(--top-accent-700);
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.environment-model-actions,
+.provider-title-row,
+.provider-tags {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.provider-tags {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.provider-endpoint {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dialog-grid {

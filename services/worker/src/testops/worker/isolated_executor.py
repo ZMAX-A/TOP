@@ -11,6 +11,7 @@ from collections.abc import Mapping
 from pathlib import Path
 
 from testops.contracts import RunExecutionIsolationEvidence, RunResult, RunSnapshot
+from testops.runners.android_appium import AndroidAppiumAdapter
 from testops.runners.legacy_pytest import LegacyPytestAdapter
 from testops.runners.web import EnvironmentSecretProvider, PlaywrightWebAdapter
 
@@ -162,6 +163,7 @@ def execute_isolated_snapshot(
         environ=child_environment,
         playwright_adapter_type=PlaywrightWebAdapter,
         legacy_adapter_type=LegacyPytestAdapter,
+        android_adapter_type=AndroidAppiumAdapter,
     )
     adapter.prepare(job)
     result = adapter.execute(job, lambda _event: None).model_copy(

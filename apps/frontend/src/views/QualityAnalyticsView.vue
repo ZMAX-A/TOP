@@ -628,16 +628,17 @@ onUnmounted(() => {
 
 <template>
   <div class="page-container" v-loading="loading">
-    <el-button
-      text
-      class="back-link"
-      @click="router.push({ name: 'project', params: { projectId } })"
-    >
-      <el-icon><ArrowLeft /></el-icon>
-      返回项目
-    </el-button>
+    <div class="page-sticky-header">
+      <el-button
+        text
+        class="back-link"
+        @click="router.push({ name: 'project', params: { projectId } })"
+      >
+        <el-icon><ArrowLeft /></el-icon>
+        返回项目
+      </el-button>
 
-    <header class="page-heading quality-heading">
+      <header class="page-heading quality-heading">
       <div>
         <div class="project-key">{{ project?.key }}</div>
         <h1>{{ project?.name || '项目' }} · 质量分析</h1>
@@ -657,7 +658,8 @@ onUnmounted(() => {
         </el-select>
         <el-button :icon="Refresh" @click="load(selectedWindowDays)">刷新</el-button>
       </div>
-    </header>
+      </header>
+    </div>
 
     <section class="dimension-filters">
       <div class="dimension-filter-heading">

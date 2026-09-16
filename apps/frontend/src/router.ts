@@ -27,6 +27,11 @@ const router = createRouter({
       component: () => import('@/views/ChangesInboxView.vue'),
     },
     {
+      path: '/ai',
+      name: 'ai-assistant',
+      component: () => import('@/views/AiAssistantView.vue'),
+    },
+    {
       path: '/admin',
       name: 'admin',
       component: () => import('@/views/AdminView.vue'),

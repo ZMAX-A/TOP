@@ -14,6 +14,9 @@ from fastapi.responses import JSONResponse
 from testops.contracts import capability_payload
 from testops.contracts.schema_export import schemas
 
+from .ai_gateway import OpenAiCompatibleGateway
+from .ai_provider_services import AiGatewayManager
+from .ai_routes import router as ai_router
 from .artifact_store import MinioArtifactStore
 from .config import Settings
 from .database import create_database_runtime, create_schema, database_ready
@@ -63,6 +66,11 @@ def create_app(
     application.state.session_factory = session_factory
     application.state.artifact_store = MinioArtifactStore.from_settings(resolved_settings)
     application.state.live_view_store = resolved_live_view_store
+    application.state.ai_gateway = OpenAiCompatibleGateway.from_settings(resolved_settings)
+    application.state.ai_gateway_manager = AiGatewayManager(
+        resolved_settings,
+        application.state.ai_gateway,
+    )
     application.state.git_release_fetcher = git_release_fetcher or HttpxGitHubReleaseFetcher(
         resolved_settings
     )
@@ -170,6 +178,7 @@ def create_app(
             raise HTTPException(status_code=404, detail="unknown contract schema") from exc
 
     application.include_router(identity_router)
+    application.include_router(ai_router)
     application.include_router(governance_router)
     application.include_router(release_sync_router)
     application.include_router(router)

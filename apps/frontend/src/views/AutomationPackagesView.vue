@@ -58,7 +58,9 @@ const canManage = computed(
     auth.state.user?.system_role === 'SYSTEM_ADMIN' ||
     currentMember.value?.role === 'PROJECT_ADMIN',
 )
-const webTargets = computed(() => targets.value.filter((item) => item.target_type === 'WEB'))
+const packageTargets = computed(() =>
+  targets.value.filter((item) => ['WEB', 'APP'].includes(item.target_type)),
+)
 const selectedTarget = computed(() =>
   targets.value.find((item) => item.id === selectedTargetId.value),
 )
@@ -82,7 +84,7 @@ const draftForm = reactive({
   name: '',
   version: '',
   digest: 'sha256:',
-  runner_type: 'WEB_PLAYWRIGHT' as const,
+  runner_type: 'WEB_PLAYWRIGHT' as AutomationPackage['runner_type'],
   image_repository: '',
   supersedes_id: '',
 })
@@ -207,8 +209,8 @@ async function initialize(): Promise<void> {
     targets.value = targetList
     baselines.value = baselineList
     selectedTargetId.value =
-      webTargets.value.find((item) => item.id === route.query.targetId)?.id ??
-      webTargets.value[0]?.id ??
+      packageTargets.value.find((item) => item.id === route.query.targetId)?.id ??
+      packageTargets.value[0]?.id ??
       ''
     await loadTargetData(
       typeof route.query.packageId === 'string' ? route.query.packageId : '',
@@ -361,7 +363,8 @@ function openDraft(): void {
     name: base?.status !== 'REVOKED' ? base?.name ?? '' : '',
     version: '',
     digest: 'sha256:',
-    runner_type: 'WEB_PLAYWRIGHT',
+    runner_type:
+      selectedTarget.value?.target_type === 'APP' ? 'ANDROID_APPIUM' : 'WEB_PLAYWRIGHT',
     image_repository: base?.status !== 'REVOKED' ? base?.image_repository ?? '' : '',
     supersedes_id: base?.status !== 'REVOKED' ? base?.id ?? '' : '',
   })
@@ -532,30 +535,31 @@ onMounted(initialize)
 
 <template>
   <div class="page-container" v-loading="loading || actionBusy">
-    <el-button
-      text
-      class="back-link"
-      @click="router.push({ name: 'project', params: { projectId } })"
-    >
-      <el-icon><ArrowLeft /></el-icon>
-      返回项目
-    </el-button>
+    <div class="page-sticky-header">
+      <el-button
+        text
+        class="back-link"
+        @click="router.push({ name: 'project', params: { projectId } })"
+      >
+        <el-icon><ArrowLeft /></el-icon>
+        返回项目
+      </el-button>
 
-    <header class="page-heading packages-heading">
+      <header class="page-heading packages-heading">
       <div>
         <div class="project-key">{{ project?.key }}</div>
         <h1>{{ project?.name || '项目' }} · 自动化包</h1>
-        <p>以不可变 OCI 摘要、Sigstore 签名、构建来源证明和 SBOM 治理包发布。</p>
+        <p>以不可变包摘要、签名、构建来源证明和 SBOM 治理 Web 与 APP 自动化发布。</p>
       </div>
       <div class="heading-actions">
         <el-select
           v-model="selectedTargetId"
-          placeholder="选择 Web 目标"
+          placeholder="选择 Web 或 APP 目标"
           class="target-select"
           @change="changeTarget"
         >
           <el-option
-            v-for="target in webTargets"
+            v-for="target in packageTargets"
             :key="target.id"
             :label="`${target.name} · ${target.key}`"
             :value="target.id"
@@ -563,7 +567,7 @@ onMounted(initialize)
         </el-select>
         <el-button :icon="Refresh" @click="refreshTargetData">刷新</el-button>
         <el-button
-          v-if="canManage && selectedTargetId"
+          v-if="canManage && selectedTarget?.target_type === 'WEB'"
           :icon="Download"
           @click="openGitReleaseSync"
         >从 Git 标签同步</el-button>
@@ -574,7 +578,8 @@ onMounted(initialize)
           @click="openDraft"
         >创建草稿</el-button>
       </div>
-    </header>
+      </header>
+    </div>
 
     <el-alert
       v-if="!canManage"
@@ -585,8 +590,8 @@ onMounted(initialize)
       class="permission-alert"
     />
     <el-alert
-      v-if="targets.length > 0 && webTargets.length === 0"
-      title="当前项目没有 Web 目标；自动化包工作台暂只支持 WEB_PLAYWRIGHT。"
+      v-if="targets.length > 0 && packageTargets.length === 0"
+      title="当前项目没有可用的 Web 或 APP 测试目标。"
       type="warning"
       :closable="false"
       show-icon
@@ -708,7 +713,7 @@ onMounted(initialize)
           <dl class="detail-list">
             <div><dt>目标</dt><dd>{{ selectedTarget?.name }}</dd></div>
             <div><dt>Runner</dt><dd><code>{{ selectedPackage.runner_type }}</code></dd></div>
-            <div class="wide"><dt>OCI 仓库</dt><dd class="mono wrap">{{ selectedPackage.image_repository }}</dd></div>
+            <div class="wide"><dt>运行包仓库</dt><dd class="mono wrap">{{ selectedPackage.image_repository }}</dd></div>
             <div class="wide"><dt>内容摘要</dt><dd class="mono wrap">{{ selectedPackage.digest }}</dd></div>
             <div><dt>替代版本</dt><dd class="mono">{{ selectedPackage.supersedes_id || '—' }}</dd></div>
             <div><dt>激活时间</dt><dd>{{ formatDate(selectedPackage.activated_at) }}</dd></div>
@@ -930,7 +935,7 @@ onMounted(initialize)
 
     <el-dialog v-model="draftVisible" title="创建自动化包草稿" width="680px" destroy-on-close>
       <el-alert
-        title="创建后状态为待供应链验证。可信 CI 必须验证最终 OCI 摘要的签名、provenance 和 SBOM，准入后才能执行全量验证。"
+        title="创建后状态为待供应链验证。可信 CI 必须验证最终包摘要、provenance 和 SBOM，准入后才能执行全量验证。"
         type="info"
         :closable="false"
         show-icon
@@ -946,11 +951,11 @@ onMounted(initialize)
             <p class="form-field-hint">必填；填写可追溯且不可变的版本号，例如 0.35.0。</p>
           </el-form-item>
         </div>
-        <el-form-item label="OCI 仓库（不带协议、标签和摘要）" required>
-          <el-input v-model="draftForm.image_repository" placeholder="registry.example.com/testops/yanjia-web" />
+        <el-form-item label="运行包仓库（不带协议、标签和摘要）" required>
+          <el-input v-model="draftForm.image_repository" placeholder="local/yanjia-android-appium" />
           <p class="form-field-hint">必填；不得包含协议、空格、@digest 或可变标签，例如 :latest。</p>
         </el-form-item>
-        <el-form-item label="OCI Manifest Digest" required>
+        <el-form-item label="不可变包 Digest" required>
           <el-input v-model="draftForm.digest" class="mono-input" placeholder="sha256:..." />
           <p class="form-field-hint">必填；格式为 sha256: 后跟 64 位小写十六进制字符。</p>
         </el-form-item>

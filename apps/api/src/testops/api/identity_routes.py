@@ -38,6 +38,9 @@ from .identity_schemas import (
     ProjectMemberCandidateResponse,
     ProjectMemberResponse,
     ProjectMemberUpsert,
+    RunEmailDeliveryResponse,
+    RunEmailPreferenceResponse,
+    RunEmailPreferenceUpdate,
     SessionResponse,
     SystemRole,
     UserCreate,
@@ -48,6 +51,11 @@ from .identity_schemas import (
     UserUpdate,
 )
 from .persistence import UserRecord
+from .run_email_services import (
+    enqueue_run_email_test,
+    get_run_email_preference,
+    update_run_email_preference,
+)
 
 Session = Annotated[AsyncSession, Depends(get_session)]
 router = APIRouter(prefix="/api/v1")
@@ -118,6 +126,60 @@ async def get_me(principal: CurrentPrincipal, session: Session) -> UserResponse:
     user = await session.get(UserRecord, principal.user_id)
     assert user is not None
     return _user_response(user)
+
+
+@router.get(
+    "/auth/me/run-email-notifications",
+    response_model=RunEmailPreferenceResponse,
+    tags=["authentication"],
+)
+async def get_my_run_email_notifications(
+    request: Request,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RunEmailPreferenceResponse:
+    return await get_run_email_preference(
+        session,
+        principal.user_id,
+        smtp_configured=request.app.state.settings.smtp_configured,
+    )
+
+
+@router.put(
+    "/auth/me/run-email-notifications",
+    response_model=RunEmailPreferenceResponse,
+    tags=["authentication"],
+)
+async def put_my_run_email_notifications(
+    payload: RunEmailPreferenceUpdate,
+    request: Request,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RunEmailPreferenceResponse:
+    return await update_run_email_preference(
+        session,
+        principal.user_id,
+        payload,
+        smtp_configured=request.app.state.settings.smtp_configured,
+    )
+
+
+@router.post(
+    "/auth/me/run-email-notifications/test",
+    response_model=RunEmailDeliveryResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+    tags=["authentication"],
+)
+async def post_my_run_email_notification_test(
+    request: Request,
+    principal: CurrentPrincipal,
+    session: Session,
+) -> RunEmailDeliveryResponse:
+    return await enqueue_run_email_test(
+        session,
+        principal.user_id,
+        smtp_configured=request.app.state.settings.smtp_configured,
+    )
 
 
 @router.post(

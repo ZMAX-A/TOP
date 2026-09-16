@@ -95,7 +95,7 @@ const filters = reactive<{
   created_range: [],
 })
 
-const createForm = reactive<RunCreate>({
+const createForm = reactive<RunCreate & { headless: boolean }>({
   project_id: '',
   target_id: '',
   environment_id: '',
@@ -133,6 +133,9 @@ const filteredCreateCases = computed(() => {
 })
 const selectedCreateEnvironment = computed(() =>
   createEnvironments.value.find((item) => item.id === createForm.environment_id),
+)
+const selectedCreateTarget = computed(() =>
+  targets.value.find((item) => item.id === createForm.target_id),
 )
 const selectedCreateBaseline = computed(() =>
   createBaselines.value.find((item) => item.baseline_id === createForm.baseline_id),
@@ -214,7 +217,10 @@ function resetCreateForm(): void {
 }
 
 function syncCreateHeadlessDefault(): void {
-  createForm.headless = selectedCreateEnvironment.value?.web_config?.headless !== false
+  createForm.headless =
+    selectedCreateTarget.value?.target_type === 'WEB'
+      ? selectedCreateEnvironment.value?.web_config?.headless !== false
+      : true
 }
 
 async function loadCreateTargetResources(): Promise<void> {
@@ -326,7 +332,9 @@ async function submitCreateRun(): Promise<void> {
   }
   try {
     await ElMessageBox.confirm(
-      `将在 ${selectedCreateEnvironment.value?.name ?? '所选环境'} 以${createForm.headless ? '无头' : '有头'}模式执行 ${createForm.case_codes.length} 条用例，任务创建后将由专用 Worker 访问已配置的测试目标。`,
+      selectedCreateTarget.value?.target_type === 'WEB'
+        ? `将在 ${selectedCreateEnvironment.value?.name ?? '所选环境'} 以${createForm.headless ? '无头' : '有头'}模式执行 ${createForm.case_codes.length} 条用例，任务创建后将由专用 Worker 访问已配置的测试目标。`
+        : `将在 ${selectedCreateEnvironment.value?.name ?? '所选环境'} 通过已连接的 Android 设备执行 ${createForm.case_codes.length} 条用例，任务创建后将由专用 Appium Worker 接管。`,
       '确认开始自动化运行',
       { type: 'warning', confirmButtonText: '开始运行', cancelButtonText: '返回选择' },
     )
@@ -339,6 +347,8 @@ async function submitCreateRun(): Promise<void> {
       {
         ...createForm,
         case_codes: [...createForm.case_codes],
+        headless:
+          selectedCreateTarget.value?.target_type === 'WEB' ? createForm.headless : null,
       },
       createClientRequestId(),
     )
@@ -441,11 +451,12 @@ onMounted(initialize)
 
 <template>
   <div class="page-container" v-loading="loading || actionBusy">
-    <el-button text class="back-link" @click="router.push({ name: 'project', params: { projectId }, query: { view: 'runs' } })">
-      <el-icon><ArrowLeft /></el-icon>
-      返回项目
-    </el-button>
-    <header class="page-heading operations-heading">
+    <div class="page-sticky-header">
+      <el-button text class="back-link" @click="router.push({ name: 'project', params: { projectId }, query: { view: 'runs' } })">
+        <el-icon><ArrowLeft /></el-icon>
+        返回项目
+      </el-button>
+      <header class="page-heading operations-heading">
       <div>
         <div class="project-key">{{ project?.key }}</div>
         <h1>{{ project?.name || '项目' }} · 运行运营</h1>
@@ -463,7 +474,8 @@ onMounted(initialize)
           @click="batchCancel"
         >批量取消（{{ selectedCancelable.length }}）</el-button>
       </div>
-    </header>
+      </header>
+    </div>
 
     <div class="metric-grid">
       <article class="metric-card"><el-icon><VideoPlay /></el-icon><strong>{{ total }}</strong><span>匹配运行</span></article>
@@ -587,7 +599,7 @@ onMounted(initialize)
     >
       <div v-loading="createLoading" class="create-run-dialog">
         <el-alert
-          title="脚本、浏览器、Excel 和 Python 依赖均由专用 Worker 镜像提供；这里只需选择运行资源和用例。"
+          title="脚本、浏览器或 Android 设备、Excel 和 Python 依赖均由专用 Worker 提供；这里只需选择运行资源和用例。"
           type="info"
           :closable="false"
           show-icon
@@ -641,7 +653,12 @@ onMounted(initialize)
                 {{ selectedCreatePackage.image_repository }}@{{ shortDigest(selectedCreatePackage.digest) }}
               </p>
             </el-form-item>
-            <el-form-item label="浏览器运行方式" required class="execution-mode-item">
+            <el-form-item
+              v-if="selectedCreateTarget?.target_type === 'WEB'"
+              label="浏览器运行方式"
+              required
+              class="execution-mode-item"
+            >
               <el-radio-group v-model="createForm.headless" class="execution-mode-options">
                 <el-radio-button :value="true">无头模式</el-radio-button>
                 <el-radio-button :value="false">有头模式</el-radio-button>

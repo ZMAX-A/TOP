@@ -76,6 +76,7 @@ class ArtifactKind(StrEnum):
 
 
 StepInput = str | int | float | bool | list[str] | dict[str, str] | None
+RunnerType = Literal["WEB_PLAYWRIGHT", "ANDROID_APPIUM"]
 
 
 class StepDefinition(FrozenModel):
@@ -214,7 +215,7 @@ class WebRunConfig(FrozenModel):
 
 
 class AutomationPackageRuntimeRef(FrozenModel):
-    runner_type: Literal["WEB_PLAYWRIGHT"] = "WEB_PLAYWRIGHT"
+    runner_type: RunnerType = "WEB_PLAYWRIGHT"
     image_repository: NonEmptyStr = "testops-worker"
     digest: Sha256Digest
 
@@ -283,6 +284,14 @@ class RunSnapshot(FrozenModel):
                 raise ValueError("WEB run requires web_config")
         elif self.web_config:
             raise ValueError("web_config is only valid for WEB runs")
+        expected_runner = {
+            TargetType.WEB: "WEB_PLAYWRIGHT",
+            TargetType.APP: "ANDROID_APPIUM",
+        }.get(self.target_type)
+        if expected_runner and self.automation_package.runner_type != expected_runner:
+            raise ValueError(
+                f"{self.target_type.value} run requires {expected_runner} automation package"
+            )
         case_ids = [case.case_id for case in self.cases]
         if len(case_ids) != len(set(case_ids)):
             raise ValueError("run snapshot contains duplicate case_id")

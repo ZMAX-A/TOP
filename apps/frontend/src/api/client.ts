@@ -1,4 +1,14 @@
 import type {
+  AiConversationDetail,
+  AiConversationList,
+  AiChatQuestionRequest,
+  AiChatQuestionResponse,
+  AiModelCatalog,
+  AiModelProvider,
+  AiModelProviderProbe,
+  AiProjectChatRequest,
+  AiProjectChatResponse,
+  AiRunAnalysis,
   AutomationPackage,
   AutomationPackageSupplyChainEnvelope,
   AutomationPackageSupplyChainVerification,
@@ -31,6 +41,9 @@ import type {
   RunBatchCancelResult,
   RunCreate,
   RunDetail,
+  RunEmailDelivery,
+  RunEmailPreference,
+  RunEmailPreferenceUpdate,
   RunEvent,
   RunList,
   RunLiveViewStatus,
@@ -126,6 +139,17 @@ export const api = {
   login: (username: string, password: string) =>
     request<LoginSession>('/api/v1/auth/login', json('POST', { username, password })),
   me: () => request<User>('/api/v1/auth/me'),
+  runEmailPreference: () =>
+    request<RunEmailPreference>('/api/v1/auth/me/run-email-notifications'),
+  updateRunEmailPreference: (payload: RunEmailPreferenceUpdate) =>
+    request<RunEmailPreference>(
+      '/api/v1/auth/me/run-email-notifications',
+      json('PUT', payload),
+    ),
+  testRunEmailNotification: () =>
+    request<RunEmailDelivery>('/api/v1/auth/me/run-email-notifications/test', {
+      method: 'POST',
+    }),
   logout: () => request<void>('/api/v1/auth/logout', { method: 'POST' }),
   createUser: (payload: unknown) => request<User>('/api/v1/users', json('POST', payload)),
   adminUsers: (filters: {
@@ -175,6 +199,18 @@ export const api = {
     ),
   supplyChainVerifierKeyReadiness: () =>
     request<SupplyChainVerifierKeyReadiness>('/api/v1/admin/supply-chain/verifier-keys'),
+  aiModels: () => request<AiModelCatalog>('/api/v1/ai/models'),
+  aiModelProviders: () => request<AiModelProvider[]>('/api/v1/ai/providers'),
+  createAiModelProvider: (payload: unknown) =>
+    request<AiModelProvider>('/api/v1/ai/providers', json('POST', payload)),
+  updateAiModelProvider: (providerId: string, payload: unknown) =>
+    request<AiModelProvider>(`/api/v1/ai/providers/${providerId}`, json('PATCH', payload)),
+  deleteAiModelProvider: (providerId: string) =>
+    request<void>(`/api/v1/ai/providers/${providerId}`, { method: 'DELETE' }),
+  probeAiModelProvider: (providerId: string) =>
+    request<AiModelProviderProbe>(`/api/v1/ai/providers/${providerId}/probe`, {
+      method: 'POST',
+    }),
   projects: () => request<Project[]>('/api/v1/projects'),
   createProject: (payload: unknown) =>
     request<Project>('/api/v1/projects', json('POST', payload)),
@@ -470,6 +506,34 @@ export const api = {
       json('POST', { mode }, { 'Idempotency-Key': idempotencyKey }),
     ),
   run: (runId: string) => request<RunDetail>(`/api/v1/runs/${runId}`),
+  analyzeRun: (runId: string) =>
+    request<AiRunAnalysis>(`/api/v1/ai/runs/${runId}/analysis`, { method: 'POST' }),
+  prepareProjectAiQuestion: (projectId: string, payload: AiChatQuestionRequest) =>
+    request<AiChatQuestionResponse>(
+      `/api/v1/ai/projects/${projectId}/chat/questions`,
+      json('POST', payload),
+    ),
+  projectAiChat: (projectId: string, payload: AiProjectChatRequest) =>
+    request<AiProjectChatResponse>(
+      `/api/v1/ai/projects/${projectId}/chat`,
+      json('POST', payload),
+    ),
+  aiConversations: (projectId: string, runId = '') =>
+    request<AiConversationList>(
+      withQuery(`/api/v1/ai/projects/${projectId}/conversations`, {
+        run_id: runId || undefined,
+      }),
+    ),
+  aiConversation: (projectId: string, conversationId: string, runId = '') =>
+    request<AiConversationDetail>(
+      withQuery(`/api/v1/ai/projects/${projectId}/conversations/${conversationId}`, {
+        run_id: runId || undefined,
+      }),
+    ),
+  deleteAiConversation: (projectId: string, conversationId: string) =>
+    request<void>(`/api/v1/ai/projects/${projectId}/conversations/${conversationId}`, {
+      method: 'DELETE',
+    }),
   runLiveViewStatus: (runId: string) =>
     request<RunLiveViewStatus>(`/api/v1/runs/${runId}/live-view`),
   createRunLiveViewTicket: (runId: string) =>

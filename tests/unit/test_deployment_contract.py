@@ -27,6 +27,7 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
         "migrate",
         "api",
         "outbox",
+        "run-emails",
         "scheduler",
         "reaper",
         "worker",
@@ -68,6 +69,9 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
     assert "RUNNER_CONTAINER_PIDS_LIMIT:" in compose
     assert "RUNNER_LIVE_VIEW_ENABLED:" in compose
     assert "RUNNER_LIVE_VIEW_PORT:" in compose
+    assert "SMTP_HOST:" in compose
+    assert "SMTP_FROM_ADDRESS:" in compose
+    assert "scripts/dispatch_run_emails.py" in compose
     for setting in (
         "SUPPLY_CHAIN_POLICY_VERSION",
         "SUPPLY_CHAIN_ALLOWED_VERIFIERS",
@@ -121,13 +125,16 @@ def test_compose_declares_the_complete_runtime_topology() -> None:
 
 def test_frontend_proxy_preserves_authenticated_sse_streaming() -> None:
     nginx = (ROOT / "infra/docker/nginx.conf").read_text("utf-8")
-    assert "proxy_pass http://api:8000;" in nginx
+    assert "resolver 127.0.0.11 valid=10s ipv6=off;" in nginx
+    assert "set $api_upstream api:8000;" in nginx
+    assert "proxy_pass http://$api_upstream;" in nginx
     assert "proxy_buffering off;" in nginx
     assert "proxy_read_timeout 3600s;" in nginx
     assert "client_max_body_size 1m;" in nginx
     assert "server_tokens off;" in nginx
     assert "location = /viewer/ws" in nginx
-    assert "proxy_pass http://viewer-gateway:6080/ws;" in nginx
+    assert "set $viewer_gateway_upstream viewer-gateway:6080;" in nginx
+    assert "proxy_pass http://$viewer_gateway_upstream/ws;" in nginx
     assert "proxy_set_header Upgrade $http_upgrade;" in nginx
     assert 'proxy_set_header Connection "upgrade";' in nginx
     assert "location /viewer/" in nginx
@@ -149,6 +156,21 @@ def test_container_base_images_are_pinned_and_bootstrap_can_be_disabled() -> Non
     assert "change-me-one-time-bootstrap-token" not in compose
     assert compose.count("@sha256:") >= 5
     assert dockerfiles.count("@sha256:") == 5
+
+
+def test_api_healthcheck_enforces_enabled_ai_route_contract() -> None:
+    compose = (ROOT / "compose.yaml").read_text("utf-8")
+    healthcheck = (ROOT / "scripts/check_api_health.py").read_text("utf-8")
+
+    assert "scripts/check_api_health.py" in compose
+    assert "AI_ENABLED" in healthcheck
+    for path in (
+        "/api/v1/ai/status",
+        "/api/v1/ai/models",
+        "/api/v1/ai/providers",
+        "/api/v1/ai/projects/{project_id}/chat",
+    ):
+        assert path in healthcheck
 
 
 def test_compose_smoke_baseline_is_stable_and_contract_valid() -> None:

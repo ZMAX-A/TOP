@@ -31,6 +31,42 @@ export interface LoginSession {
   user: User
 }
 
+export type RunEmailStatus = Extract<
+  RunStatus,
+  'PASSED' | 'FAILED' | 'CANCELED' | 'TIMED_OUT' | 'INFRA_ERROR'
+>
+
+export interface RunEmailDelivery {
+  id: string
+  event_type: string
+  run_id: string | null
+  destination_display: string
+  status: 'PENDING' | 'DELIVERED' | 'FAILED' | 'CANCELED'
+  attempts: number
+  last_error: string | null
+  created_at: string
+  delivered_at: string | null
+}
+
+export interface RunEmailPreference {
+  email: string | null
+  emails: string[]
+  selected_emails: string[]
+  enabled: boolean
+  statuses: RunEmailStatus[]
+  smtp_configured: boolean
+  updated_at: string | null
+  last_delivery: RunEmailDelivery | null
+}
+
+export interface RunEmailPreferenceUpdate {
+  email?: string | null
+  emails: string[]
+  selected_emails: string[]
+  enabled: boolean
+  statuses: RunEmailStatus[]
+}
+
 export interface Project {
   id: string
   key: string
@@ -306,7 +342,7 @@ export interface RunnerCapabilities {
   browsers: string[]
   labels: Record<string, string>
   automation_packages: Array<{
-    runner_type: 'WEB_PLAYWRIGHT'
+    runner_type: 'WEB_PLAYWRIGHT' | 'ANDROID_APPIUM'
     image_repository: string
     digest: string
   }>
@@ -483,7 +519,7 @@ export interface AutomationPackage {
   name: string
   version: string
   digest: string
-  runner_type: 'WEB_PLAYWRIGHT'
+  runner_type: 'WEB_PLAYWRIGHT' | 'ANDROID_APPIUM'
   image_repository: string
   status: 'DRAFT' | 'ACTIVE' | 'DEPRECATED' | 'REVOKED'
   supersedes_id: string | null
@@ -502,7 +538,7 @@ export interface GitReleaseAutomationPackage {
   name: string
   version: string
   digest: string
-  runner_type: 'WEB_PLAYWRIGHT'
+  runner_type: 'WEB_PLAYWRIGHT' | 'ANDROID_APPIUM'
   image_repository: string
 }
 
@@ -686,7 +722,7 @@ export interface RunCreate {
   baseline_id: string
   automation_package_id: string
   case_codes: string[]
-  headless: boolean
+  headless?: boolean | null
 }
 
 export interface Run {
@@ -812,7 +848,7 @@ export interface RunSnapshot {
     name: string
     version: string
     digest: string
-    runner_type: 'WEB_PLAYWRIGHT'
+    runner_type: 'WEB_PLAYWRIGHT' | 'ANDROID_APPIUM'
     image_repository: string
     supply_chain: {
       verification_id: string
@@ -837,6 +873,153 @@ export interface RunDetail extends Run {
   result: RunResult | null
   cases: RunCase[]
   artifacts: Artifact[]
+}
+
+export type AiFailureCategory =
+  | 'PRODUCT_DEFECT'
+  | 'AUTOMATION_SCRIPT'
+  | 'ASSERTION'
+  | 'ENVIRONMENT'
+  | 'TEST_DATA'
+  | 'FLAKY_TIMING'
+  | 'PLATFORM_RESOURCE'
+  | 'UNKNOWN'
+
+export interface AiProbableCause {
+  title: string
+  detail: string
+  category: AiFailureCategory
+  confidence: number
+  evidence_refs: string[]
+}
+
+export interface AiRunAnalysis {
+  run_id: string
+  run_status: RunStatus
+  model: string
+  generated_at: string
+  latency_ms: number
+  analyzed_case_count: number
+  evidence_truncated: boolean
+  summary: string
+  classification: AiFailureCategory
+  confidence: number
+  probable_causes: AiProbableCause[]
+  recommendations: string[]
+  missing_evidence: string[]
+}
+
+export interface AiChatTurn {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export interface AiProjectChatRequest {
+  message: string
+  run_id: string | null
+  conversation_id: string | null
+  question_message_id: string | null
+  model_provider_key: string | null
+  history: AiChatTurn[]
+}
+
+export interface AiChatQuestionRequest {
+  message: string
+  run_id: string | null
+  conversation_id: string | null
+  model_provider_key: string | null
+}
+
+export interface AiChatQuestionResponse {
+  conversation_id: string
+  message_id: string
+  created_at: string
+}
+
+export interface AiModelOption {
+  key: string
+  name: string
+  model: string
+  source: 'ENVIRONMENT' | 'CUSTOM'
+  is_default: boolean
+}
+
+export interface AiModelCatalog {
+  items: AiModelOption[]
+}
+
+export interface AiModelProvider {
+  id: string
+  name: string
+  provider_type: 'OPENAI_COMPATIBLE'
+  base_url: string
+  model: string
+  status: 'ACTIVE' | 'DISABLED'
+  is_default: boolean
+  api_key_configured: boolean
+  transport_security: 'HTTPS' | 'LOCAL_HTTP' | 'INSECURE_HTTP'
+  created_at: string
+  updated_at: string
+}
+
+export interface AiModelProviderProbe {
+  status: 'READY'
+  provider_id: string
+  model: string
+  latency_ms: number
+}
+
+export interface AiProjectChatSection {
+  title: string
+  items: string[]
+}
+
+export interface AiProjectChatResponse {
+  conversation_id: string
+  project_id: string
+  run_id: string | null
+  model: string
+  generated_at: string
+  latency_ms: number
+  evidence_truncated: boolean
+  answer: string
+  sections: AiProjectChatSection[]
+  evidence_refs: string[]
+  suggested_questions: string[]
+}
+
+export interface AiConversationSummary {
+  id: string
+  project_id: string
+  run_id: string | null
+  title: string
+  message_count: number
+  created_at: string
+  updated_at: string
+}
+
+export interface AiConversationMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  sections: AiProjectChatSection[]
+  evidence_refs: string[]
+  suggested_questions: string[]
+  model: string | null
+  latency_ms: number | null
+  generated_at: string | null
+  evidence_truncated: boolean
+  status: 'PENDING' | 'COMPLETED' | 'FAILED' | null
+  created_at: string
+}
+
+export interface AiConversationDetail {
+  conversation: AiConversationSummary
+  messages: AiConversationMessage[]
+}
+
+export interface AiConversationList {
+  items: AiConversationSummary[]
 }
 
 export interface RunLiveViewStatus {

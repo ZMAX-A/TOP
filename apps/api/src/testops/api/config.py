@@ -280,6 +280,27 @@ class Settings:
     github_release_token: str | None = field(default=None, repr=False)
     github_release_timeout_seconds: float = 15.0
     github_release_max_manifest_bytes: int = 5_000_000
+    ai_enabled: bool = False
+    ai_base_url: str | None = None
+    ai_api_key: str | None = field(default=None, repr=False)
+    ai_model: str | None = None
+    ai_provider_encryption_key: str | None = field(default=None, repr=False)
+    ai_timeout_seconds: float = 60.0
+    ai_allow_insecure_http: bool = False
+    ai_analysis_max_tokens: int = 16_384
+    ai_thinking_budget: int = 12_288
+    ai_max_evidence_chars: int = 24_000
+    ai_max_concurrency: int = 1
+    public_base_url: str = "http://localhost:8080"
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: str | None = field(default=None, repr=False)
+    smtp_from_address: str | None = None
+    smtp_from_name: str = "TestOps Platform"
+    smtp_starttls: bool = True
+    smtp_use_ssl: bool = False
+    smtp_timeout_seconds: float = 15.0
     supply_chain_policy_version: str = "testops-supply-chain-v1"
     supply_chain_allowed_verifiers: tuple[str, ...] = ()
     supply_chain_allowed_certificate_issuers: tuple[str, ...] = ()
@@ -309,9 +330,79 @@ class Settings:
         if not 1 <= self.github_release_timeout_seconds <= 60:
             raise ValueError("GITHUB_RELEASE_TIMEOUT_SECONDS must be between 1 and 60")
         if not 1_024 <= self.github_release_max_manifest_bytes <= 10_000_000:
+            raise ValueError("GITHUB_RELEASE_MAX_MANIFEST_BYTES must be between 1024 and 10000000")
+        if not 1 <= self.ai_timeout_seconds <= 300:
+            raise ValueError("AI_TIMEOUT_SECONDS must be between 1 and 300")
+        if not 256 <= self.ai_analysis_max_tokens <= 16_384:
+            raise ValueError("AI_ANALYSIS_MAX_TOKENS must be between 256 and 16384")
+        if not 0 <= self.ai_thinking_budget <= self.ai_analysis_max_tokens:
+            raise ValueError("AI_THINKING_BUDGET must be between 0 and AI_ANALYSIS_MAX_TOKENS")
+        if not 4_000 <= self.ai_max_evidence_chars <= 100_000:
+            raise ValueError("AI_MAX_EVIDENCE_CHARS must be between 4000 and 100000")
+        if not 1 <= self.ai_max_concurrency <= 8:
+            raise ValueError("AI_MAX_CONCURRENCY must be between 1 and 8")
+        if not 1 <= self.smtp_port <= 65535:
+            raise ValueError("SMTP_PORT must be between 1 and 65535")
+        if not 1 <= self.smtp_timeout_seconds <= 60:
+            raise ValueError("SMTP_TIMEOUT_SECONDS must be between 1 and 60")
+        if self.smtp_starttls and self.smtp_use_ssl:
+            raise ValueError("SMTP_STARTTLS and SMTP_USE_SSL cannot both be enabled")
+        if (self.smtp_username is None) != (self.smtp_password is None):
+            raise ValueError("SMTP_USERNAME and SMTP_PASSWORD must be configured together")
+        parsed_public_url = urlsplit(self.public_base_url)
+        if (
+            parsed_public_url.scheme not in {"http", "https"}
+            or not parsed_public_url.hostname
+            or parsed_public_url.username
+            or parsed_public_url.password
+            or parsed_public_url.query
+            or parsed_public_url.fragment
+        ):
             raise ValueError(
-                "GITHUB_RELEASE_MAX_MANIFEST_BYTES must be between 1024 and 10000000"
+                "PUBLIC_BASE_URL must be an HTTP(S) URL without credentials, query or fragment"
             )
+        if (
+            self.ai_provider_encryption_key is not None
+            and len(self.ai_provider_encryption_key.encode("utf-8")) < 32
+        ):
+            raise ValueError("AI_PROVIDER_ENCRYPTION_KEY must be at least 32 bytes")
+        if self.ai_enabled:
+            missing = [
+                name
+                for name, value in (
+                    ("AI_BASE_URL", self.ai_base_url),
+                    ("AI_API_KEY", self.ai_api_key),
+                    ("AI_MODEL", self.ai_model),
+                )
+                if not value or not value.strip()
+            ]
+            if missing:
+                raise ValueError(
+                    "AI is enabled but required settings are missing: " + ", ".join(missing)
+                )
+            assert self.ai_base_url is not None
+            parsed_ai_url = urlsplit(self.ai_base_url)
+            if (
+                parsed_ai_url.scheme not in {"http", "https"}
+                or not parsed_ai_url.hostname
+                or parsed_ai_url.username
+                or parsed_ai_url.password
+                or parsed_ai_url.query
+                or parsed_ai_url.fragment
+            ):
+                raise ValueError(
+                    "AI_BASE_URL must be an HTTP(S) URL without credentials, query or fragment"
+                )
+            loopback_hosts = {"localhost", "127.0.0.1", "::1", "host.docker.internal"}
+            if (
+                parsed_ai_url.scheme == "http"
+                and parsed_ai_url.hostname not in loopback_hosts
+                and not self.ai_allow_insecure_http
+            ):
+                raise ValueError(
+                    "AI_BASE_URL uses non-local HTTP; set AI_ALLOW_INSECURE_HTTP=true "
+                    "only for an explicitly trusted network"
+                )
         credential_ids = [
             item.credential_id
             for item in (
@@ -354,12 +445,17 @@ class Settings:
         )
         if not 30 <= run_dispatch_start_timeout_seconds <= 3600:
             raise ValueError("RUN_DISPATCH_START_TIMEOUT_SECONDS must be between 30 and 3600")
-        github_release_timeout_seconds = float(
-            os.getenv("GITHUB_RELEASE_TIMEOUT_SECONDS", "15")
-        )
+        github_release_timeout_seconds = float(os.getenv("GITHUB_RELEASE_TIMEOUT_SECONDS", "15"))
         github_release_max_manifest_bytes = int(
             os.getenv("GITHUB_RELEASE_MAX_MANIFEST_BYTES", "5000000")
         )
+        ai_timeout_seconds = float(os.getenv("AI_TIMEOUT_SECONDS", "60"))
+        ai_analysis_max_tokens = int(os.getenv("AI_ANALYSIS_MAX_TOKENS", "16384"))
+        ai_thinking_budget = int(os.getenv("AI_THINKING_BUDGET", "12288"))
+        ai_max_evidence_chars = int(os.getenv("AI_MAX_EVIDENCE_CHARS", "24000"))
+        ai_max_concurrency = int(os.getenv("AI_MAX_CONCURRENCY", "1"))
+        smtp_port = int(os.getenv("SMTP_PORT", "587"))
+        smtp_timeout_seconds = float(os.getenv("SMTP_TIMEOUT_SECONDS", "15"))
         cors_origins = tuple(
             origin.strip()
             for origin in os.getenv(
@@ -425,6 +521,28 @@ class Settings:
             github_release_token=os.getenv("GITHUB_RELEASE_TOKEN") or None,
             github_release_timeout_seconds=github_release_timeout_seconds,
             github_release_max_manifest_bytes=github_release_max_manifest_bytes,
+            ai_enabled=_environment_bool("AI_ENABLED", False),
+            ai_base_url=os.getenv("AI_BASE_URL") or None,
+            ai_api_key=os.getenv("AI_API_KEY") or None,
+            ai_model=os.getenv("AI_MODEL") or None,
+            ai_provider_encryption_key=os.getenv("AI_PROVIDER_ENCRYPTION_KEY") or None,
+            ai_timeout_seconds=ai_timeout_seconds,
+            ai_allow_insecure_http=_environment_bool("AI_ALLOW_INSECURE_HTTP", False),
+            ai_analysis_max_tokens=ai_analysis_max_tokens,
+            ai_thinking_budget=ai_thinking_budget,
+            ai_max_evidence_chars=ai_max_evidence_chars,
+            ai_max_concurrency=ai_max_concurrency,
+            public_base_url=os.getenv("PUBLIC_BASE_URL", "http://localhost:8080").rstrip("/"),
+            smtp_host=os.getenv("SMTP_HOST") or None,
+            smtp_port=smtp_port,
+            smtp_username=os.getenv("SMTP_USERNAME") or None,
+            smtp_password=os.getenv("SMTP_PASSWORD") or None,
+            smtp_from_address=os.getenv("SMTP_FROM_ADDRESS") or None,
+            smtp_from_name=os.getenv("SMTP_FROM_NAME", "TestOps Platform").strip()
+            or "TestOps Platform",
+            smtp_starttls=_environment_bool("SMTP_STARTTLS", True),
+            smtp_use_ssl=_environment_bool("SMTP_USE_SSL", False),
+            smtp_timeout_seconds=smtp_timeout_seconds,
             supply_chain_policy_version=supply_chain_policy_version,
             supply_chain_allowed_verifiers=_environment_tuple("SUPPLY_CHAIN_ALLOWED_VERIFIERS"),
             supply_chain_allowed_certificate_issuers=_environment_tuple(
@@ -447,3 +565,7 @@ class Settings:
             supply_chain_envelope_future_skew_seconds=(supply_chain_envelope_future_skew_seconds),
             supply_chain_key_expiry_warning_days=supply_chain_key_expiry_warning_days,
         )
+
+    @property
+    def smtp_configured(self) -> bool:
+        return bool(self.smtp_host and self.smtp_from_address)

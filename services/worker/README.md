@@ -15,6 +15,10 @@ FAILED 投递的人工重放会创建新的 PENDING 记录并保留原失败记�
 控制面的低基数指标会统计 PENDING/FAILED、最老 PENDING 年龄和重放记录；dispatcher 不直接推送指标，也不在
 标签中写入项目、目标或投递 ID。
 
+Run 结果邮件使用独立的 `run_email_deliveries` 队列和 `scripts/dispatch_run_emails.py`。用户只维护自己的收件
+邮箱和订阅状态，SMTP 主机、发件账号与密码由平台环境统一配置。结果落库和邮件入队在同一事务中完成，
+`run-emails` 服务负责 SMTP 发送和有界重试，因此邮件服务故障不会阻塞或回滚测试结果。
+
 当前闭环包括：
 
 - `run:<run_id>` 确定性任务 ID；

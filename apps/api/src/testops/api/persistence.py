@@ -19,6 +19,7 @@ from sqlalchemy import (
     Text,
     UniqueConstraint,
     Uuid,
+    text,
 )
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
@@ -86,6 +87,88 @@ class AuthSessionRecord(Base):
         nullable=False,
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+
+
+class RunEmailPreferenceRecord(TimestampMixin, Base):
+    __tablename__ = "run_email_preferences"
+    __table_args__ = (
+        CheckConstraint(
+            "enabled = false OR email IS NOT NULL",
+            name="enabled_requires_email",
+        ),
+    )
+
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    email: Mapped[str | None] = mapped_column(String(320))
+    emails: Mapped[list[str]] = mapped_column(
+        JSON_DOCUMENT,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'"),
+    )
+    selected_emails: Mapped[list[str]] = mapped_column(
+        JSON_DOCUMENT,
+        nullable=False,
+        default=list,
+        server_default=text("'[]'"),
+    )
+    enabled: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    statuses: Mapped[list[str]] = mapped_column(JSON_DOCUMENT, nullable=False, default=list)
+
+
+class RunEmailDeliveryRecord(Base):
+    __tablename__ = "run_email_deliveries"
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('PENDING', 'DELIVERED', 'FAILED', 'CANCELED')",
+            name="status_allowed",
+        ),
+        Index("ix_run_email_deliveries_pending", "status", "available_at"),
+        Index("ix_run_email_deliveries_user_created", "user_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("projects.id", ondelete="SET NULL"),
+        index=True,
+    )
+    run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("test_runs.id", ondelete="SET NULL"),
+        index=True,
+    )
+    event_type: Mapped[str] = mapped_column(String(64), nullable=False)
+    dedupe_key: Mapped[str] = mapped_column(String(200), nullable=False, unique=True)
+    recipient_email: Mapped[str] = mapped_column(String(320), nullable=False)
+    destination_display: Mapped[str] = mapped_column(String(320), nullable=False)
+    payload: Mapped[dict[str, Any]] = mapped_column(JSON_DOCUMENT, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="PENDING",
+        server_default="PENDING",
+    )
+    attempts: Mapped[int] = mapped_column(Integer, nullable=False, default=0, server_default="0")
+    available_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    last_error: Mapped[str | None] = mapped_column(String(500))
+    delivered_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
 
 
 class ProjectRecord(TimestampMixin, Base):
@@ -350,7 +433,7 @@ class AutomationPackageRecord(TimestampMixin, Base):
     __table_args__ = (
         UniqueConstraint("target_id", "name", "version"),
         CheckConstraint(
-            "runner_type IN ('WEB_PLAYWRIGHT')",
+            "runner_type IN ('WEB_PLAYWRIGHT', 'ANDROID_APPIUM')",
             name="runner_type_allowed",
         ),
         CheckConstraint(
@@ -738,6 +821,136 @@ class TestRunRecord(TimestampMixin, Base):
     timeout_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), index=True)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     error_message: Mapped[str | None] = mapped_column(Text)
+
+
+class AiModelProviderRecord(TimestampMixin, Base):
+    __tablename__ = "ai_model_providers"
+    __table_args__ = (
+        CheckConstraint(
+            "provider_type = 'OPENAI_COMPATIBLE'",
+            name="provider_type_supported",
+        ),
+        CheckConstraint(
+            "status IN ('ACTIVE', 'DISABLED')",
+            name="status_allowed",
+        ),
+        Index("ix_ai_model_providers_default_status", "is_default", "status"),
+        Index(
+            "uq_ai_model_providers_single_default",
+            "is_default",
+            unique=True,
+            postgresql_where=text("is_default"),
+            sqlite_where=text("is_default = 1"),
+        ),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    name: Mapped[str] = mapped_column(String(120), nullable=False, unique=True)
+    provider_type: Mapped[str] = mapped_column(
+        String(32),
+        nullable=False,
+        default="OPENAI_COMPATIBLE",
+        server_default="OPENAI_COMPATIBLE",
+    )
+    base_url: Mapped[str] = mapped_column(String(2_000), nullable=False)
+    model: Mapped[str] = mapped_column(String(200), nullable=False)
+    api_key_ciphertext: Mapped[str | None] = mapped_column(Text)
+    status: Mapped[str] = mapped_column(
+        String(16),
+        nullable=False,
+        default="ACTIVE",
+        server_default="ACTIVE",
+    )
+    is_default: Mapped[bool] = mapped_column(
+        Boolean,
+        nullable=False,
+        default=False,
+        server_default="false",
+    )
+    created_by: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+    updated_by: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), nullable=False)
+
+
+class AiChatConversationRecord(TimestampMixin, Base):
+    __tablename__ = "ai_chat_conversations"
+    __table_args__ = (
+        Index(
+            "ix_ai_chat_conversations_user_project_scope_updated",
+            "user_id",
+            "project_id",
+            "run_id",
+            "updated_at",
+        ),
+        CheckConstraint("message_count >= 0", name="message_count_non_negative"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    user_id: Mapped[UUID] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    project_id: Mapped[UUID] = mapped_column(
+        ForeignKey("projects.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    run_id: Mapped[UUID | None] = mapped_column(
+        ForeignKey("test_runs.id", ondelete="CASCADE"),
+        nullable=True,
+        index=True,
+    )
+    title: Mapped[str] = mapped_column(String(120), nullable=False)
+    message_count: Mapped[int] = mapped_column(
+        Integer,
+        nullable=False,
+        default=0,
+        server_default="0",
+    )
+
+
+class AiChatMessageRecord(Base):
+    __tablename__ = "ai_chat_messages"
+    __table_args__ = (
+        UniqueConstraint("conversation_id", "sequence"),
+        CheckConstraint("role IN ('user', 'assistant')", name="role_allowed"),
+        Index("ix_ai_chat_messages_conversation_created", "conversation_id", "created_at"),
+    )
+
+    id: Mapped[UUID] = mapped_column(Uuid(as_uuid=True), primary_key=True, default=uuid4)
+    conversation_id: Mapped[UUID] = mapped_column(
+        ForeignKey("ai_chat_conversations.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    sequence: Mapped[int] = mapped_column(Integer, nullable=False)
+    role: Mapped[str] = mapped_column(String(16), nullable=False)
+    content: Mapped[str] = mapped_column(Text, nullable=False)
+    sections: Mapped[list[dict[str, Any]]] = mapped_column(
+        JSON_DOCUMENT,
+        nullable=False,
+        default=list,
+    )
+    evidence_refs: Mapped[list[str]] = mapped_column(
+        JSON_DOCUMENT,
+        nullable=False,
+        default=list,
+    )
+    suggested_questions: Mapped[list[str]] = mapped_column(
+        JSON_DOCUMENT,
+        nullable=False,
+        default=list,
+    )
+    response_metadata: Mapped[dict[str, Any]] = mapped_column(
+        JSON_DOCUMENT,
+        nullable=False,
+        default=dict,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        default=utc_now,
+        nullable=False,
+    )
 
 
 class RegressionScheduleFiringRecord(Base):

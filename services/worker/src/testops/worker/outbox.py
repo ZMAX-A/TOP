@@ -115,10 +115,19 @@ def _worker_hosts_package(
     )
 
 
-def _worker_supports_execution_isolation(worker: RunnerWorkerRecord) -> bool:
+def _worker_supports_execution_isolation(
+    worker: RunnerWorkerRecord,
+    *,
+    allow_in_process_device_worker: bool = False,
+) -> bool:
     isolation = worker.capabilities.get("execution_isolation")
     if not isinstance(isolation, dict):
         return False
+    if allow_in_process_device_worker and isolation.get("mode") == "IN_PROCESS":
+        return (
+            isolation.get("dedicated_process") is False
+            and isolation.get("credential_scope") == "WORKER"
+        )
     if isolation.get("mode") == "SUBPROCESS":
         return (
             isolation.get("dedicated_process") is True
@@ -152,7 +161,9 @@ def _worker_isolation_rank(worker: RunnerWorkerRecord) -> int:
     isolation = worker.capabilities.get("execution_isolation")
     if not isinstance(isolation, dict):
         return 0
-    return {"SUBPROCESS": 1, "CONTAINER": 2, "KUBERNETES": 3}.get(str(isolation.get("mode")), 0)
+    return {"IN_PROCESS": 1, "SUBPROCESS": 2, "CONTAINER": 3, "KUBERNETES": 4}.get(
+        str(isolation.get("mode")), 0
+    )
 
 
 async def _prepare_run_dispatch(
@@ -210,17 +221,25 @@ async def _prepare_run_dispatch(
     )
     if not capable_workers:
         raise CapacityWait("RUNNER_CAPABILITY_MISMATCH")
-    isolated_workers = tuple(
-        worker for worker in capable_workers if _worker_supports_execution_isolation(worker)
-    )
-    if not isolated_workers:
-        raise CapacityWait("RUNNER_ISOLATION_UNAVAILABLE")
     automation_package = snapshot.get("automation_package")
     if not isinstance(automation_package, dict):
         raise ValueError("Outbox Run Snapshot has no automation package runtime")
     runner_type = str(automation_package.get("runner_type", ""))
     image_repository = str(automation_package.get("image_repository", ""))
     package_digest = str(automation_package.get("digest", ""))
+    allow_in_process_device_worker = (
+        target_type == "APP" and runner_type == "ANDROID_APPIUM"
+    )
+    isolated_workers = tuple(
+        worker
+        for worker in capable_workers
+        if _worker_supports_execution_isolation(
+            worker,
+            allow_in_process_device_worker=allow_in_process_device_worker,
+        )
+    )
+    if not isolated_workers:
+        raise CapacityWait("RUNNER_ISOLATION_UNAVAILABLE")
     package_workers = tuple(
         worker
         for worker in isolated_workers

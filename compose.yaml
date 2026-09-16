@@ -29,6 +29,29 @@ x-control-plane-environment: &control-plane-environment
   GITHUB_RELEASE_TOKEN: ${GITHUB_RELEASE_TOKEN:-}
   GITHUB_RELEASE_TIMEOUT_SECONDS: ${GITHUB_RELEASE_TIMEOUT_SECONDS:-15}
   GITHUB_RELEASE_MAX_MANIFEST_BYTES: ${GITHUB_RELEASE_MAX_MANIFEST_BYTES:-5000000}
+  AI_ENABLED: ${AI_ENABLED:-false}
+  AI_BASE_URL: ${AI_BASE_URL:-}
+  AI_API_KEY: ${AI_API_KEY:-}
+  AI_MODEL: ${AI_MODEL:-}
+  AI_PROVIDER_ENCRYPTION_KEY: ${AI_PROVIDER_ENCRYPTION_KEY:-}
+  AI_TIMEOUT_SECONDS: ${AI_TIMEOUT_SECONDS:-60}
+  AI_ALLOW_INSECURE_HTTP: ${AI_ALLOW_INSECURE_HTTP:-false}
+  AI_ANALYSIS_MAX_TOKENS: ${AI_ANALYSIS_MAX_TOKENS:-16384}
+  AI_THINKING_BUDGET: ${AI_THINKING_BUDGET:-12288}
+  AI_MAX_EVIDENCE_CHARS: ${AI_MAX_EVIDENCE_CHARS:-24000}
+  AI_MAX_CONCURRENCY: ${AI_MAX_CONCURRENCY:-1}
+  PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-http://localhost:8080}
+  SMTP_HOST: ${SMTP_HOST:-}
+  SMTP_PORT: ${SMTP_PORT:-587}
+  SMTP_USERNAME: ${SMTP_USERNAME:-}
+  SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+  SMTP_FROM_ADDRESS: ${SMTP_FROM_ADDRESS:-}
+  SMTP_FROM_NAME: ${SMTP_FROM_NAME:-TestOps Platform}
+  SMTP_STARTTLS: ${SMTP_STARTTLS:-true}
+  SMTP_USE_SSL: ${SMTP_USE_SSL:-false}
+  SMTP_TIMEOUT_SECONDS: ${SMTP_TIMEOUT_SECONDS:-15}
+  RUN_EMAIL_BATCH_SIZE: ${RUN_EMAIL_BATCH_SIZE:-20}
+  RUN_EMAIL_MAX_ATTEMPTS: ${RUN_EMAIL_MAX_ATTEMPTS:-5}
   SUPPLY_CHAIN_POLICY_VERSION: ${SUPPLY_CHAIN_POLICY_VERSION:-testops-supply-chain-v1}
   SUPPLY_CHAIN_ALLOWED_VERIFIERS: ${SUPPLY_CHAIN_ALLOWED_VERIFIERS:-}
   SUPPLY_CHAIN_ALLOWED_CERTIFICATE_ISSUERS: ${SUPPLY_CHAIN_ALLOWED_CERTIFICATE_ISSUERS:-}
@@ -190,8 +213,11 @@ services:
       test:
         - CMD
         - python
-        - -c
-        - import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/readyz', timeout=3).read()
+        - scripts/check_api_health.py
+        - --base-url
+        - http://127.0.0.1:8000
+        - --timeout-seconds
+        - "3"
       interval: 5s
       timeout: 5s
       retries: 20
@@ -226,6 +252,22 @@ services:
       - --watch
       - --interval-seconds
       - "1"
+    environment: *control-plane-environment
+    depends_on:
+      api:
+        condition: service_healthy
+    init: true
+    restart: unless-stopped
+
+  run-emails:
+    image: testops-api:${TESTOPS_IMAGE_TAG:-0.35.0}
+    build: *api-build
+    command:
+      - python
+      - scripts/dispatch_run_emails.py
+      - --watch
+      - --interval-seconds
+      - ${RUN_EMAIL_POLL_SECONDS:-2}
     environment: *control-plane-environment
     depends_on:
       api:

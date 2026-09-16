@@ -240,12 +240,13 @@ onMounted(load)
 
 <template>
   <div class="page-container change-page" v-loading="loading">
-    <el-button text class="back-link" @click="router.push(`/projects/${projectId}?view=changes`)">
-      <el-icon><ArrowLeft /></el-icon>
-      返回变更列表
-    </el-button>
+    <div class="page-sticky-header">
+      <el-button text class="back-link" @click="router.push(`/projects/${projectId}?view=changes`)">
+        <el-icon><ArrowLeft /></el-icon>
+        返回变更列表
+      </el-button>
 
-    <header class="page-heading change-heading">
+      <header class="page-heading change-heading">
       <div>
         <div class="request-id mono">CR · {{ requestId }}</div>
         <h1>{{ detail?.title || '变更申请' }}</h1>
@@ -257,7 +258,8 @@ onMounted(load)
         </el-tag>
         <el-button :icon="Refresh" @click="load">刷新状态</el-button>
       </div>
-    </header>
+      </header>
+    </div>
 
     <section class="surface workflow-card">
       <el-steps :active="workflowStep" align-center finish-status="success">

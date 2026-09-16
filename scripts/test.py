@@ -12,6 +12,7 @@ for relative in (
     "packages/contracts/src",
     "apps/api/src",
     "runners/legacy_pytest/src",
+    "runners/android_appium/src",
     "runners/web_playwright/src",
     "packages/migrations/src",
     "services/worker/src",

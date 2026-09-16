@@ -42,6 +42,7 @@ MAX_LOG_CHARACTERS = 4 * 1024 * 1024
 LEGACY_RERUN_ROUNDS = 2
 LEGACY_RERUN_WAIT_SECONDS = 30
 LEGACY_ORCHESTRATION_GRACE_SECONDS = 60
+LEGACY_PER_CASE_ORCHESTRATION_GRACE_SECONDS = 30
 ANSI_ESCAPE_PATTERN = re.compile(r"\x1b\[[0-?]*[ -/]*[@-~]")
 PYTEST_RESULT_PATTERN = re.compile(
     r"(?P<case_code>TC-[A-Z0-9-]+).*?\b(?P<status>PASSED|FAILED|SKIPPED|ERROR)\b",
@@ -838,6 +839,7 @@ class LegacyPytestAdapter(AutomationAdapter):
             case_budget * (1 + LEGACY_RERUN_ROUNDS)
             + LEGACY_RERUN_WAIT_SECONDS * LEGACY_RERUN_ROUNDS
             + LEGACY_ORCHESTRATION_GRACE_SECONDS
+            + len(cases) * LEGACY_PER_CASE_ORCHESTRATION_GRACE_SECONDS
         )
         return max(60, min(seconds, 6 * 60 * 60))
 
