@@ -42,7 +42,10 @@ def package_files(source: str | Path) -> tuple[Path, ...]:
             raise AndroidPackageExportError(f"required directory is unavailable: {directory}")
         for path in root.rglob("*"):
             relative = path.relative_to(source_path)
-            if any(part in IGNORED_PARTS for part in relative.parts):
+            if any(
+                part in IGNORED_PARTS or part.endswith(".egg-info")
+                for part in relative.parts
+            ):
                 continue
             if path.is_symlink():
                 raise AndroidPackageExportError(
@@ -58,7 +61,7 @@ def package_source_digest(source: str | Path, *, adapter_root: str | Path | None
     adapter_path = (
         Path(adapter_root).resolve()
         if adapter_root is not None
-        else Path(__file__).resolve().parents[4]
+        else Path(__file__).resolve().parents[3]
     )
     documents: list[tuple[str, Path]] = [
         (f"android/{path.relative_to(source_path).as_posix()}", path)
@@ -78,7 +81,12 @@ def package_source_digest(source: str | Path, *, adapter_root: str | Path | None
     return f"sha256:{digest.hexdigest()}"
 
 
-def export_package(source: str | Path, destination: str | Path) -> str:
+def export_package(
+    source: str | Path,
+    destination: str | Path,
+    *,
+    adapter_root: str | Path | None = None,
+) -> str:
     source_path = Path(source).resolve()
     destination_path = Path(destination).resolve()
     if destination_path == source_path or source_path in destination_path.parents:
@@ -91,4 +99,4 @@ def export_package(source: str | Path, destination: str | Path) -> str:
         output = destination_path / relative
         output.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(path, output)
-    return package_source_digest(source_path)
+    return package_source_digest(destination_path, adapter_root=adapter_root)

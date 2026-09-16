@@ -249,7 +249,7 @@ class AndroidAppiumAdapter(AutomationAdapter):
             raise AndroidAppiumValidationError(
                 "Android package is incomplete: " + ", ".join(missing_paths)
             )
-        self._validate_manifest()
+        self._validate_manifest(package.version)
         actual_digest = package_source_digest(self._project_root)
         if actual_digest.lower() != package.digest.lower():
             raise AndroidAppiumValidationError(
@@ -454,14 +454,14 @@ class AndroidAppiumAdapter(AutomationAdapter):
             "platform": os.name,
         }
 
-    def _validate_manifest(self) -> None:
+    def _validate_manifest(self, package_version: str) -> None:
         try:
             payload = json.loads((self._project_root / "testops-package.json").read_text("utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise AndroidAppiumValidationError("invalid Android package manifest") from exc
         expected = {
             "name": ANDROID_PACKAGE_NAME,
-            "version": ANDROID_RUNNER_VERSION,
+            "version": package_version,
             "runner_type": "ANDROID_APPIUM",
             "target_type": "APP",
             "entrypoint": "scripts/run-excel.ps1",

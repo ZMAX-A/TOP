@@ -5,14 +5,25 @@ param(
     [string]$PoolKey = 'android-local',
     [string]$QueueName = 'testops.pool.android-local',
     [string]$DisplayName = 'YanJia Android Device Worker',
-    [string]$ImageRepository = 'local/yanjia-android-appium'
+    [string]$ImageRepository = 'local/yanjia-android-appium',
+    [string]$AdapterRoot = ''
 )
 
 $ErrorActionPreference = 'Stop'
 $platformRoot = Split-Path -Parent $PSScriptRoot
 $resolvedAppRoot = [System.IO.Path]::GetFullPath($AppProjectRoot)
+$resolvedAdapterRoot = if ($AdapterRoot) {
+    [System.IO.Path]::GetFullPath($AdapterRoot)
+} else {
+    Join-Path $platformRoot 'runners\android_appium\src'
+}
 if (-not (Test-Path -LiteralPath (Join-Path $resolvedAppRoot 'testops-package.json'))) {
     throw "APP 自动化包无效：$resolvedAppRoot"
+}
+if (-not (Test-Path -LiteralPath (
+    Join-Path $resolvedAdapterRoot 'testops\runners\android_appium\package_digest.py'
+))) {
+    throw "Android 适配器无效：$resolvedAdapterRoot"
 }
 if (-not $env:RUNNER_CALLBACK_TOKEN) {
     throw 'RUNNER_CALLBACK_TOKEN 未配置。'
@@ -36,7 +47,8 @@ if (-not (Test-Path -LiteralPath $python)) {
 }
 
 $digest = (& $python (Join-Path $PSScriptRoot 'package_android_appium.py') `
-    --source $resolvedAppRoot | Select-Object -Last 1).Trim()
+    --source $resolvedAppRoot `
+    --adapter-root $resolvedAdapterRoot | Select-Object -Last 1).Trim()
 if ($LASTEXITCODE -ne 0 -or $digest -notmatch '^sha256:[0-9a-f]{64}$') {
     throw 'Android 自动化包摘要计算失败。'
 }
@@ -46,9 +58,9 @@ $pythonPaths = @(
     'apps\api\src',
     'runners\web_playwright\src',
     'runners\legacy_pytest\src',
-    'runners\android_appium\src',
     'services\worker\src'
 ) | ForEach-Object { Join-Path $platformRoot $_ }
+$pythonPaths = @($resolvedAdapterRoot) + $pythonPaths
 $env:PYTHONPATH = $pythonPaths -join [System.IO.Path]::PathSeparator
 $env:TESTOPS_ANDROID_APPIUM_PROJECT_ROOT = $resolvedAppRoot
 $env:RUNNER_WORKER_KEY = $WorkerKey

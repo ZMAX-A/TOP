@@ -24,11 +24,12 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Hash or export YanJia Android automation")
     parser.add_argument("--source", required=True, type=Path)
     parser.add_argument("--export-to", type=Path)
+    parser.add_argument("--adapter-root", type=Path)
     args = parser.parse_args()
     digest = (
-        export_package(args.source, args.export_to)
+        export_package(args.source, args.export_to, adapter_root=args.adapter_root)
         if args.export_to
-        else package_source_digest(args.source)
+        else package_source_digest(args.source, adapter_root=args.adapter_root)
     )
     print(digest)
     return 0

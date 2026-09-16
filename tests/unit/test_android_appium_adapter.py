@@ -56,7 +56,7 @@ class FakeCommandRunner:
         del run_id
 
 
-def _project(root: Path) -> None:
+def _project(root: Path, *, package_version: str = "1.0.7") -> None:
     for directory in ("config", "scripts", "src", "tests", ".venv/Scripts"):
         (root / directory).mkdir(parents=True, exist_ok=True)
     for relative in (
@@ -77,7 +77,7 @@ def _project(root: Path) -> None:
             {
                 "schema_version": "1.0",
                 "name": ANDROID_PACKAGE_NAME,
-                "version": "1.0.0",
+                "version": package_version,
                 "runner_type": "ANDROID_APPIUM",
                 "entrypoint": "scripts/run-excel.ps1",
                 "workbook": "test_case.xlsx",
@@ -118,7 +118,7 @@ def test_android_adapter_executes_exact_case_without_local_dotenv(tmp_path: Path
         ),
         automation_package=AutomationPackageRef(
             name=ANDROID_PACKAGE_NAME,
-            version="1.0.0",
+            version="1.0.7",
             runner_type="ANDROID_APPIUM",
             image_repository="local/yanjia-android-appium",
             digest=package_source_digest(project),

@@ -82,6 +82,10 @@ python scripts/package_android_appium.py `
   -QueueName testops.pool.android-local
 ```
 
+正式发布应从已签名 Release 制品中解压 `android/` 与 `adapter/`，并把后者通过
+`-AdapterRoot` 传给启动器。Worker 会对这两部分重新计算同一个包摘要，避免使用工作区
+换行符或未签名的本地适配器。`android/.venv` 可以在解压后单独配置；该目录不进入包摘要。
+
 启动器会：
 
 - 重新计算白名单包摘要并注册精确摘要能力；
