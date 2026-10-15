@@ -30,7 +30,7 @@ platform = [
   "redis>=5.2,<7",
 ]
 kubernetes-executor = [
-  "kubernetes>=33,<35",
+  "kubernetes>=33,<38",
 ]
 dev = [
   "aiosqlite>=0.21,<1",
